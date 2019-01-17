@@ -5,13 +5,13 @@ import cornerstoneMath from 'cornerstone-math';
 import cornerstoneTools from 'cornerstone-tools';
 import Hammer from 'hammerjs';
 import OHIF from 'ohif-core';
-import sha from './sha.js';
-import version from './version.js';
+//import sha from './sha.js';
+//import version from './version.js';
 import { homepage } from '../package.json';
 
 window.info = {
-    sha,
-    version,
+    //sha,
+  //version,
     homepage
 };
 

@@ -4,29 +4,20 @@ import { withRouter } from 'react-router';
 import { Route, Switch } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { ViewerbaseDragDropContext } from 'react-viewerbase';
-import routes from './routes/';
-import StudyListRouting from './studylist/StudyListRouting.js';
-//import CallbackPage from './CallbackPage.js';'
-import userManager from "./userManager.js";
-import './App.css';
+import ViewerRouting from "./routes/ViewerRouting.js";
+import StandaloneRouting from './routes/StandaloneRouting.js';
+import IHEInvokeImageDisplay from './routes/IHEInvokeImageDisplay.js';
+//import CallbackPage from './CallbackPage.js';
+//import userManager from "./userManager.js";
+import './OHIFStandaloneViewer.css';
 import './variables.css';
 import './theme-tide.css';
 
-const { ViewerRouting, StandaloneRouting, IHEInvokeImageDisplay } = routes;
-
 const reload = () => window.location.reload();
 
-function setContext(context) {
-    /*Rollbar.configure({
-        payload: {
-            context
-        }
-    });*/
-}
-
-function LoadingUser() {
+/*function LoadingUser() {
     return (<div>Loading user...</div>);
-}
+}*/
 
 class App extends Component {
     static propTypes = {
@@ -36,7 +27,9 @@ class App extends Component {
 
     componentDidMount() {
         this.unlisten = this.props.history.listen((location, action) => {
-            setContext(window.location.pathname);
+            if (this.props.setContext) {
+                this.props.setContext(window.location.pathname);
+            }
         });
     }
 
@@ -61,14 +54,9 @@ class App extends Component {
         return (
             <Switch>
                 <Route
-                    exact
-                    path="/studylist"
-                    component={StudyListRouting}
-                />
-                <Route
-                    exact
-                    path="/"
-                    component={StudyListRouting}
+                  exact
+                  path="/"
+                  component={StandaloneRouting}
                 />
                 <Route
                     exact
@@ -90,11 +78,11 @@ class App extends Component {
 
                 <Route path="/silent-refresh.html" onEnter={reload} />
                 <Route path="/logout-redirect.html" onEnter={reload} />
-                <Route exact path='/login' component={() => {
-                        userManager.signinRedirect();
+                {/*<Route exact path='/login' component={() => {
+                    userManager.signinRedirect();
                 }}
-                />
-              {/*<Route path="/callback" component={CallbackPage} />*/}
+                />*/
+                /*<Route path="/callback" component={CallbackPage} />*/}
                 <Route render={() =>
                     <div> Sorry, this page does not exist. </div>}
                 />
@@ -104,9 +92,10 @@ class App extends Component {
 }
 
 const mapStateToProps = state => {
-    return {
+  return {};
+    /*return {
         user: state.oidc.user,
-    };
+    };*/
 };
 
 const ConnectedApp = connect(
