@@ -1,26 +1,23 @@
-import React, { Component } from 'react';
-import { withRouter } from 'react-router-dom';
+import React, { Component } from "react";
+import { CallbackComponent } from "redux-oidc";
+import { withRouter } from "react-router-dom";
 import PropTypes from 'prop-types';
-import { CallbackComponent } from 'redux-oidc';
 
 class CallbackPage extends Component {
   static propTypes = {
     userManager: PropTypes.object.isRequired,
     history: PropTypes.object.isRequired
-  };
+  }
 
   render() {
     return (
       <CallbackComponent
         userManager={this.props.userManager}
         successCallback={() => {
-          const pathname = sessionStorage.getItem('ohif-redirect-to');
-          debugger;
-
-          this.props.history.push(pathname);
+          this.props.history.push("/");
         }}
         errorCallback={error => {
-          this.props.history.push('/');
+          //this.props.history.push("/");
           throw new Error(error);
         }}
       >
