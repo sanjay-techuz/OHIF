@@ -1,7 +1,7 @@
+import { annotation } from '@cornerstonejs/tools';
 import log from '../../log';
 import guid from '../../utils/guid';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
-
 /**
  * Measurement source schema
  *
@@ -566,7 +566,9 @@ class MeasurementService extends PubSubService {
           notYetUpdatedAtSource: false,
         });
       } else {
-        log.info('Measurement added.', newMeasurement);
+        log.info(':::::ANNOTATION RESPONSE::::', annotation.state.getAnnotation(internalUID));
+
+        log.info('Measurement added.', newMeasurement, source);
         this._broadcastEvent(this.EVENTS.MEASUREMENT_ADDED, {
           source,
           measurement: newMeasurement,
