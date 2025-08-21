@@ -131,7 +131,7 @@ const RMLOSeriesMatchingRules = [
     constraint: {
       doesNotContain: ['P', 'FL'],
     },
-    required: true,
+    required: false,
   },
   {
     weight: 5,
@@ -155,19 +155,25 @@ const RMLOSeriesMatchingRules = [
     },
   },
   {
+    weight: 20,
     attribute: 'SeriesDescription',
-    required: true,
+    constraint: {
+      contains: 'R XCCL',
+    },
+  },
+  {
+    attribute: 'SeriesDescription',
+    required: false,
     constraint: {
       doesNotContain: 'CC',
     },
   },
   {
     attribute: 'SeriesDescription',
-    required: true,
+    required: false,
     constraint: {
       doesNotEqual: 'L MLO',
     },
-    required: true,
   },
 ];
 
@@ -211,4 +217,4 @@ const LMLOPrior = {
   studyMatchingRules: priorStudyMatchingRules,
 };
 
-export { RCC, LCC, RMLO, LMLO, RCCPrior, LCCPrior, RMLOPrior, LMLOPrior };
+export { LCC, LCCPrior, LMLO, LMLOPrior, RCC, RCCPrior, RMLO, RMLOPrior };

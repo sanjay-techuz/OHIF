@@ -198,8 +198,6 @@ function computeOverlap(maskA: boolean[][], maskB: boolean[][]): number {
 export function calculateROIOverlap(annoA: Annotation, annoB: Annotation): number {
   const shapeA = get2DPolygonPoints(annoA);
   const shapeB = get2DPolygonPoints(annoB);
-  console.log('shapeA===>', shapeA);
-  console.log('shapeB===>', shapeB);
 
   if (shapeA.length === 0 || shapeB.length === 0) {
     return 0;

@@ -1,28 +1,28 @@
-import { Types, DicomMetadataStore } from '@ohif/core';
+import { DicomMetadataStore, Types } from '@ohif/core';
 
 import { ContextMenuController } from './CustomizableContextMenu';
 import DicomTagBrowser from './DicomTagBrowser/DicomTagBrowser';
-import reuseCachedLayouts from './utils/reuseCachedLayouts';
-import {
-  configureViewportForLayerAddition,
-  configureViewportForLayerRemoval,
-  canAddDisplaySetToViewport,
-  DERIVED_OVERLAY_MODALITIES,
-} from './utils/layerConfigurationUtils';
 import findViewportsByPosition, {
   findOrCreateViewport as layoutFindOrCreate,
 } from './findViewportsByPosition';
+import {
+  canAddDisplaySetToViewport,
+  configureViewportForLayerAddition,
+  configureViewportForLayerRemoval,
+  DERIVED_OVERLAY_MODALITIES,
+} from './utils/layerConfigurationUtils';
+import reuseCachedLayouts from './utils/reuseCachedLayouts';
 
-import { ContextMenuProps } from './CustomizableContextMenu/types';
-import { NavigateHistory } from './types/commandModuleTypes';
 import { history } from '@ohif/app';
-import { useViewportGridStore } from './stores/useViewportGridStore';
+import { ContextMenuProps } from './CustomizableContextMenu/types';
+import requestDisplaySetCreationForStudy from './Panels/requestDisplaySetCreationForStudy';
 import { useDisplaySetSelectorStore } from './stores/useDisplaySetSelectorStore';
 import { useHangingProtocolStageIndexStore } from './stores/useHangingProtocolStageIndexStore';
 import { useToggleHangingProtocolStore } from './stores/useToggleHangingProtocolStore';
-import { useViewportsByPositionStore } from './stores/useViewportsByPositionStore';
 import { useToggleOneUpViewportGridStore } from './stores/useToggleOneUpViewportGridStore';
-import requestDisplaySetCreationForStudy from './Panels/requestDisplaySetCreationForStudy';
+import { useViewportGridStore } from './stores/useViewportGridStore';
+import { useViewportsByPositionStore } from './stores/useViewportsByPositionStore';
+import { NavigateHistory } from './types/commandModuleTypes';
 import promptSaveReport from './utils/promptSaveReport';
 
 export type HangingProtocolParams = {

@@ -6,15 +6,21 @@ import ToolbarLayoutSelectorWithServices from './Toolbar/ToolbarLayoutSelector';
 import { ProgressDropdownWithService } from './Components/ProgressDropdownWithService';
 
 // new
-import ToolButtonListWrapper from './Toolbar/ToolButtonListWrapper';
-import ToolRowWrapper from './Toolbar/ToolRowWrapper';
+import HangingProtocolDropdown from './Toolbar/HangingProtocolDropdown';
 import { ToolBoxButtonGroupWrapper, ToolBoxButtonWrapper } from './Toolbar/ToolBoxWrapper';
+import ToolButtonListWrapper from './Toolbar/ToolButtonListWrapper';
 import { ToolButtonWrapper } from './Toolbar/ToolButtonWrapper';
+import ToolRowWrapper from './Toolbar/ToolRowWrapper';
 
 export default function getToolbarModule({ commandsManager, servicesManager }: withAppTypes) {
   const { cineService } = servicesManager.services;
   return [
     // new
+    {
+      name: 'ohif.hangingProtocolDropdown',
+      defaultComponent: props =>
+        HangingProtocolDropdown({ ...props, commandsManager, servicesManager }),
+    },
     {
       name: 'ohif.toolButton',
       defaultComponent: ToolButtonWrapper,

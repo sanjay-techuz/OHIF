@@ -91,6 +91,8 @@ function modeFactory({ modeConfiguration }) {
       initToolGroups(extensionManager, toolGroupService, commandsManager);
 
       toolbarService.register(toolbarButtons);
+
+      // remove toolbar buttons from below, just remove from array and it will hide.
       toolbarService.updateSection(toolbarService.sections.primary, [
         'MeasurementTools',
         'Zoom',
@@ -101,6 +103,7 @@ function modeFactory({ modeConfiguration }) {
         'Layout',
         'Crosshairs',
         'MoreTools',
+        'HangingProtocol',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
@@ -139,6 +142,7 @@ function modeFactory({ modeConfiguration }) {
         'CircleROI',
         'PlanarFreehandROI',
         'SplineROI',
+        // 'SplineROI',
         'LivewireContour',
       ]);
 
@@ -244,6 +248,10 @@ function modeFactory({ modeConfiguration }) {
           return {
             id: ohif.layout,
             props: {
+              // You can handle left and right panel context from here
+              // leftPanels: [],
+              // leftPanelResizable: false,
+              // rightPanels: [tracked.measurements],
               leftPanels: [tracked.thumbnailList],
               leftPanelResizable: true,
               rightPanels: [cornerstone.segmentation, tracked.measurements],

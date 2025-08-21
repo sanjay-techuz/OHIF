@@ -22,6 +22,13 @@ export const setToolActiveToolbar = {
 const toolbarButtons: Button[] = [
   // sections
   {
+    id: 'HangingProtocol',
+    uiType: 'ohif.hangingProtocolDropdown', // Use the new uiType
+    props: {
+      id: 'hanging-protocol-dropdown',
+    },
+  },
+  {
     id: 'MeasurementTools',
     uiType: 'ohif.toolButtonList',
     props: {

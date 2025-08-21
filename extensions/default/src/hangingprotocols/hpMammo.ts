@@ -1,12 +1,12 @@
 import {
-  RCC,
-  RMLO,
   LCC,
-  LMLO,
-  RCCPrior,
   LCCPrior,
-  RMLOPrior,
+  LMLO,
   LMLOPrior,
+  RCC,
+  RCCPrior,
+  RMLO,
+  RMLOPrior,
 } from './utils/mammoDisplaySetSelector';
 
 const rightDisplayArea = {
@@ -34,7 +34,7 @@ const hpMammography = {
   protocolMatchingRules: [
     {
       id: 'Mammography',
-      weight: 150,
+      weight: 10,
       attribute: 'ModalitiesInStudy',
       constraint: {
         contains: 'MG',
@@ -45,7 +45,7 @@ const hpMammography = {
       id: 'numberOfImages',
       attribute: 'numberOfDisplaySetsWithImages',
       constraint: {
-        greaterThan: 2,
+        greaterThan: 0,
       },
       required: true,
     },
@@ -191,6 +191,88 @@ const hpMammography = {
             },
           ],
         },
+      ],
+    },
+    // New: All (2x2 grid)
+    {
+      name: 'All',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 2,
+          columns: 2,
+        },
+      },
+      viewports: [
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
+      ],
+    },
+    // New: Right-Left CC (1x2)
+    {
+      name: 'Right-Left CC',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
+      ],
+    },
+    // New: Right-Left MLO (1x2)
+    {
+      name: 'Right-Left MLO',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
+      ],
+    },
+    // New: Right CC-Right MLO (1x2)
+    {
+      name: 'Right CC-Right MLO',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
+      ],
+    },
+    // New: Left CC-Left MLO (1x2)
+    {
+      name: 'Left CC-Left MLO',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
+        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
       ],
     },
   ],

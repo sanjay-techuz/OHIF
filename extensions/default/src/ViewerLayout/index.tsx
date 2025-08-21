@@ -1,13 +1,23 @@
-import React, { useEffect, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import React, { useCallback, useEffect, useState } from 'react';
 
-import { InvestigationalUseDialog } from '@ohif/ui-next';
-import { HangingProtocolService, CommandsManager } from '@ohif/core';
+import { CommandsManager, HangingProtocolService } from '@ohif/core';
+import {
+  Button,
+  IconPresentationProvider,
+  Icons,
+  InvestigationalUseDialog,
+  Onboarding,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+  ToolButton,
+} from '@ohif/ui-next';
 import { useAppConfig } from '@state';
-import ViewerHeader from './ViewerHeader';
 import SidePanelWithServices from '../Components/SidePanelWithServices';
-import { Onboarding, ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@ohif/ui-next';
+import { Toolbar } from '../Toolbar';
 import useResizablePanels from './ResizablePanelsHook';
+import ViewerHeader from './ViewerHeader';
 
 const resizableHandleClassName = 'mt-[1px] bg-black';
 
@@ -151,7 +161,7 @@ function ViewerLayout({
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
-        style={{ height: 'calc(100vh - 52px' }}
+        style={{ height: 'calc(100vh - 110px' }}
       >
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
@@ -209,6 +219,63 @@ function ViewerLayout({
           </ResizablePanelGroup>
         </React.Fragment>
       </div>
+      <IconPresentationProvider
+        size="large"
+        IconContainer={ToolButton}
+      >
+        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 transform">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="bg-bkg-full relative flex items-center justify-center gap-3 rounded-lg px-4 py-2 shadow-lg">
+              <Toolbar buttonSection="primary" />
+            </div>
+          </div>
+        </div>
+
+        <div className="fixed right-10 bottom-1 flex select-none items-center">
+          <div className="flex items-center justify-center space-x-2">
+            <div className="bg-bkg-full relative flex items-center justify-center gap-3 rounded-lg px-4 py-2 shadow-lg">
+              <Button
+                variant="ghost"
+                className="hover:bg-primary-dark"
+                onClick={() => {
+                  commandsManager.run('undo');
+                }}
+              >
+                <Icons.Undo className="" />
+              </Button>
+              <Button
+                variant="ghost"
+                className="hover:bg-primary-dark"
+                onClick={() => {
+                  commandsManager.run('redo');
+                }}
+              >
+                <Icons.Redo className="" />
+              </Button>
+            </div>
+          </div>
+          {/* <div className="text-primary flex cursor-pointer items-center">
+            <Button
+              variant="ghost"
+              className="hover:bg-primary-dark"
+              onClick={() => {
+                commandsManager.run('undo');
+              }}
+            >
+              <Icons.Undo className="" />
+            </Button>
+            <Button
+              variant="ghost"
+              className="hover:bg-primary-dark"
+              onClick={() => {
+                commandsManager.run('redo');
+              }}
+            >
+              <Icons.Redo className="" />
+            </Button>
+          </div> */}
+        </div>
+      </IconPresentationProvider>
       <Onboarding tours={customizationService.getCustomization('ohif.tours')} />
       <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} />
     </div>

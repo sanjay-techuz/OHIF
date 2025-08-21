@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useParams, useLocation } from 'react-router';
-import PropTypes from 'prop-types';
-import { utils } from '@ohif/core';
-import { ImageViewerProvider, DragAndDropProvider } from '@ohif/ui-next';
-import { useSearchParams } from '../../hooks';
-import { useAppConfig } from '@state';
 import ViewportGrid from '@components/ViewportGrid';
-import Compose from './Compose';
+import { utils } from '@ohif/core';
+import { DragAndDropProvider, ImageViewerProvider } from '@ohif/ui-next';
+import { useAppConfig } from '@state';
+import PropTypes from 'prop-types';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useParams } from 'react-router';
+import { useSearchParams } from '../../hooks';
 import loadModules from '../../pluginImports';
+import Compose from './Compose';
 import { defaultRouteInit } from './defaultRouteInit';
 import { updateAuthServiceAndCleanUrl } from './updateAuthServiceAndCleanUrl';
 
@@ -265,6 +265,7 @@ export default function ModeRoute({
       return defaultRouteInit(
         {
           servicesManager,
+          commandsManager,
           studyInstanceUIDs,
           dataSource,
           filters,

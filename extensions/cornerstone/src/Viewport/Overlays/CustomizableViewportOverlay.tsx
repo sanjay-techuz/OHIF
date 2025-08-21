@@ -1,16 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Enums, metaData, utilities } from '@cornerstonejs/core';
+import type { ImageSliceData } from '@cornerstonejs/core/types';
+import { utils } from '@ohif/core';
+import type { InstanceMetadata } from '@ohif/core/src/types';
+import { ViewportOverlay } from '@ohif/ui-next';
 import { vec3 } from 'gl-matrix';
 import PropTypes from 'prop-types';
-import { metaData, Enums, utilities } from '@cornerstonejs/core';
-import type { ImageSliceData } from '@cornerstonejs/core/types';
-import { ViewportOverlay } from '@ohif/ui-next';
-import type { InstanceMetadata } from '@ohif/core/src/types';
-import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
-import { utils } from '@ohif/core';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StackViewportData, VolumeViewportData } from '../../types/CornerstoneCacheService';
+import AnnotationTooltipsOverlay from './AnnotationTooltipsOverlay';
+import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
 
-import './CustomizableViewportOverlay.css';
 import { useViewportRendering } from '../../hooks';
+import './CustomizableViewportOverlay.css';
 
 const EPSILON = 1e-4;
 const { formatPN } = utils;
@@ -240,14 +241,21 @@ function CustomizableViewportOverlay({
   );
 
   return (
-    <ViewportOverlay
-      topLeft={getContent(topLeftCustomization, 'topLeftOverlayItem')}
-      topRight={getContent(topRightCustomization, 'topRightOverlayItem')}
-      bottomLeft={getContent(bottomLeftCustomization, 'bottomLeftOverlayItem')}
-      bottomRight={getContent(bottomRightCustomization, 'bottomRightOverlayItem')}
-      color={isLight ? 'text-neutral-dark' : 'text-neutral-light'}
-      shadowClass={isLight ? 'shadow-light' : 'shadow-dark'}
-    />
+    <>
+      <ViewportOverlay
+        topLeft={getContent(topLeftCustomization, 'topLeftOverlayItem')}
+        topRight={getContent(topRightCustomization, 'topRightOverlayItem')}
+        bottomLeft={getContent(bottomLeftCustomization, 'bottomLeftOverlayItem')}
+        bottomRight={getContent(bottomRightCustomization, 'bottomRightOverlayItem')}
+        color={isLight ? 'text-neutral-dark' : 'text-neutral-light'}
+        shadowClass={isLight ? 'shadow-light' : 'shadow-dark'}
+      />
+      {/* Always-visible annotation label tooltips */}
+      <AnnotationTooltipsOverlay
+        element={element}
+        viewportId={viewportId}
+      />
+    </>
   );
 }
 

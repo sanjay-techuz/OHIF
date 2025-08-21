@@ -1,6 +1,6 @@
-import getStudies from './studiesList';
-import { DicomMetadataStore, log, utils, Enums } from '@ohif/core';
+import { DicomMetadataStore, Enums, log, utils } from '@ohif/core';
 import isSeriesFilterUsed from '../../utils/isSeriesFilterUsed';
+import getStudies from './studiesList';
 
 const { getSplitParam } = utils;
 
@@ -14,7 +14,14 @@ const { getSplitParam } = utils;
  * @returns array of subscriptions to cancel
  */
 export async function defaultRouteInit(
-  { servicesManager, studyInstanceUIDs, dataSource, filters, appConfig }: withAppTypes,
+  {
+    servicesManager,
+    commandsManager,
+    studyInstanceUIDs,
+    dataSource,
+    filters,
+    appConfig,
+  }: withAppTypes,
   hangingProtocolId,
   stageIndex
 ) {
@@ -31,6 +38,64 @@ export async function defaultRouteInit(
     if (!displaySets || !displaySets.length) {
       return;
     }
+
+    // Dynamically set the viewport grid layout based on the number of image display sets (cases)
+    // Filter out overlays, unsupported, and display sets without a description/label
+    const imageDisplaySets = displaySets.filter(ds => {
+      // Exclude overlays (SEG, RTSTRUCT, etc.), unsupported, and empty/unknown
+      if (ds.isOverlayDisplaySet || ds.unsupported) {
+        return false;
+      }
+      // Exclude display sets without a description or label
+      if (!ds.SeriesDescription && !ds.label) {
+        return false;
+      }
+      // Optionally, filter by Modality if needed (e.g., exclude SR, PR, etc.)
+      if (['SR', 'PR', 'SEG', 'RTSTRUCT', 'SM'].includes(ds.Modality)) {
+        return false;
+      }
+      return true;
+    });
+    const numCases = imageDisplaySets.length;
+
+    // Calculate grid layout (rows x cols)
+    let numRows = 1,
+      numCols = 1;
+    if (numCases === 1) {
+      numRows = 1;
+      numCols = 1;
+    } else if (numCases === 2) {
+      numRows = 1;
+      numCols = 2;
+    } else if (numCases === 3) {
+      numRows = 1;
+      numCols = 3;
+    } else if (numCases === 4) {
+      numRows = 2;
+      numCols = 2;
+    } else if (numCases <= 6) {
+      numRows = 2;
+      numCols = 3;
+    } else if (numCases <= 9) {
+      numRows = 3;
+      numCols = 3;
+    } else {
+      // For more than 9, use a single row with N columns (may want to improve this for large N)
+      numRows = 1;
+      numCols = 1;
+    }
+
+    setTimeout(
+      () =>
+        commandsManager?.run({
+          commandName: 'setViewportGridLayout',
+          commandOptions: {
+            numRows: numRows,
+            numCols: numCols,
+          },
+        }),
+      100
+    );
 
     // Gets the studies list to use
     const studies = getStudies(studyInstanceUIDs, displaySets);
