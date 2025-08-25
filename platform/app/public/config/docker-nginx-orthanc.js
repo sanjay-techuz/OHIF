@@ -53,22 +53,26 @@ window.config = {
   httpErrorHandler: error => {
     console.warn(`HTTP Error Handler (status: ${error.status})`, error);
   },
-  // whiteLabeling: {
-  //   /* Optional: Should return a React component to be rendered in the "Logo" section of the application's Top Navigation bar */
-  //   createLogoComponentFn: function (React) {
-  //     return React.createElement(
-  //       'a',
-  //       {
-  //         target: '_self',
-  //         rel: 'noopener noreferrer',
-  //         className: 'text-purple-600 line-through',
-  //         href: '/',
-  //       },
-  //       React.createElement('img', {
-  //         src: './assets/mstile-310x310.png',
-  //         className: 'w-8 h-8',
-  //       })
-  //     );
-  //   },
-  // },
+  whiteLabeling: {
+    createLogoComponentFn: function (React) {
+      return React.createElement(
+        'a',
+        {
+          target: '_self',
+          rel: 'noopener noreferrer',
+          className: 'text-purple-600 line-through',
+          href: '/',
+        },
+        React.createElement('img', {
+          src: './biedx.png',
+          className: 'w-10 h-10',
+        })
+        // React.createElement(
+        //   'p',
+        //   { className: '' }, // props
+        //   'Biedx'
+        // )
+      );
+    },
+  },
 };
