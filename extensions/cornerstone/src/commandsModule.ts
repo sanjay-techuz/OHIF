@@ -1,44 +1,44 @@
+import { ONNXSegmentationController } from '@cornerstonejs/ai';
 import {
-  getEnabledElement,
-  StackViewport,
-  VolumeViewport,
-  utilities as csUtils,
+  BaseVolumeViewport,
   Enums as CoreEnums,
   Types as CoreTypes,
-  BaseVolumeViewport,
+  utilities as csUtils,
+  getEnabledElement,
   getRenderingEngines,
+  StackViewport,
+  VolumeViewport,
 } from '@cornerstonejs/core';
+import * as labelmapInterpolation from '@cornerstonejs/labelmap-interpolation';
+import * as cornerstoneTools from '@cornerstonejs/tools';
 import {
-  ToolGroupManager,
-  Enums,
-  utilities as cstUtils,
   annotation,
+  utilities as cstUtils,
+  Enums,
+  ToolGroupManager,
   Types as ToolTypes,
 } from '@cornerstonejs/tools';
-import * as cornerstoneTools from '@cornerstonejs/tools';
-import * as labelmapInterpolation from '@cornerstonejs/labelmap-interpolation';
-import { ONNXSegmentationController } from '@cornerstonejs/ai';
 
-import { Types as OhifTypes, utils } from '@ohif/core';
-import i18n from '@ohif/i18n';
+import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
+import { apiService, getCustomParams, Types as OhifTypes, utils } from '@ohif/core';
 import {
-  callInputDialogAutoComplete,
-  createReportAsync,
-  colorPickerDialog,
   callInputDialog,
+  callInputDialogAutoComplete,
+  colorPickerDialog,
+  createReportAsync,
 } from '@ohif/extension-default';
-import { vec3, mat4 } from 'gl-matrix';
+import i18n from '@ohif/i18n';
+import { mat4, vec3 } from 'gl-matrix';
+import { toolNames } from './initCornerstoneTools';
+import { usePositionPresentationStore, useSegmentationPresentationStore } from './stores';
+import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
+import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
+import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
-import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
 import toggleVOISliceSync from './utils/toggleVOISliceSync';
-import { usePositionPresentationStore, useSegmentationPresentationStore } from './stores';
-import { toolNames } from './initCornerstoneTools';
-import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
 import { updateSegmentBidirectionalStats } from './utils/updateSegmentationStats';
-import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
-import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
-import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
 const toggleSyncFunctions = {
@@ -550,10 +550,20 @@ function commandsModule({
       }
     },
 
-    removeMeasurement: ({ uid }) => {
+    removeMeasurement: async ({ uid }) => {
       if (Array.isArray(uid)) {
         measurementService.removeMany(uid);
       } else {
+        // To remove the measurement from the server
+        const { userType, isPreview } = getCustomParams();
+        if (isPreview) {
+          return;
+        }
+        if (userType === 'student') {
+          await apiService.delete(`/student/annotation-measurements/${uid}`);
+        } else {
+          await apiService.delete(`/faculty/annotation-measurements/${uid}`);
+        }
         measurementService.remove(uid);
       }
     },
@@ -1917,6 +1927,28 @@ function commandsModule({
         deleting,
       });
     },
+    // Show the question modal for Circle ROI - pass measurementUid
+    showCircleROIQuestionModal: async ({ uid }) => {
+      const measurement = measurementService.getMeasurement(uid);
+      if (measurement && measurement.toolName === 'CircleROI') {
+        // Show the question modal for Circle ROI in diagnostic mode - pass measurementUid
+        measurementService._broadcastEvent(measurementService.EVENTS.SHOW_MEASUREMENT_MODAL, {
+          measurementUid: uid,
+          measurement: measurement,
+        });
+      }
+    },
+    // Show the recall modal for Circle ROI in screening mode - pass measurementUid
+    showRecallModal: async ({ uid }) => {
+      const measurement = measurementService.getMeasurement(uid);
+      if (measurement && measurement.toolName === 'CircleROI') {
+        // Show the recall modal for Circle ROI in screening mode
+        measurementService._broadcastEvent(measurementService.EVENTS.SHOW_RECALL_MODAL, {
+          measurementUid: uid,
+          measurement: measurement,
+        });
+      }
+    },
   };
 
   const definitions = {
@@ -2201,6 +2233,8 @@ function commandsModule({
     hydrateSecondaryDisplaySet: actions.hydrateSecondaryDisplaySet,
     getVolumeIdForDisplaySet: actions.getVolumeIdForDisplaySet,
     triggerCreateAnnotationMemo: actions.triggerCreateAnnotationMemo,
+    showCircleROIQuestionModal: actions.showCircleROIQuestionModal,
+    showRecallModal: actions.showRecallModal,
   };
 
   return {

@@ -1,15 +1,15 @@
-import React, { ReactNode } from 'react';
+import { IconPresentationProvider } from '@ohif/ui-next';
 import classNames from 'classnames';
+import React, { ReactNode } from 'react';
 import {
+  Button,
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuTrigger,
   Icons,
-  Button,
   ToolButton,
 } from '../';
-import { IconPresentationProvider } from '@ohif/ui-next';
 
 import NavBar from '../NavBar';
 
@@ -31,6 +31,7 @@ interface HeaderProps {
   PatientInfo?: ReactNode;
   Secondary?: ReactNode;
   UndoRedo?: ReactNode;
+  SubmitButton?: ReactNode;
 }
 
 function Header({
@@ -43,6 +44,7 @@ function Header({
   PatientInfo,
   UndoRedo,
   Secondary,
+  SubmitButton,
   ...props
 }: HeaderProps): ReactNode {
   const onClickReturn = () => {
@@ -82,6 +84,8 @@ function Header({
           </div>
           <div className="absolute right-0 top-1/2 flex -translate-y-1/2 select-none items-center">
             {UndoRedo}
+            <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>
+            {SubmitButton}
             <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>
             {PatientInfo}
             <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>

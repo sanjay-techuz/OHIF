@@ -15,7 +15,8 @@ export const measurementTrackingMode = {
 };
 
 function promptBeginTracking({ servicesManager, extensionManager }, ctx, evt) {
-  const { uiViewportDialogService, customizationService } = servicesManager.services;
+  const { uiViewportDialogService, customizationService, measurementService } =
+    servicesManager.services;
   const appConfig = extensionManager._appConfig;
   // When the state change happens after a promise, the state machine sends the retult in evt.data;
   // In case of direct transition to the state, the state machine sends the data in evt;
@@ -31,6 +32,17 @@ function promptBeginTracking({ servicesManager, extensionManager }, ctx, evt) {
       : standardMode
         ? await _askTrackMeasurements(uiViewportDialogService, customizationService, viewportId)
         : RESPONSE.SET_STUDY_AND_SERIES;
+    // TODO: Remove this after proper implementation of the measurement modal
+    // if (promptResult === RESPONSE.SET_STUDY_AND_SERIES) {
+    //   const measurements = measurementService.getMeasurements();
+    //   const latestMeasurement = measurements[measurements.length - 1]; // or filter by StudyInstanceUID etc.
+    //   console.log('Latest Measurement to track:', latestMeasurement);
+
+    //   measurementService._sendEvent(measurementService.EVENTS.SHOW_MEASUREMENT_MODAL, {
+    //     source: latestMeasurement.source || {},
+    //     measurement: latestMeasurement,
+    //   });
+    // }
 
     resolve({
       userResponse: promptResult,

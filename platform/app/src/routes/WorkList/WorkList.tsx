@@ -1,39 +1,40 @@
-import React, { useState, useEffect, useMemo } from 'react';
 import classnames from 'classnames';
-import PropTypes from 'prop-types';
-import { Link, useNavigate } from 'react-router-dom';
-import moment from 'moment';
-import qs from 'query-string';
 import isEqual from 'lodash.isequal';
+import moment from 'moment';
+import PropTypes from 'prop-types';
+import qs from 'query-string';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 //
-import filtersMeta from './filtersMeta.js';
+import { Types as coreTypes, utils } from '@ohif/core';
 import { useAppConfig } from '@state';
 import { useDebounce, useSearchParams } from '../../hooks';
-import { utils, Types as coreTypes } from '@ohif/core';
+import filtersMeta from './filtersMeta.js';
 
 import {
-  StudyListExpandedRow,
-  EmptyStudies,
-  StudyListTable,
-  StudyListPagination,
-  StudyListFilter,
   Button,
   ButtonEnums,
+  EmptyStudies,
+  StudyListExpandedRow,
+  StudyListFilter,
+  StudyListPagination,
+  StudyListTable,
 } from '@ohif/ui';
 
 import {
+  Clipboard,
   Header,
   Icons,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  Clipboard,
-  useModal,
-  useSessionStorage,
+  InvestigationalUseDialog,
   Onboarding,
   ScrollArea,
-  InvestigationalUseDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  useModal,
+  useSessionStorage,
+  ViewTypeSelectionModal,
 } from '@ohif/ui-next';
 
 import { Types } from '@ohif/ui';
@@ -62,6 +63,11 @@ function WorkList({
 }: withAppTypes) {
   const { show, hide } = useModal();
   const { t } = useTranslation();
+
+  // ViewType Selection Modal State
+  const [showViewTypeModal, setShowViewTypeModal] = useState(false);
+  const [selectedMode, setSelectedMode] = useState(null);
+  const [selectedStudyInstanceUid, setSelectedStudyInstanceUid] = useState(null);
   // ~ Modes
   const [appConfig] = useAppConfig();
   // ~ Filters
@@ -164,6 +170,33 @@ function WorkList({
       pageNumber: 1,
       resultsPerPage: Number(newResultsPerPage),
     });
+  };
+
+  // ViewType Selection Modal Handlers
+  const handleModeClick = (mode, studyInstanceUid, event) => {
+    event.preventDefault();
+    setSelectedMode(mode);
+    setSelectedStudyInstanceUid(studyInstanceUid);
+    setShowViewTypeModal(true);
+  };
+
+  const handleViewTypeSelection = viewType => {
+    const query = new URLSearchParams();
+    if (filterValues.configUrl) {
+      query.append('configUrl', filterValues.configUrl);
+    }
+    query.append('StudyInstanceUIDs', selectedStudyInstanceUid);
+    query.append('viewType', viewType);
+    preserveQueryParameters(query);
+
+    navigate(`/${selectedMode.routeName}${dataPath || ''}?${query.toString()}`);
+    setShowViewTypeModal(false);
+  };
+
+  const handleCloseViewTypeModal = () => {
+    setShowViewTypeModal(false);
+    setSelectedMode(null);
+    setSelectedStudyInstanceUid(null);
   };
 
   // Set body style
@@ -421,6 +454,9 @@ function WorkList({
                       // For example, the event bubbles up when the icon embedded in the disabled button is clicked.
                       if (!isValidMode) {
                         event.preventDefault();
+                      } else {
+                        // Show viewType selection modal for valid modes
+                        handleModeClick(mode, studyInstanceUid, event);
                       }
                     }}
                     // to={`${mode.routeName}/dicomweb?StudyInstanceUIDs=${studyInstanceUid}`}
@@ -598,6 +634,13 @@ function WorkList({
           )}
         </ScrollArea>
       </div>
+
+      {/* ViewType Selection Modal */}
+      <ViewTypeSelectionModal
+        open={showViewTypeModal}
+        onClose={handleCloseViewTypeModal}
+        onSelectViewType={handleViewTypeSelection}
+      />
     </div>
   );
 }
