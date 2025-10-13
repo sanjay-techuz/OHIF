@@ -47,8 +47,8 @@ function ViewerLayout({
 
   const [hasRightPanels, setHasRightPanels] = useState(hasPanels('right'));
   const [hasLeftPanels, setHasLeftPanels] = useState(hasPanels('left'));
-  const [leftPanelClosedState, setLeftPanelClosed] = useState(leftPanelClosed);
-  const [rightPanelClosedState, setRightPanelClosed] = useState(rightPanelClosed);
+  const [leftPanelClosedState, setLeftPanelClosed] = useState(true);
+  const [rightPanelClosedState, setRightPanelClosed] = useState(true);
 
   const [
     leftPanelProps,
