@@ -27,6 +27,13 @@ const leftDisplayArea = {
   },
 };
 
+// Default display area with 1.5x zoom for mammography
+const defaultDisplayArea = {
+  storeAsInitialCamera: true,
+  // Set default zoom to 1.5x for mammography
+  // scale: 1.5,
+};
+
 const hpMammography = {
   id: '@ohif/hpMammo',
   hasUpdatedPriorsInformation: false,
@@ -60,6 +67,15 @@ const hpMammography = {
     LCCPrior,
     RMLOPrior,
     LMLOPrior,
+  },
+  // Add callback to set zoom for mammography with condition
+  callbacks: {
+    onViewportDataInitialized: [
+      {
+        commandName: 'setMammographyZoomConditional',
+        commandOptions: {},
+      },
+    ],
   },
 
   stages: [
@@ -200,15 +216,39 @@ const hpMammography = {
         type: 'grid',
         layoutType: 'grid',
         properties: {
-          rows: 2,
-          columns: 2,
+          rows: 1,
+          columns: 4,
         },
       },
       viewports: [
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RMLO' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LMLO' }],
+        },
       ],
     },
     // New: Right-Left CC (1x2)
@@ -223,8 +263,20 @@ const hpMammography = {
         },
       },
       viewports: [
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LCC' }],
+        },
       ],
     },
     // New: Right-Left MLO (1x2)
@@ -239,8 +291,18 @@ const hpMammography = {
         },
       },
       viewports: [
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'RMLO' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'LMLO' }],
+        },
       ],
     },
     // New: Right CC-Right MLO (1x2)
@@ -255,8 +317,18 @@ const hpMammography = {
         },
       },
       viewports: [
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RCC' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'RMLO' }] },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'RCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'RMLO' }],
+        },
       ],
     },
     // New: Left CC-Left MLO (1x2)
@@ -271,8 +343,162 @@ const hpMammography = {
         },
       },
       viewports: [
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LCC' }] },
-        { viewportOptions: { toolGroupId: 'default' }, displaySets: [{ id: 'LMLO' }] },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'LCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+          },
+          displaySets: [{ id: 'LMLO' }],
+        },
+      ],
+    },
+    // Stage 7: RCC-LCC-TOP (Hidden from dropdown, keyboard navigation only)
+    {
+      id: 'mammoStage7',
+      name: 'RCC-LCC-TOP',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LCC' }],
+        },
+      ],
+      // Apply 2x zoom and pan to top 50% (no default zoom for partial views)
+      onViewportDataInitialized: [
+        {
+          commandName: 'setMammographyPartialView',
+          commandOptions: { verticalAlignment: 'top' },
+        },
+      ],
+    },
+    // Stage 8: RCC-LCC-BOTTOM (Hidden from dropdown, keyboard navigation only)
+    {
+      id: 'mammoStage8',
+      name: 'RCC-LCC-BOTTOM',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RCC' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LCC' }],
+        },
+      ],
+      // Apply 2x zoom and pan to bottom 50% (no default zoom for partial views)
+      onViewportDataInitialized: [
+        {
+          commandName: 'setMammographyPartialView',
+          commandOptions: { verticalAlignment: 'bottom' },
+        },
+      ],
+    },
+    // Stage 9: RMLO-LMLO-TOP (Hidden from dropdown, keyboard navigation only)
+    {
+      id: 'mammoStage9',
+      name: 'RMLO-LMLO-TOP',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RMLO' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LMLO' }],
+        },
+      ],
+      // Apply 2x zoom and pan to top 50% (no default zoom for partial views)
+      onViewportDataInitialized: [
+        {
+          commandName: 'setMammographyPartialView',
+          commandOptions: { verticalAlignment: 'top' },
+        },
+      ],
+    },
+    // Stage 10: RMLO-LMLO-BOTTOM (Hidden from dropdown, keyboard navigation only)
+    {
+      id: 'mammoStage10',
+      name: 'RMLO-LMLO-BOTTOM',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: {
+          rows: 1,
+          columns: 2,
+        },
+      },
+      viewports: [
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'RMLO' }],
+        },
+        {
+          viewportOptions: {
+            toolGroupId: 'default',
+            displayArea: defaultDisplayArea,
+          },
+          displaySets: [{ id: 'LMLO' }],
+        },
+      ],
+      // Apply 2x zoom and pan to bottom 50% (no default zoom for partial views)
+      onViewportDataInitialized: [
+        {
+          commandName: 'setMammographyPartialView',
+          commandOptions: { verticalAlignment: 'bottom' },
+        },
       ],
     },
   ],

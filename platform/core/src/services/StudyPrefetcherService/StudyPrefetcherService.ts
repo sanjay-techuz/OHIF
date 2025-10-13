@@ -1,8 +1,8 @@
-import { PubSubService } from '../_shared/pubSubServiceInterface';
 import { ExtensionManager } from '../../extensions';
+import { DisplaySet } from '../../types';
+import { PubSubService } from '../_shared/pubSubServiceInterface';
 import ServicesManager from '../ServicesManager';
 import ViewportGridService from '../ViewportGridService';
-import { DisplaySet } from '../../types';
 
 enum RequestType {
   /** Highest priority for loading*/
@@ -291,6 +291,12 @@ class StudyPrefetcherService extends PubSubService {
     }
 
     const activeViewport = viewports.get(activeViewportId);
+
+    // Check if activeViewport exists and has displaySetInstanceUIDs
+    if (!activeViewport || !activeViewport.displaySetInstanceUIDs) {
+      return;
+    }
+
     const displaySetUpdated = this._setActiveDisplaySetsUIDs(activeViewport.displaySetInstanceUIDs);
 
     if (forceRestart || displaySetUpdated) {

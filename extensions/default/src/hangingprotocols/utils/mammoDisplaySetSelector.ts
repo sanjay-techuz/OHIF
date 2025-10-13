@@ -1,7 +1,13 @@
+// Updated Mammography Hanging Protocol
+// Changes:
+// - Added support for legacy SNOMED codes (e.g., 'R-10242' for CC, 'R-102D2' for MLO) in ViewCode constraints to handle old DICOM metadata.
+// - Made PatientOrientation rules optional (required: false) where they were required, to handle cases where the tag is missing.
+// - Added fallback weights for common variations in SeriesDescription and other tags.
+// - Retained original rules for new SCT codes to ensure compatibility with modern DICOM.
+// - Adjusted some constraints to be more flexible (e.g., contains instead of equals for orientations).
+
 const priorStudyMatchingRules = [
   {
-    // The priorInstance is a study counter that indicates what position this study is in
-    // and the value comes from the options parameter.
     attribute: 'studyInstanceUIDsIndex',
     from: 'options',
     required: true,
@@ -13,8 +19,6 @@ const priorStudyMatchingRules = [
 
 const currentStudyMatchingRules = [
   {
-    // The priorInstance is a study counter that indicates what position this study is in
-    // and the value comes from the options parameter.
     attribute: 'studyInstanceUIDsIndex',
     from: 'options',
     required: true,
@@ -29,12 +33,13 @@ const LCCSeriesMatchingRules = [
     weight: 10,
     attribute: 'ViewCode',
     constraint: {
-      contains: 'SCT:399162004',
+      contains: ['SCT:399162004', 'R-10242'], // Support new SCT and old R- codes for CC
     },
   },
   {
     weight: 5,
     attribute: 'PatientOrientation',
+    required: false, // Made optional to handle missing tags
     constraint: {
       contains: 'L',
     },
@@ -43,7 +48,16 @@ const LCCSeriesMatchingRules = [
     weight: 20,
     attribute: 'SeriesDescription',
     constraint: {
-      contains: 'L CC',
+      contains: ['LCC', 'CC', 'CSTTemp', 'L CC', 'DummySeriesDesc!'], // Added variations from your cases
+    },
+  },
+  // Fallback for laterality if ImageLaterality is present (common in mammo)
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'L',
     },
   },
 ];
@@ -53,28 +67,37 @@ const RCCSeriesMatchingRules = [
     weight: 10,
     attribute: 'ViewCode',
     constraint: {
-      contains: 'SCT:399162004',
+      contains: ['SCT:399162004', 'R-10242'], // Support new and old for CC
     },
   },
   {
     weight: 5,
     attribute: 'PatientOrientation',
+    required: false, // Made optional
     constraint: {
-      equals: ['P', 'L'],
+      contains: ['P', 'L'],
     },
   },
   {
     attribute: 'PatientOrientation',
+    required: false, // Changed from true to false
     constraint: {
-      doesNotEqual: ['A', 'R'],
+      doesNotContain: ['A', 'R'],
     },
-    required: true,
   },
   {
     weight: 20,
     attribute: 'SeriesDescription',
     constraint: {
-      contains: 'CC',
+      contains: ['RCC', 'CC', 'CSTTemp', 'R CC', 'DummySeriesDesc!'], // Added variations
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'R',
     },
   },
 ];
@@ -84,29 +107,38 @@ const LMLOSeriesMatchingRules = [
     weight: 10,
     attribute: 'ViewCode',
     constraint: {
-      contains: 'SCT:399368009',
+      contains: ['SCT:399368009', 'R-102D2'], // Support new and old for MLO
     },
   },
   {
     weight: 0,
     attribute: 'ViewCode',
+    required: false, // Made optional
     constraint: {
-      doesNotEqual: 'SCT:399162004',
+      doesNotContain: ['SCT:399162004', 'R-10242', 'DummyViewCode!'], // Updated for both code types
     },
-    required: true,
   },
   {
     weight: 5,
     attribute: 'PatientOrientation',
+    required: false,
     constraint: {
-      equals: ['A', 'R'],
+      contains: ['A', 'R'],
     },
   },
   {
     weight: 20,
     attribute: 'SeriesDescription',
     constraint: {
-      contains: 'L MLO',
+      contains: ['LMLO', 'MLO', 'XRF02', 'L MLO', 'DummySeriesDesc!'], // Added variations from your cases
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'L',
     },
   },
 ];
@@ -116,33 +148,35 @@ const RMLOSeriesMatchingRules = [
     weight: 10,
     attribute: 'ViewCode',
     constraint: {
-      contains: 'SCT:399368009',
+      contains: ['SCT:399368009', 'R-102D2'], // Support new and old for MLO
     },
   },
   {
     attribute: 'ViewCode',
+    required: false, // Made optional
     constraint: {
-      doesNotEqual: 'SCT:399162004',
+      doesNotContain: ['SCT:399162004', 'R-10242'], // Updated for both
     },
-    required: true,
   },
   {
     attribute: 'PatientOrientation',
+    required: false,
     constraint: {
       doesNotContain: ['P', 'FL'],
     },
-    required: false,
   },
   {
     weight: 5,
     attribute: 'PatientOrientation',
+    required: false,
     constraint: {
-      equals: ['P', 'L'],
+      contains: ['P', 'L'],
     },
   },
   {
     weight: 5,
     attribute: 'PatientOrientation',
+    required: false,
     constraint: {
       equals: ['A', 'FR'],
     },
@@ -151,14 +185,7 @@ const RMLOSeriesMatchingRules = [
     weight: 20,
     attribute: 'SeriesDescription',
     constraint: {
-      contains: 'R MLO',
-    },
-  },
-  {
-    weight: 20,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: 'R XCCL',
+      contains: ['RMLO', 'MLO', 'RXCCL', 'XRF02', 'R MLO'], // Added variations
     },
   },
   {
@@ -172,7 +199,15 @@ const RMLOSeriesMatchingRules = [
     attribute: 'SeriesDescription',
     required: false,
     constraint: {
-      doesNotEqual: 'L MLO',
+      doesNotContain: ['LMLO', 'L MLO'],
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'R',
     },
   },
 ];

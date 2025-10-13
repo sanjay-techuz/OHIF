@@ -308,6 +308,16 @@ export default class DisplaySetService extends PubSubService {
     // Some of the sop class handlers take a direct reference to instances
     // so make sure it gets copied here so that they have their own ref
     let instances = [...instancesSrc];
+
+    // Apply mammography-specific filtering to remove instances without ImageLaterality
+    // This prevents hanging protocol errors when processing mammography cases
+    instances = this._filterInstancesForMammography(instances);
+
+    // Safety check: if all instances were filtered out, return empty array
+    if (instances.length === 0) {
+      return [];
+    }
+
     const instance = instances[0];
 
     const existingDisplaySets = this.getDisplaySetsForSeries(instance.SeriesInstanceUID) || [];
@@ -400,6 +410,65 @@ export default class DisplaySetService extends PubSubService {
       }
     }
     return allDisplaySets;
+  }
+
+  /**
+   * Filters instances for mammography cases to remove files without ImageLaterality metadata.
+   * This prevents hanging protocol errors when processing mammography cases (normal, prior, DBT).
+   *
+   * For mammography cases:
+   * - Normal mammography: 4 views (RCC, LCC, RMLO, LMLO)
+   * - Prior mammography: 8 views (4 normal + 4 prior)
+   * - DBT (Digital Breast Tomosynthesis): 3D views
+   *
+   * Only instances with ImageLaterality property are kept for mammography modality.
+   * This filtering ensures hanging protocols work correctly and prevents errors.
+   *
+   * @param instances - Array of DICOM instances to filter
+   * @returns Filtered array of instances
+   */
+  private _filterInstancesForMammography(instances: InstanceMetadata[]): InstanceMetadata[] {
+    if (!instances || instances.length === 0) {
+      return instances;
+    }
+
+    // Check if any instance has mammography modality (MG)
+    const hasMammography = instances.some(
+      instance =>
+        instance.Modality === 'MG' ||
+        (instance.ModalitiesInStudy && instance.ModalitiesInStudy.includes('MG'))
+    );
+
+    // If no mammography cases, return instances unchanged
+    if (!hasMammography) {
+      return instances;
+    }
+
+    // Filter instances: keep only those with ImageLaterality for mammography
+    const filteredInstances = instances.filter(instance => {
+      // For mammography modality, require ImageLaterality
+      if (instance.Modality === 'MG') {
+        const hasImageLaterality =
+          instance?.ImageLaterality !== undefined &&
+          instance?.ImageLaterality !== null &&
+          instance?.ImageLaterality !== '';
+
+        if (!hasImageLaterality) {
+          console.log('🚫 Filtered out mammography instance without ImageLaterality:', {
+            SOPInstanceUID: instance.SOPInstanceUID,
+            SeriesDescription: instance.SeriesDescription,
+            Modality: instance.Modality,
+          });
+        }
+
+        return hasImageLaterality;
+      }
+
+      // Keep all non-mammography instances unchanged
+      return true;
+    });
+
+    return filteredInstances;
   }
 
   /**

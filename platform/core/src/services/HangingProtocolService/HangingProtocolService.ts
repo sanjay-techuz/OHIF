@@ -1,16 +1,16 @@
 import cloneDeep from 'lodash.clonedeep';
 
-import { PubSubService } from '../_shared/pubSubServiceInterface';
-import sortBy from '../../utils/sortBy';
-import ProtocolEngine from './ProtocolEngine';
-import { StudyMetadata } from '../../types/StudyMetadata';
-import DisplaySet from '../DisplaySetService/DisplaySet';
 import { CommandsManager } from '../../classes';
 import * as HangingProtocol from '../../types/HangingProtocol';
+import { StudyMetadata } from '../../types/StudyMetadata';
+import sortBy from '../../utils/sortBy';
+import uuidv4 from '../../utils/uuidv4';
+import { PubSubService } from '../_shared/pubSubServiceInterface';
+import DisplaySet from '../DisplaySetService/DisplaySet';
 import { isDisplaySetFromUrl, sopInstanceLocation } from './custom-attribute/isDisplaySetFromUrl';
 import numberOfDisplaySetsWithImages from './custom-attribute/numberOfDisplaySetsWithImages';
 import seriesDescriptionsFromDisplaySets from './custom-attribute/seriesDescriptionsFromDisplaySets';
-import uuidv4 from '../../utils/uuidv4';
+import ProtocolEngine from './ProtocolEngine';
 
 type Protocol = HangingProtocol.Protocol | HangingProtocol.ProtocolGenerator;
 
@@ -1248,7 +1248,7 @@ export default class HangingProtocolService extends PubSubService {
       if (matchDetails) {
         if (
           matchDetails.displaySetsInfo?.length &&
-          matchDetails.displaySetsInfo[0].displaySetInstanceUID
+          matchDetails.displaySetsInfo[0]?.displaySetInstanceUID
         ) {
           matchedViewports++;
         } else {
@@ -1533,7 +1533,7 @@ export default class HangingProtocolService extends PubSubService {
           // Todo: why we have images here since the matching type does not have it
           {
             studies: this.studies,
-            instance: displaySet.images?.[0],
+            instance: displaySet.images?.[0] || null,
             displaySetMatchDetails: this.displaySetMatchDetails,
             displaySets: studyDisplaySets,
           }

@@ -59,9 +59,9 @@ function ViewerLayout({
     resizableRightPanelProps,
     onHandleDragging,
   ] = useResizablePanels(
-    leftPanelClosed,
+    leftPanelClosedState,
     setLeftPanelClosed,
-    rightPanelClosed,
+    rightPanelClosedState,
     setRightPanelClosed,
     hasLeftPanels,
     hasRightPanels

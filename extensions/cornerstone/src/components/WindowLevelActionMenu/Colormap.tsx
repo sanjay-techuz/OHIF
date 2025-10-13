@@ -1,5 +1,5 @@
-import React, { ReactElement, useEffect, useRef, useState } from 'react';
 import { AllInOneMenu, ScrollArea, Switch, Tabs, TabsList, TabsTrigger } from '@ohif/ui-next';
+import React, { ReactElement, useEffect, useRef, useState } from 'react';
 import { useViewportRendering } from '../../hooks/useViewportRendering';
 
 export function Colormap({ viewportId }: { viewportId?: string } = {}): ReactElement {
@@ -33,6 +33,12 @@ export function Colormap({ viewportId }: { viewportId?: string } = {}): ReactEle
   }, [activeDisplaySetUID]);
 
   const handleSetColorLUT = (colormap, immediate = true) => {
+    // Validate colormap object before processing
+    if (!colormap || typeof colormap !== 'object' || !colormap.name) {
+      console.warn('Invalid colormap object passed to handleSetColorLUT:', colormap);
+      return;
+    }
+
     // Check if it's a fusion viewport
     const oneOpacityColormaps = ['Grayscale', 'X Ray'];
     const opacity =

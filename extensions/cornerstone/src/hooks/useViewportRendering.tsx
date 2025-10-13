@@ -1,20 +1,19 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
-import { useSystem } from '@ohif/core';
-import { useViewportDisplaySets } from './useViewportDisplaySets';
 import {
+  BaseVolumeViewport,
+  Enums,
   StackViewport,
   Types,
   VolumeViewport3D,
   utilities,
-  Enums,
-  BaseVolumeViewport,
-  cache,
 } from '@cornerstonejs/core';
-import { WindowLevelPreset } from '../types/WindowLevel';
-import { ColorbarPositionType, ColorbarOptions, ColorbarProperties } from '../types/Colorbar';
-import { VolumeRenderingConfig } from '../types/VolumeRenderingConfig';
-import { VolumeLightingParams } from '../types';
+import { useSystem } from '@ohif/core';
 import { ButtonLocation } from '@ohif/core/src/services/ToolBarService/ToolbarService';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { VolumeLightingParams } from '../types';
+import { ColorbarOptions, ColorbarPositionType, ColorbarProperties } from '../types/Colorbar';
+import { VolumeRenderingConfig } from '../types/VolumeRenderingConfig';
+import { WindowLevelPreset } from '../types/WindowLevel';
+import { useViewportDisplaySets } from './useViewportDisplaySets';
 
 interface ViewportRenderingOptions {
   location?: number;
@@ -538,6 +537,12 @@ export function useViewportRendering(
   const setColormap = useCallback(
     ({ colormap, opacity = 1, immediate = false }) => {
       if (!viewportId) {
+        return;
+      }
+
+      // Validate colormap object before passing to command
+      if (!colormap || typeof colormap !== 'object' || !colormap.name) {
+        console.warn('Invalid colormap object in setColormap:', colormap);
         return;
       }
 

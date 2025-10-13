@@ -968,10 +968,36 @@ function commandsModule({
 
       const { viewport } = enabledElement;
 
-      viewport.resetProperties?.();
-      viewport.resetCamera();
+      // Instead of calling resetProperties() which can cause colormap null errors,
+      // manually reset the properties we need
+      try {
+        // Reset camera first
+        viewport.resetCamera();
+        // viewport.resetProperties?.();
 
-      viewport.render();
+        // Reset properties manually to avoid colormap null issues
+        const currentProperties = viewport.getProperties();
+
+        // Reset to default values without colormap issues
+        const resetProperties = {
+          // Reset window/level to default
+          voiRange: undefined,
+          // Reset invert to false
+          invert: false,
+          // Reset rotation to 0
+          rotation: 0,
+          // Keep colormap as is or set to default if needed
+          colormap: currentProperties.colormap || { name: 'Grayscale', opacity: 1 },
+        };
+
+        viewport.setProperties(resetProperties);
+        viewport.render();
+      } catch (error) {
+        console.warn('Error during viewport reset, falling back to basic reset:', error);
+        // Fallback: just reset camera if property reset fails
+        viewport.resetCamera();
+        viewport.render();
+      }
     },
     scaleViewport: ({ direction }) => {
       const enabledElement = _getActiveViewportEnabledElement();
@@ -992,6 +1018,138 @@ function commandsModule({
           viewport.render();
         }
       }
+    },
+
+    setMammographyZoomConditional: ({ viewportId, verticalAlignment }) => {
+      // Check if we're in a partial view stage (stages 7-10)
+      const hangingProtocolService = servicesManager.services.hangingProtocolService;
+      const currentStageIndex = hangingProtocolService.stageIndex;
+
+      // ROBUST SOLUTION: Use multiple attempts with increasing delays
+      const applyZoomWithRetry = (attempt = 1, maxAttempts = 5) => {
+        const renderingEngine = cornerstoneViewportService.getRenderingEngine();
+        if (!renderingEngine) {
+          if (attempt < maxAttempts) {
+            setTimeout(() => applyZoomWithRetry(attempt + 1, maxAttempts), 200 * attempt);
+          }
+          return;
+        }
+
+        const viewports = renderingEngine.getViewports();
+
+        const targetViewports = viewportId
+          ? [renderingEngine.getViewport(viewportId)].filter(Boolean)
+          : Object.values(viewports).filter(vp => vp instanceof StackViewport);
+
+        if (targetViewports.length === 0) {
+          if (attempt < maxAttempts) {
+            setTimeout(() => applyZoomWithRetry(attempt + 1, maxAttempts), 200 * attempt);
+          }
+          return;
+        }
+
+        // Check if viewports are ready (have image data)
+        const readyViewports = targetViewports.filter(viewport => {
+          if (!(viewport instanceof StackViewport)) {
+            return false;
+          }
+          const imageData = viewport.getImageData();
+          return imageData && (imageData.dimensions || imageData.width);
+        });
+
+        if (readyViewports.length === 0) {
+          if (attempt < maxAttempts) {
+            setTimeout(() => applyZoomWithRetry(attempt + 1, maxAttempts), 200 * attempt);
+          }
+          return;
+        }
+
+        // Apply zoom based on stage type
+        if (currentStageIndex >= 7) {
+          // Partial view stages (7-10) - 2x zoom + pan
+          const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
+          const stageVerticalAlignment =
+            currentStage?.onViewportDataInitialized?.[0]?.commandOptions?.verticalAlignment;
+
+          readyViewports.forEach((viewport, index) => {
+            viewport.resetCamera();
+            const camera = viewport.getCamera();
+            const imageData = viewport.getImageData();
+            if (!imageData || !imageData.dimensions) {
+              return;
+            }
+
+            const [width, height] = imageData.dimensions;
+            const newParallelScale = camera.parallelScale / 1.75;
+
+            // Compute pan distance in world coordinates
+            // Get spacing and center offset
+            const spacingY = imageData.spacing ? imageData.spacing[1] : 1;
+            const halfHeightWorld = (height * spacingY) / 3.5;
+
+            // Pan direction: +Y = down, -Y = up (depends on OHIF orientation)
+            let panY = 0;
+            if (stageVerticalAlignment === 'top') {
+              panY = -halfHeightWorld / 2; // move up to focus top half
+            } else if (stageVerticalAlignment === 'bottom') {
+              panY = halfHeightWorld / 2; // move down to focus bottom half
+            }
+
+            // Apply camera update - use position and focalPoint for panning
+            const newPosition = [...camera.position];
+            const newFocalPoint = [...camera.focalPoint];
+
+            // Apply vertical pan by adjusting position and focalPoint
+            newPosition[1] += panY; // Adjust Y position
+            newFocalPoint[1] += panY; // Adjust Y focal point
+
+            viewport.setCamera({
+              ...camera,
+              parallelScale: newParallelScale,
+              position: newPosition,
+              focalPoint: newFocalPoint,
+            });
+
+            // // Get image dimensions
+            // let imageWidth = 0;
+            // let imageHeight = 0;
+            // if (imageData.dimensions && imageData.dimensions.length >= 2) {
+            //   imageWidth = imageData.dimensions[0];
+            //   imageHeight = imageData.dimensions[1];
+            // } else if (imageData.width && imageData.height) {
+            //   imageWidth = imageData.width;
+            //   imageHeight = imageData.height;
+            // }
+
+            // const newParallelScale = parallelScale / 2; // 2x zoom
+            // let panY = 0;
+            // if (stageVerticalAlignment === 'top') {
+            //   panY = -(imageHeight / 4) * newParallelScale;
+            // } else if (stageVerticalAlignment === 'bottom') {
+            //   panY = (imageHeight / 4) * newParallelScale;
+            // }
+
+            // viewport.setCamera({
+            //   parallelScale: newParallelScale,
+            //   pan: [0, panY],
+            // });
+            viewport.render();
+          });
+        } else {
+          // Normal stages (0-6) - 1.4x zoom
+          readyViewports.forEach((viewport, index) => {
+            viewport.resetCamera();
+            const { parallelScale } = viewport.getCamera();
+            const zoomFactor = 1 / 1.4; // 0.714
+            const newParallelScale = parallelScale * zoomFactor;
+            viewport.setCamera({ parallelScale: newParallelScale });
+            viewport.render();
+          });
+        }
+      };
+
+      // Start with immediate attempt, then retry with delays
+      applyZoomWithRetry();
     },
 
     /** Jumps the active viewport or the specified one to the given slice index */
@@ -1068,7 +1226,13 @@ function commandsModule({
       }
 
       // HP takes priority over the default opacity
-      colormap = { ...colormap, opacity: hpOpacity || opacity };
+      // Add null check to prevent spread operator error when colormap is null
+      if (colormap && typeof colormap === 'object' && colormap.name) {
+        colormap = { ...colormap, opacity: hpOpacity || opacity };
+      } else {
+        console.warn('Invalid colormap object, using default Grayscale:', colormap);
+        colormap = { name: 'Grayscale', opacity: hpOpacity || opacity };
+      }
 
       if (viewport instanceof StackViewport) {
         viewport.setProperties({ colormap });
@@ -2177,6 +2341,7 @@ function commandsModule({
     deleteActiveAnnotation: {
       commandFn: actions.deleteActiveAnnotation,
     },
+    setMammographyZoomConditional: actions.setMammographyZoomConditional,
     setDisplaySetsForViewports: actions.setDisplaySetsForViewports,
     undo: actions.undo,
     redo: actions.redo,
