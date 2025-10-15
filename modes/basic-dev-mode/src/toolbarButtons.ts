@@ -128,23 +128,23 @@ const toolbarButtons: Button[] = [
       evaluate: 'evaluate.cornerstoneTool',
     },
   },
-  {
-    id: 'Capture',
-    uiType: 'ohif.toolButton',
-    props: {
-      icon: 'tool-capture',
-      label: 'Capture',
-      tooltip: 'Capture',
-      commands: 'showDownloadViewportModal',
-      evaluate: [
-        'evaluate.action',
-        {
-          name: 'evaluate.viewport.supported',
-          unsupportedViewportTypes: ['video', 'wholeSlide'],
-        },
-      ],
-    },
-  },
+  // {
+  //   id: 'Capture',
+  //   uiType: 'ohif.toolButton',
+  //   props: {
+  //     icon: 'tool-capture',
+  //     label: 'Capture',
+  //     tooltip: 'Capture',
+  //     commands: 'showDownloadViewportModal',
+  //     evaluate: [
+  //       'evaluate.action',
+  //       {
+  //         name: 'evaluate.viewport.supported',
+  //         unsupportedViewportTypes: ['video', 'wholeSlide'],
+  //       },
+  //     ],
+  //   },
+  // },
   {
     id: 'Layout',
     uiType: 'ohif.layoutSelector',

@@ -1,39 +1,38 @@
-import React, { useState, useEffect, useMemo } from 'react';
 import classnames from 'classnames';
-import PropTypes from 'prop-types';
-import { Link, useNavigate } from 'react-router-dom';
-import moment from 'moment';
-import qs from 'query-string';
 import isEqual from 'lodash.isequal';
+import moment from 'moment';
+import PropTypes from 'prop-types';
+import qs from 'query-string';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link, useNavigate } from 'react-router-dom';
 //
-import filtersMeta from './filtersMeta.js';
+import { Types as coreTypes, utils } from '@ohif/core';
 import { useAppConfig } from '@state';
 import { useDebounce, useSearchParams } from '../../hooks';
-import { utils, Types as coreTypes } from '@ohif/core';
+import filtersMeta from './filtersMeta.js';
 
 import {
-  StudyListExpandedRow,
-  EmptyStudies,
-  StudyListTable,
-  StudyListPagination,
-  StudyListFilter,
   Button,
   ButtonEnums,
+  EmptyStudies,
+  StudyListExpandedRow,
+  StudyListFilter,
+  StudyListPagination,
+  StudyListTable,
 } from '@ohif/ui';
 
 import {
+  Clipboard,
   Header,
   Icons,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  Clipboard,
-  useModal,
-  useSessionStorage,
   Onboarding,
   ScrollArea,
-  InvestigationalUseDialog,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  useModal,
+  useSessionStorage,
 } from '@ohif/ui-next';
 
 import { Types } from '@ohif/ui';
@@ -551,7 +550,7 @@ function WorkList({
         showPatientInfo={PatientInfoVisibility.DISABLED}
       />
       <Onboarding />
-      <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} />
+      {/* <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} /> */}
       <div className="flex h-full flex-col overflow-y-auto">
         <ScrollArea>
           <div className="flex grow flex-col">

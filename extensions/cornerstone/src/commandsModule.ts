@@ -1,44 +1,44 @@
+import { ONNXSegmentationController } from '@cornerstonejs/ai';
 import {
-  getEnabledElement,
-  StackViewport,
-  VolumeViewport,
-  utilities as csUtils,
+  BaseVolumeViewport,
   Enums as CoreEnums,
   Types as CoreTypes,
-  BaseVolumeViewport,
+  utilities as csUtils,
+  getEnabledElement,
   getRenderingEngines,
+  StackViewport,
+  VolumeViewport,
 } from '@cornerstonejs/core';
+import * as labelmapInterpolation from '@cornerstonejs/labelmap-interpolation';
+import * as cornerstoneTools from '@cornerstonejs/tools';
 import {
-  ToolGroupManager,
-  Enums,
-  utilities as cstUtils,
   annotation,
+  utilities as cstUtils,
+  Enums,
+  ToolGroupManager,
   Types as ToolTypes,
 } from '@cornerstonejs/tools';
-import * as cornerstoneTools from '@cornerstonejs/tools';
-import * as labelmapInterpolation from '@cornerstonejs/labelmap-interpolation';
-import { ONNXSegmentationController } from '@cornerstonejs/ai';
 
+import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 import { Types as OhifTypes, utils } from '@ohif/core';
-import i18n from '@ohif/i18n';
 import {
-  callInputDialogAutoComplete,
-  createReportAsync,
-  colorPickerDialog,
   callInputDialog,
+  callInputDialogAutoComplete,
+  colorPickerDialog,
+  createReportAsync,
 } from '@ohif/extension-default';
-import { vec3, mat4 } from 'gl-matrix';
+import i18n from '@ohif/i18n';
+import { mat4, vec3 } from 'gl-matrix';
+import { toolNames } from './initCornerstoneTools';
+import { usePositionPresentationStore, useSegmentationPresentationStore } from './stores';
+import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
+import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
+import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
-import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
 import toggleVOISliceSync from './utils/toggleVOISliceSync';
-import { usePositionPresentationStore, useSegmentationPresentationStore } from './stores';
-import { toolNames } from './initCornerstoneTools';
-import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
 import { updateSegmentBidirectionalStats } from './utils/updateSegmentationStats';
-import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
-import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
-import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
 const toggleSyncFunctions = {
@@ -968,17 +968,14 @@ function commandsModule({
 
       const { viewport } = enabledElement;
 
-      // Instead of calling resetProperties() which can cause colormap null errors,
-      // manually reset the properties we need
       try {
         // Reset camera first
         viewport.resetCamera();
-        // viewport.resetProperties?.();
 
-        // Reset properties manually to avoid colormap null issues
+        // Get current properties to check what needs to be reset
         const currentProperties = viewport.getProperties();
 
-        // Reset to default values without colormap issues
+        // Create a safe reset properties object
         const resetProperties = {
           // Reset window/level to default
           voiRange: undefined,
@@ -986,17 +983,47 @@ function commandsModule({
           invert: false,
           // Reset rotation to 0
           rotation: 0,
-          // Keep colormap as is or set to default if needed
-          colormap: currentProperties.colormap || { name: 'Grayscale', opacity: 1 },
         };
 
+        // Only set colormap if it's not null and has a valid name
+        if (
+          currentProperties.colormap &&
+          typeof currentProperties.colormap === 'object' &&
+          currentProperties.colormap.name
+        ) {
+          // Keep existing colormap if it's valid
+          resetProperties.colormap = currentProperties.colormap;
+        } else {
+          // Set default grayscale colormap if current one is invalid
+          resetProperties.colormap = { name: 'Grayscale', opacity: 1 };
+        }
+
+        // Apply the reset properties
         viewport.setProperties(resetProperties);
         viewport.render();
       } catch (error) {
-        console.warn('Error during viewport reset, falling back to basic reset:', error);
-        // Fallback: just reset camera if property reset fails
-        viewport.resetCamera();
-        viewport.render();
+        console.warn('Error during viewport reset, using fallback approach:', error);
+
+        // Fallback: Reset camera and try to reset properties safely
+        try {
+          viewport.resetCamera();
+
+          // Try to reset properties with null-safe colormap
+          const safeProperties = {
+            voiRange: undefined,
+            invert: false,
+            rotation: 0,
+            colormap: { name: 'Grayscale', opacity: 1 },
+          };
+
+          viewport.setProperties(safeProperties);
+          viewport.render();
+        } catch (fallbackError) {
+          console.warn('Fallback reset also failed, using minimal reset:', fallbackError);
+          // Last resort: just reset camera
+          viewport.resetCamera();
+          viewport.render();
+        }
       }
     },
     scaleViewport: ({ direction }) => {

@@ -8,7 +8,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       className="toaster group"
-      loadingIcon={<Icons.LoadingSpinner />}
+      loadingIcon={
+        <img
+          src="/biedx.png"
+          alt="Loading"
+          className="h-5 w-5 animate-spin"
+        />
+      }
       icons={{
         warning: <Icons.StatusWarning />,
         info: <Icons.Info className="text-secondary-foreground" />,

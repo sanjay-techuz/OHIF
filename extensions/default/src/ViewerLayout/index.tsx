@@ -6,7 +6,6 @@ import {
   Button,
   IconPresentationProvider,
   Icons,
-  InvestigationalUseDialog,
   Onboarding,
   ResizableHandle,
   ResizablePanel,
@@ -277,7 +276,7 @@ function ViewerLayout({
         </div>
       </IconPresentationProvider>
       <Onboarding tours={customizationService.getCustomization('ohif.tours')} />
-      <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} />
+      {/* <InvestigationalUseDialog dialogConfiguration={appConfig?.investigationalUseDialog} /> */}
     </div>
   );
 }

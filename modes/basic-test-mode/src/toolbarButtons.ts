@@ -1,8 +1,7 @@
 // TODO: torn, can either bake this here; or have to create a whole new button type
 // Only ways that you can pass in a custom React component for render :l
-import type { Button } from '@ohif/core/types';
 import { EVENTS } from '@cornerstonejs/core';
-import { ViewportGridService } from '@ohif/core';
+import type { Button } from '@ohif/core/types';
 
 import { defaults } from '@ohif/core';
 const { windowLevelPresets } = defaults;
@@ -344,23 +343,23 @@ const toolbarButtons: Button[] = [
       commands: setToolActiveToolbar,
     },
   },
-  {
-    id: 'Capture',
-    uiType: 'ohif.toolButton',
-    props: {
-      icon: 'tool-capture',
-      label: 'Capture',
-      tooltip: 'Capture',
-      commands: 'showDownloadViewportModal',
-      evaluate: [
-        'evaluate.action',
-        {
-          name: 'evaluate.viewport.supported',
-          unsupportedViewportTypes: ['video', 'wholeSlide'],
-        },
-      ],
-    },
-  },
+  // {
+  //   id: 'Capture',
+  //   uiType: 'ohif.toolButton',
+  //   props: {
+  //     icon: 'tool-capture',
+  //     label: 'Capture',
+  //     tooltip: 'Capture',
+  //     commands: 'showDownloadViewportModal',
+  //     evaluate: [
+  //       'evaluate.action',
+  //       {
+  //         name: 'evaluate.viewport.supported',
+  //         unsupportedViewportTypes: ['video', 'wholeSlide'],
+  //       },
+  //     ],
+  //   },
+  // },
   {
     id: 'Layout',
     uiType: 'ohif.layoutSelector',

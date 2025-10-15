@@ -1,5 +1,5 @@
-import type { Button } from '@ohif/core/types';
 import { ViewportGridService } from '@ohif/core';
+import type { Button } from '@ohif/core/types';
 
 const setToolActiveToolbar = {
   commandName: 'setToolActiveToolbar',
@@ -230,22 +230,22 @@ const toolbarButtons: Button[] = [
       },
     },
   },
-  {
-    id: 'Capture',
-    uiType: 'ohif.toolButton',
-    props: {
-      icon: 'tool-capture',
-      label: 'Capture',
-      commands: 'showDownloadViewportModal',
-      evaluate: [
-        'evaluate.action',
-        {
-          name: 'evaluate.viewport.supported',
-          unsupportedViewportTypes: ['video', 'wholeSlide'],
-        },
-      ],
-    },
-  },
+  // {
+  //   id: 'Capture',
+  //   uiType: 'ohif.toolButton',
+  //   props: {
+  //     icon: 'tool-capture',
+  //     label: 'Capture',
+  //     commands: 'showDownloadViewportModal',
+  //     evaluate: [
+  //       'evaluate.action',
+  //       {
+  //         name: 'evaluate.viewport.supported',
+  //         unsupportedViewportTypes: ['video', 'wholeSlide'],
+  //       },
+  //     ],
+  //   },
+  // },
   {
     id: 'Layout',
     uiType: 'ohif.layoutSelector',

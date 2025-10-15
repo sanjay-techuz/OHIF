@@ -8,6 +8,7 @@ window.config = {
   modes: [],
   customizationService: {},
   showStudyList: true,
+  showPatientInfo: 'disabled', // Hide patient info from header
   // some windows systems have issues with more than 3 web workers
   maxNumberOfWebWorkers: 3,
   // below flag is for performance reasons, but it might not work for all servers
@@ -105,12 +106,12 @@ window.config = {
       configuration: {
         friendlyName: 'AWS S3 Static wado server',
         name: 'aws',
-        wadoUriRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        qidoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        wadoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
-        // wadoUriRoot: 'http://localhost:5000/dicomweb',
-        // qidoRoot: 'http://localhost:5000/dicomweb',
-        // wadoRoot: 'http://localhost:5000/dicomweb',
+        // wadoUriRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
+        // qidoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
+        // wadoRoot: 'https://d14fa38qiwhyfd.cloudfront.net/dicomweb',
+        wadoUriRoot: 'http://4.145.114.191/pacs/dicom-web',
+        qidoRoot: 'http://4.145.114.191/pacs/dicom-web',
+        wadoRoot: 'http://4.145.114.191/pacs/dicom-web',
         qidoSupportsIncludeField: false,
         imageRendering: 'wadors',
         thumbnailRendering: 'wadors',
