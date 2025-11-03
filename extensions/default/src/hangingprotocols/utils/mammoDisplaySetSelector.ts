@@ -252,4 +252,241 @@ const LMLOPrior = {
   studyMatchingRules: priorStudyMatchingRules,
 };
 
-export { LCC, LCCPrior, LMLO, LMLOPrior, RCC, RCCPrior, RMLO, RMLOPrior };
+// DBT (Digital Breast Tomosynthesis) Series Matching Rules
+const RCC3DSeriesMatchingRules = [
+  {
+    weight: 30,
+    attribute: 'SOPClassUID',
+    constraint: {
+      equals: '1.2.840.10008.5.1.4.1.1.13.1.3', // DBT SOP Class UID
+    },
+  },
+  {
+    weight: 10,
+    attribute: 'SeriesDescription',
+    constraint: {
+      contains: ['R CC', 'RCC3D', 'RCC 3D', 'RCC-3D', 'RCC_DBT', 'RCC DBT', 'RCC_TOMO', 'RCC TOMO'],
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'R',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'Modality',
+    constraint: {
+      equals: 'MG',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'PatientOrientation',
+    required: false,
+    constraint: {
+      contains: ['P', 'L'],
+    },
+  },
+];
+
+const LCC3DSeriesMatchingRules = [
+  {
+    weight: 30,
+    attribute: 'SOPClassUID',
+    constraint: {
+      equals: '1.2.840.10008.5.1.4.1.1.13.1.3', // DBT SOP Class UID
+    },
+  },
+  {
+    weight: 10,
+    attribute: 'SeriesDescription',
+    constraint: {
+      contains: ['L CC', 'LCC3D', 'LCC 3D', 'LCC-3D', 'LCC_DBT', 'LCC DBT', 'LCC_TOMO', 'LCC TOMO'],
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'L',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'Modality',
+    constraint: {
+      equals: 'MG',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'PatientOrientation',
+    required: false,
+    constraint: {
+      contains: ['A', 'R'],
+    },
+  },
+];
+
+const RMLO3DSeriesMatchingRules = [
+  {
+    weight: 30,
+    attribute: 'SOPClassUID',
+    constraint: {
+      equals: '1.2.840.10008.5.1.4.1.1.13.1.3', // DBT SOP Class UID
+    },
+  },
+  {
+    weight: 10,
+    attribute: 'SeriesDescription',
+    constraint: {
+      contains: [
+        'R MLO',
+        'RMLO3D',
+        'RMLO 3D',
+        'RMLO-3D',
+        'RMLO_DBT',
+        'RMLO DBT',
+        'RMLO_TOMO',
+        'RMLO TOMO',
+      ],
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'R',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'Modality',
+    constraint: {
+      equals: 'MG',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'PatientOrientation',
+    required: false,
+    constraint: {
+      contains: ['P', 'FL'],
+    },
+  },
+];
+
+const LMLO3DSeriesMatchingRules = [
+  {
+    weight: 30,
+    attribute: 'SOPClassUID',
+    constraint: {
+      equals: '1.2.840.10008.5.1.4.1.1.13.1.3', // DBT SOP Class UID
+    },
+  },
+  {
+    weight: 10,
+    attribute: 'SeriesDescription',
+    constraint: {
+      contains: [
+        'L MLO',
+        'LMLO3D',
+        'LMLO 3D',
+        'LMLO-3D',
+        'LMLO_DBT',
+        'LMLO DBT',
+        'LMLO_TOMO',
+        'LMLO TOMO',
+      ],
+    },
+  },
+  {
+    weight: 25,
+    attribute: 'ImageLaterality',
+    required: false,
+    constraint: {
+      equals: 'L',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'Modality',
+    constraint: {
+      equals: 'MG',
+    },
+  },
+  {
+    weight: 15,
+    attribute: 'PatientOrientation',
+    required: false,
+    constraint: {
+      contains: ['A', 'FR'],
+    },
+  },
+];
+
+// DBT Display Set Objects
+const RCC3D = {
+  seriesMatchingRules: RCC3DSeriesMatchingRules,
+  studyMatchingRules: currentStudyMatchingRules,
+};
+
+const RCC3DPrior = {
+  seriesMatchingRules: RCC3DSeriesMatchingRules,
+  studyMatchingRules: priorStudyMatchingRules,
+};
+
+const LCC3D = {
+  seriesMatchingRules: LCC3DSeriesMatchingRules,
+  studyMatchingRules: currentStudyMatchingRules,
+};
+
+const LCC3DPrior = {
+  seriesMatchingRules: LCC3DSeriesMatchingRules,
+  studyMatchingRules: priorStudyMatchingRules,
+};
+
+const RMLO3D = {
+  seriesMatchingRules: RMLO3DSeriesMatchingRules,
+  studyMatchingRules: currentStudyMatchingRules,
+};
+
+const RMLO3DPrior = {
+  seriesMatchingRules: RMLO3DSeriesMatchingRules,
+  studyMatchingRules: priorStudyMatchingRules,
+};
+
+const LMLO3D = {
+  seriesMatchingRules: LMLO3DSeriesMatchingRules,
+  studyMatchingRules: currentStudyMatchingRules,
+};
+
+const LMLO3DPrior = {
+  seriesMatchingRules: LMLO3DSeriesMatchingRules,
+  studyMatchingRules: priorStudyMatchingRules,
+};
+
+export {
+  LCC,
+  LCC3D,
+  LCC3DPrior,
+  LCCPrior,
+  LMLO,
+  LMLO3D,
+  LMLO3DPrior,
+  LMLOPrior,
+  RCC,
+  RCC3D,
+  RCC3DPrior,
+  RCCPrior,
+  RMLO,
+  RMLO3D,
+  RMLO3DPrior,
+  RMLOPrior,
+};

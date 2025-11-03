@@ -1092,8 +1092,10 @@ function commandsModule({
         }
 
         // Apply zoom based on stage type
-        if (currentStageIndex >= 7) {
-          // Partial view stages (7-10) - 2x zoom + pan
+        if (currentStageIndex >= 16) {
+          // Partial view stages (16-21) - 2x zoom + pan to show 33% of image
+          // Stages: 16=RCC-LCC-TOP, 17=RCC-LCC-CENTER, 18=RCC-LCC-BOTTOM
+          //         19=RMLO-LMLO-TOP, 20=RMLO-LMLO-CENTER, 21=RMLO-LMLO-BOTTOM
           const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
           const stageVerticalAlignment =
             currentStage?.onViewportDataInitialized?.[0]?.commandOptions?.verticalAlignment;
@@ -1106,60 +1108,87 @@ function commandsModule({
               return;
             }
 
-            const [width, height] = imageData.dimensions;
-            const newParallelScale = camera.parallelScale / 1.75;
+            const [, height] = imageData.dimensions;
+            // Apply 2x zoom
+            const newParallelScale = camera.parallelScale / 2;
 
-            // Compute pan distance in world coordinates
-            // Get spacing and center offset
-            const spacingY = imageData.spacing ? imageData.spacing[1] : 1;
-            const halfHeightWorld = (height * spacingY) / 3.5;
+            // Compute pan distance in world coordinates for 33% view
+            // Get spacing to convert pixels to world coordinates
+            const spacing = imageData.spacing || [1, 1];
+            const [, spacingY] = spacing;
 
-            // Pan direction: +Y = down, -Y = up (depends on OHIF orientation)
+            // Full image height in world coordinates
+            const fullHeightWorld = height * spacingY;
+
+            // Calculate pan to show the center of each third (33%)
+            // Image center is at 0 after resetCamera
+            // Top third center: -1/3 from center
+            // Center third center: 0 (at center)
+            // Bottom third center: +1/3 from center
             let panY = 0;
             if (stageVerticalAlignment === 'top') {
-              panY = -halfHeightWorld / 2; // move up to focus top half
+              // Pan up to show top 33%: move center to -1/3 of image height
+              panY = -fullHeightWorld / 3;
+            } else if (stageVerticalAlignment === 'center') {
+              // Pan to show center 33%: keep center at image center
+              panY = 0;
             } else if (stageVerticalAlignment === 'bottom') {
-              panY = halfHeightWorld / 2; // move down to focus bottom half
+              // Pan down to show bottom 33%: move center to +1/3 of image height
+              panY = fullHeightWorld / 3;
             }
 
             // Apply camera update - use position and focalPoint for panning
-            const newPosition = [...camera.position];
-            const newFocalPoint = [...camera.focalPoint];
+            const newPosition = [...camera.position] as [number, number, number];
+            const newFocalPoint = [...camera.focalPoint] as [number, number, number];
 
             // Apply vertical pan by adjusting position and focalPoint
             newPosition[1] += panY; // Adjust Y position
             newFocalPoint[1] += panY; // Adjust Y focal point
 
+            let panX = 0;
+            try {
+              // Get the current stage and viewport configuration
+              const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
+              if (currentStage && currentStage.viewports && currentStage.viewports[index]) {
+                const viewportConfig = currentStage.viewports[index];
+                if (viewportConfig.displaySets && viewportConfig.displaySets[0]) {
+                  const displaySetId = viewportConfig.displaySets[0].id;
+                  // Apply pan based on display set type (both FFDM and DBT)
+                  if (
+                    displaySetId === 'LCC' ||
+                    displaySetId === 'LMLO' ||
+                    displaySetId === 'LCC3D' ||
+                    displaySetId === 'LMLO3D'
+                  ) {
+                    panX = -25; // Left side - pan left
+                  } else if (
+                    displaySetId === 'RCC' ||
+                    displaySetId === 'RMLO' ||
+                    displaySetId === 'RCC3D' ||
+                    displaySetId === 'RMLO3D'
+                  ) {
+                    panX = 25; // Right side - pan right
+                  }
+                }
+              }
+            } catch (error) {
+              // Fallback: use viewport index to determine side
+              if (index === 0 || index === 2) {
+                panX = 25; // RCC, RMLO
+              } else if (index === 1 || index === 3) {
+                panX = -25; // LCC, LMLO
+              }
+            }
+            newPosition[0] += panX; // Adjust X position
+            newFocalPoint[0] += panX; // Adjust X focal point
             viewport.setCamera({
               ...camera,
               parallelScale: newParallelScale,
               position: newPosition,
               focalPoint: newFocalPoint,
             });
+            // viewport.setPan([100, 0]);
 
-            // // Get image dimensions
-            // let imageWidth = 0;
-            // let imageHeight = 0;
-            // if (imageData.dimensions && imageData.dimensions.length >= 2) {
-            //   imageWidth = imageData.dimensions[0];
-            //   imageHeight = imageData.dimensions[1];
-            // } else if (imageData.width && imageData.height) {
-            //   imageWidth = imageData.width;
-            //   imageHeight = imageData.height;
-            // }
-
-            // const newParallelScale = parallelScale / 2; // 2x zoom
-            // let panY = 0;
-            // if (stageVerticalAlignment === 'top') {
-            //   panY = -(imageHeight / 4) * newParallelScale;
-            // } else if (stageVerticalAlignment === 'bottom') {
-            //   panY = (imageHeight / 4) * newParallelScale;
-            // }
-
-            // viewport.setCamera({
-            //   parallelScale: newParallelScale,
-            //   pan: [0, panY],
-            // });
             viewport.render();
           });
         } else {
@@ -1167,8 +1196,55 @@ function commandsModule({
           readyViewports.forEach((viewport, index) => {
             viewport.resetCamera();
             const { parallelScale } = viewport.getCamera();
+            const imageData = viewport.getImageData();
             const zoomFactor = 1 / 1.4; // 0.714
-            const newParallelScale = parallelScale * zoomFactor;
+            // const newParallelScale = parallelScale * zoomFactor;
+
+            const [width, height] = imageData.dimensions;
+            const [spacingX, spacingY] = imageData.spacing;
+            const scaleX = width * spacingX;
+            const scaleY = height * spacingY;
+            const newParallelScale = Math.max(scaleX, scaleY) / 2;
+            const noneViewports = [0, 1, 2, 11];
+            if (!noneViewports.includes(currentStageIndex)) {
+              // Determine viewport type based on display set
+              let panX = 0;
+              try {
+                // Get the current stage and viewport configuration
+                const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
+                if (currentStage && currentStage.viewports && currentStage.viewports[index]) {
+                  const viewportConfig = currentStage.viewports[index];
+                  if (viewportConfig.displaySets && viewportConfig.displaySets[0]) {
+                    const displaySetId = viewportConfig.displaySets[0].id;
+                    // Apply pan based on display set type (both FFDM and DBT)
+                    if (
+                      displaySetId === 'LCC' ||
+                      displaySetId === 'LMLO' ||
+                      displaySetId === 'LCC3D' ||
+                      displaySetId === 'LMLO3D'
+                    ) {
+                      panX = -100; // Left side - pan left
+                    } else if (
+                      displaySetId === 'RCC' ||
+                      displaySetId === 'RMLO' ||
+                      displaySetId === 'RCC3D' ||
+                      displaySetId === 'RMLO3D'
+                    ) {
+                      panX = 100; // Right side - pan right
+                    }
+                  }
+                }
+              } catch (error) {
+                // Fallback: use viewport index to determine side
+                if (index === 0 || index === 2) {
+                  panX = 100; // RCC, RMLO
+                } else if (index === 1 || index === 3) {
+                  panX = -100; // LCC, LMLO
+                }
+              }
+              viewport.setPan([panX, 0]);
+            }
+
             viewport.setCamera({ parallelScale: newParallelScale });
             viewport.render();
           });

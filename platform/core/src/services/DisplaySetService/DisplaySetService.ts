@@ -1,3 +1,4 @@
+import { detectMammographyCaseType } from '../../../../../extensions/cornerstone/src/utils/mammographyCaseDetector';
 import { ExtensionManager } from '../../extensions';
 import { DisplaySet, InstanceMetadata } from '../../types';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
@@ -444,28 +445,49 @@ export default class DisplaySetService extends PubSubService {
       return instances;
     }
 
-    // Filter instances: keep only those with ImageLaterality for mammography
+    // Enhanced mammography filtering using case type detection
     const filteredInstances = instances.filter(instance => {
-      // For mammography modality, require ImageLaterality
-      if (instance.Modality === 'MG') {
+      if (instance.Modality !== 'MG') {
+        return true; // Keep non-mammography instances
+      }
+
+      // Use mammography detection utility
+      try {
+        const caseType = detectMammographyCaseType(instance);
+
+        // For FFDM cases, require ImageLaterality
+        if (caseType === 'FFDM') {
+          const hasImageLaterality =
+            instance?.ImageLaterality !== undefined &&
+            instance?.ImageLaterality !== null &&
+            instance?.ImageLaterality !== '';
+
+          if (!hasImageLaterality) {
+            return false;
+          }
+          return hasImageLaterality;
+        }
+
+        // For DBT cases, don't require ImageLaterality (they may not have it)
+        if (caseType === 'DBT') {
+          return true;
+        }
+        return true;
+      } catch (error) {
+        console.warn('Error in mammography case detection, falling back to original logic:', error);
+
+        // Fallback to original logic
         const hasImageLaterality =
           instance?.ImageLaterality !== undefined &&
           instance?.ImageLaterality !== null &&
           instance?.ImageLaterality !== '';
 
         if (!hasImageLaterality) {
-          console.log('🚫 Filtered out mammography instance without ImageLaterality:', {
-            SOPInstanceUID: instance.SOPInstanceUID,
-            SeriesDescription: instance.SeriesDescription,
-            Modality: instance.Modality,
-          });
+          return false;
         }
 
         return hasImageLaterality;
       }
-
-      // Keep all non-mammography instances unchanged
-      return true;
     });
 
     return filteredInstances;

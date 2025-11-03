@@ -1,14 +1,17 @@
-import { handleSegmentChange } from './segmentUtils';
 import { isReferenceViewable } from './isReferenceViewable';
+import promptHydrationDialog, {
+  HydrationCallback,
+  HydrationDialogProps,
+  HydrationSRResult,
+} from './promptHydrationDialog';
 import {
   setupSegmentationDataModifiedHandler,
   setupSegmentationModifiedHandler,
 } from './segmentationHandlers';
-import promptHydrationDialog, {
-  HydrationDialogProps,
-  HydrationCallback,
-  HydrationSRResult,
-} from './promptHydrationDialog';
+import { handleSegmentChange } from './segmentUtils';
+
+// Mammography utilities
+import { detectMammographyCaseType, isDBTCase, isFFDMCase } from './mammographyCaseDetector';
 
 const utils = {
   handleSegmentChange,
@@ -16,8 +19,12 @@ const utils = {
   setupSegmentationDataModifiedHandler,
   setupSegmentationModifiedHandler,
   promptHydrationDialog,
+  // Mammography utilities
+  detectMammographyCaseType,
+  isDBTCase,
+  isFFDMCase,
 };
 
-export type { HydrationDialogProps, HydrationCallback, HydrationSRResult };
+export type { HydrationCallback, HydrationDialogProps, HydrationSRResult };
 
 export default utils;
