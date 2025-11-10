@@ -13,10 +13,18 @@ import HPLMLOP from '../../assets/images/HP-LMLO-P.png';
 import HPRCCP from '../../assets/images/HP-RCC-P.png';
 import HPRMLOP from '../../assets/images/HP-RMLO-P.png';
 
+import HPALL3D from '../../assets/images/HP-ALL-3D.png';
 import HPLCC3D from '../../assets/images/HP-LCC-3D.png';
 import HPLMLO3D from '../../assets/images/HP-LMLO-3D.png';
 import HPRCC3D from '../../assets/images/HP-RCC-3D.png';
 import HPRMLO3D from '../../assets/images/HP-RMLO-3D.png';
+
+import HPRLCCBOTTOM from '../../assets/images/RL-CC-BOTTOM.png';
+import HPRLCCCENTER from '../../assets/images/RL-CC-CENTER.png';
+import HPRLCCTOP from '../../assets/images/RL-CC-TOP.png';
+import HPRLMOMBOTTOM from '../../assets/images/RL-MLO-BOTTOM.png';
+import HPRLMOMCENTER from '../../assets/images/RL-MLO-CENTER.png';
+import HPRLMLOTOP from '../../assets/images/RL-MLO-TOP.png';
 
 interface HangingProtocolDropdownProps {
   id: string;
@@ -29,62 +37,34 @@ interface HangingProtocolDropdownProps {
   servicesManager: ServicesManager;
 }
 
-// Base view options (always shown, without prior stages)
-const BASE_VIEW_OPTIONS = [
+// Unified array with ALL hanging protocols (used for both dropdown and navigation)
+// Includes all stages: prior, current, DBT, and hidden partial views
+const ALL_HANGING_PROTOCOLS = [
+  // Prior stages (0-1)
+  { label: 'All Prior and Current', stageIndex: 0, icon: HPALLCP, requiresPrior: true },
+  // Current stages (2-10)
   { label: 'All Current', stageIndex: 2, icon: HPALL },
-  { label: 'Right-Left CC', stageIndex: 3, icon: RLMLO },
-  { label: 'Right-Left MLO', stageIndex: 6, icon: RLCC },
+  { label: 'Right-Left CC', stageIndex: 3, icon: RLCC },
+  { label: 'Right CC Current/Prior', stageIndex: 4, icon: HPRCCP, requiresPrior: true },
+  { label: 'Left CC Current/Prior', stageIndex: 5, icon: HPLCCP, requiresPrior: true },
+  { label: 'Right-Left MLO', stageIndex: 6, icon: RLMLO },
+  { label: 'Right MLO Current/Prior', stageIndex: 7, icon: HPRMLOP, requiresPrior: true },
+  { label: 'Left MLO Current/Prior', stageIndex: 8, icon: HPLMLOP, requiresPrior: true },
   { label: 'Right CC-Right MLO', stageIndex: 9, icon: RCCRMLO },
   { label: 'Left CC-Left MLO', stageIndex: 10, icon: LCCLMLO },
-];
-
-const DBT_VIEW_OPTIONS = [
-  { label: 'DBT All', stageIndex: 11, icon: HPALL },
-  { label: 'DBT Right CC', stageIndex: 12, icon: HPRCC3D },
-  { label: 'DBT Right MLO', stageIndex: 13, icon: HPRMLO3D },
-  { label: 'DBT Left CC', stageIndex: 14, icon: HPLCC3D },
-  { label: 'DBT Left MLO', stageIndex: 15, icon: HPLMLO3D },
-];
-
-// Base stages without prior (for current-only cases)
-const BASE_MAMMOGRAPHY_STAGES = [
-  { label: 'All Current', stageIndex: 2 },
-  { label: 'Right-Left CC', stageIndex: 3 },
-  { label: 'Right-Left MLO', stageIndex: 6 },
-  { label: 'Right CC-Right MLO', stageIndex: 9 },
-  { label: 'Left CC-Left MLO', stageIndex: 10 },
-  // Hidden FFDM stages for keyboard navigation (not in dropdown)
-  { label: 'RCC-LCC-TOP', stageIndex: 16 },
-  { label: 'RCC-LCC-CENTER', stageIndex: 17 },
-  { label: 'RCC-LCC-BOTTOM', stageIndex: 18 },
-  { label: 'RMLO-LMLO-TOP', stageIndex: 19 },
-  { label: 'RMLO-LMLO-CENTER', stageIndex: 20 },
-  { label: 'RMLO-LMLO-BOTTOM', stageIndex: 21 },
-];
-
-// Prior-only stages (only available when prior exists)
-const PRIOR_ONLY_STAGES = [
-  { label: 'All Prior and Current', stageIndex: 0 },
-  { label: 'Right CC Current/Prior', stageIndex: 4 },
-  { label: 'Left CC Current/Prior', stageIndex: 5 },
-  { label: 'Right MLO Current/Prior', stageIndex: 7 },
-  { label: 'Left MLO Current/Prior', stageIndex: 8 },
-];
-
-const DBT_STAGES = [
-  { label: 'DBT All', stageIndex: 11 },
-  { label: 'DBT Right CC', stageIndex: 12 },
-  { label: 'DBT Right MLO', stageIndex: 13 },
-  { label: 'DBT Left CC', stageIndex: 14 },
-  { label: 'DBT Left MLO', stageIndex: 15 },
-];
-
-const PRIOR_STAGES = [
-  { label: 'All Prior and Current', stageIndex: 0, icon: HPALLCP },
-  { label: 'Right CC Current/Prior', stageIndex: 4, icon: HPRCCP },
-  { label: 'Left CC Current/Prior', stageIndex: 5, icon: HPLCCP },
-  { label: 'Right MLO Current/Prior', stageIndex: 7, icon: HPRMLOP },
-  { label: 'Left MLO Current/Prior', stageIndex: 8, icon: HPLMLOP },
+  // DBT stages (11-15)
+  { label: 'DBT All', stageIndex: 11, icon: HPALL3D, requiresDBT: true },
+  { label: 'DBT Right CC', stageIndex: 12, icon: HPRCC3D, requiresDBT: true },
+  { label: 'DBT Right MLO', stageIndex: 13, icon: HPRMLO3D, requiresDBT: true },
+  { label: 'DBT Left CC', stageIndex: 14, icon: HPLCC3D, requiresDBT: true },
+  { label: 'DBT Left MLO', stageIndex: 15, icon: HPLMLO3D, requiresDBT: true },
+  // Hidden partial view stages (16-21) - now visible in dropdown
+  { label: 'RCC-LCC-TOP', stageIndex: 16, icon: HPRLCCTOP },
+  { label: 'RCC-LCC-CENTER', stageIndex: 17, icon: HPRLCCCENTER },
+  { label: 'RCC-LCC-BOTTOM', stageIndex: 18, icon: HPRLCCBOTTOM },
+  { label: 'RMLO-LMLO-TOP', stageIndex: 19, icon: HPRLMLOTOP },
+  { label: 'RMLO-LMLO-CENTER', stageIndex: 20, icon: HPRLMOMCENTER },
+  { label: 'RMLO-LMLO-BOTTOM', stageIndex: 21, icon: HPRLMOMBOTTOM },
 ];
 
 const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
@@ -179,44 +159,21 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     };
   }, [hangingProtocolService, isMammo, checkForPrior, activeDisplaySets]);
 
-  // Determine which view options to use based on case type and prior availability
-  const currentViewOptions = useMemo(() => {
-    let options = [...BASE_VIEW_OPTIONS];
-
-    // Add PRIOR_STAGES to dropdown only if prior exists (to avoid blank viewports)
-    if (hasPrior) {
-      // Combine and sort by stageIndex to ensure correct order
-      options = [...PRIOR_STAGES, ...options].sort((a, b) => a.stageIndex - b.stageIndex);
-    }
-
-    // Add DBT stages if DBT case
-    if (isDBT) {
-      options = [...options, ...DBT_VIEW_OPTIONS].sort((a, b) => a.stageIndex - b.stageIndex);
-    }
-
-    return options;
-  }, [isDBT, hasPrior]);
-
-  // Determine which stages are available for keyboard navigation
-  const currentMammographyStages = useMemo(() => {
-    let stages = [...BASE_MAMMOGRAPHY_STAGES];
-
-    // Add PRIOR_ONLY_STAGES only if prior exists (to avoid blank viewports)
-    if (hasPrior) {
-      // Insert PRIOR_ONLY_STAGES in the correct order based on stageIndex
-      // Stage 0 should come first, then insert 4, 5, 7, 8 in their correct positions
-      const priorStagesSorted = [...PRIOR_ONLY_STAGES].sort((a, b) => a.stageIndex - b.stageIndex);
-      stages = [...priorStagesSorted, ...stages].sort((a, b) => a.stageIndex - b.stageIndex);
-    }
-
-    // Add DBT stages if DBT case
-    if (isDBT) {
-      stages = [...stages, ...DBT_STAGES].sort((a, b) => a.stageIndex - b.stageIndex);
-    }
-
-    return stages;
-  }, [isDBT, hasPrior]);
-  const [selected, setSelected] = useState(currentViewOptions[0].stageIndex);
+  // Unified array for both dropdown and navigation - filter based on prior/DBT availability
+  const allHangingProtocols = useMemo(() => {
+    return ALL_HANGING_PROTOCOLS.filter(protocol => {
+      // Filter out prior-only stages if no prior exists
+      if (protocol.requiresPrior && !hasPrior) {
+        return false;
+      }
+      // Filter out DBT stages if not DBT case
+      if (protocol.requiresDBT && !isDBT) {
+        return false;
+      }
+      return true;
+    });
+  }, [hasPrior, isDBT]);
+  const [selected, setSelected] = useState(allHangingProtocols[0]?.stageIndex ?? 2);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
   useEffect(() => {
@@ -226,7 +183,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
           commandName: 'setHangingProtocol',
           commandOptions: {
             protocolId: '@ohif/hpMammo',
-            stageIndex: currentViewOptions[0].stageIndex,
+            stageIndex: allHangingProtocols[0]?.stageIndex ?? 2,
           },
         });
         // Apply zoom immediately after hanging protocol change
@@ -238,23 +195,23 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         }, 100);
       }, 1000);
     }
-  }, [isMammo, currentViewOptions, commandsManager]);
+  }, [isMammo, allHangingProtocols, commandsManager]);
 
   // Reset currentStageIndex when case type or prior status changes
   useEffect(() => {
     setCurrentStageIndex(0);
-    setSelected(currentViewOptions[0].stageIndex);
-  }, [isDBT, hasPrior, currentViewOptions]);
+    setSelected(allHangingProtocols[0]?.stageIndex ?? 2);
+  }, [isDBT, hasPrior, allHangingProtocols]);
 
   const handleChange = useCallback(
     event => {
       const stageIndex = parseInt(event, 10);
       setSelected(stageIndex);
       // Update currentStageIndex to match the selected stage
-      const stageIndexInArray = currentViewOptions.findIndex(
-        option => option.stageIndex === stageIndex
+      const stageIndexInArray = allHangingProtocols.findIndex(
+        protocol => protocol.stageIndex === stageIndex
       );
-      setCurrentStageIndex(stageIndexInArray);
+      setCurrentStageIndex(stageIndexInArray >= 0 ? stageIndexInArray : 0);
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
@@ -271,24 +228,22 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     },
-    [commandsManager, currentViewOptions]
+    [commandsManager, allHangingProtocols]
   );
 
   // Keyboard navigation handlers
   const handleNextStage = useCallback(() => {
     const nextIndex = currentStageIndex + 1;
-    console.log('nextIndex', nextIndex);
-    console.log('currentMammographyStages', currentMammographyStages);
-    if (nextIndex < currentMammographyStages.length) {
+    if (nextIndex < allHangingProtocols.length) {
       setCurrentStageIndex(nextIndex);
-      const stage = currentMammographyStages[nextIndex];
-      setSelected(stage.stageIndex);
+      const protocol = allHangingProtocols[nextIndex];
+      setSelected(protocol.stageIndex);
 
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
           protocolId: '@ohif/hpMammo',
-          stageIndex: stage.stageIndex,
+          stageIndex: protocol.stageIndex,
         },
       });
 
@@ -302,13 +257,13 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     } else {
       // Loop back to first stage
       setCurrentStageIndex(0);
-      const stage = currentMammographyStages[0];
-      setSelected(stage.stageIndex);
+      const protocol = allHangingProtocols[0];
+      setSelected(protocol.stageIndex);
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
           protocolId: '@ohif/hpMammo',
-          stageIndex: stage.stageIndex,
+          stageIndex: protocol.stageIndex,
         },
       });
 
@@ -320,20 +275,20 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     }
-  }, [currentStageIndex, commandsManager, currentMammographyStages]);
+  }, [currentStageIndex, commandsManager, allHangingProtocols]);
 
   const handlePreviousStage = useCallback(() => {
     const prevIndex = currentStageIndex - 1;
     if (prevIndex >= 0) {
       setCurrentStageIndex(prevIndex);
-      const stage = currentMammographyStages[prevIndex];
-      setSelected(stage.stageIndex);
+      const protocol = allHangingProtocols[prevIndex];
+      setSelected(protocol.stageIndex);
 
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
           protocolId: '@ohif/hpMammo',
-          stageIndex: stage.stageIndex,
+          stageIndex: protocol.stageIndex,
         },
       });
 
@@ -346,15 +301,15 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       }, 100);
     } else {
       // Loop to last stage
-      const lastIndex = currentMammographyStages.length - 1;
+      const lastIndex = allHangingProtocols.length - 1;
       setCurrentStageIndex(lastIndex);
-      const stage = currentMammographyStages[lastIndex];
-      setSelected(stage.stageIndex);
+      const protocol = allHangingProtocols[lastIndex];
+      setSelected(protocol.stageIndex);
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
           protocolId: '@ohif/hpMammo',
-          stageIndex: stage.stageIndex,
+          stageIndex: protocol.stageIndex,
         },
       });
 
@@ -366,7 +321,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     }
-  }, [currentStageIndex, commandsManager, currentMammographyStages]);
+  }, [currentStageIndex, commandsManager, allHangingProtocols]);
 
   // Keyboard shortcuts for stage navigation (only for mammography)
   useEffect(() => {
@@ -393,17 +348,20 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isMammo, handleNextStage, handlePreviousStage]);
 
+  // Hide the dropdown if not a mammography study OR if MR is present (MR dropdown will show instead)
   if (!isMammo) {
-    return null; // Hide the dropdown if not a mammography study
+    return null;
   }
 
   const defaultOption = selected => {
     return (
       <div className="flex items-center">
         <img
-          src={currentViewOptions.find(option => option.stageIndex === selected)?.icon || HPALL}
+          src={
+            allHangingProtocols.find(protocol => protocol.stageIndex === selected)?.icon || HPALL
+          }
           alt="Selected Hanging Protocol"
-          className="w-15 h-8"
+          className="w-15 h-10 object-cover"
         />
       </div>
     );
@@ -415,19 +373,17 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       value={`${selected}`}
     >
       <SelectTrigger className="h-10 w-20 py-0">
-        {/* <SelectValue placeholder="Select a series" />   */}
-        {selected !== undefined || selected !== null
+        {selected !== undefined && selected !== null
           ? defaultOption(selected)
           : 'Select Hanging Protocol'}
       </SelectTrigger>
       <SelectContent>
-        {currentViewOptions.map(option => (
+        {allHangingProtocols.map(protocol => (
           <SelectItem
-            key={option.stageIndex}
-            value={`${option.stageIndex}`}
+            key={protocol.stageIndex}
+            value={`${protocol.stageIndex}`}
           >
-            {defaultOption(option.stageIndex)}
-            {/* {option.label} */}
+            {defaultOption(protocol.stageIndex)}
           </SelectItem>
         ))}
       </SelectContent>
