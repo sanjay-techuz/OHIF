@@ -23,10 +23,21 @@ const toolbarButtons: Button[] = [
   // sections
   {
     id: 'HangingProtocol',
-    uiType: 'ohif.hangingProtocolDropdown', // Use the new uiType
+    uiType: 'ohif.hangingProtocolDropdown', // Use the new uiType for MG (mammography)
     props: {
       id: 'hanging-protocol-dropdown',
     },
+    // Component handles visibility based on all active display sets
+    // Shows only for MG cases (hides if MR is present)
+  },
+  {
+    id: 'MRHangingProtocol',
+    uiType: 'ohif.mrHangingProtocolDropdown', // Use the new uiType for MR
+    props: {
+      id: 'mr-hanging-protocol-dropdown',
+    },
+    // Component handles visibility based on all active display sets
+    // Shows only for MR cases
   },
   {
     id: 'MeasurementTools',

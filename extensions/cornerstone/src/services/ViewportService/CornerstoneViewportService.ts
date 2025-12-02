@@ -1,26 +1,18 @@
-import { PubSubService } from '@ohif/core';
-import { Types as OhifTypes } from '@ohif/core';
 import {
+  BaseVolumeViewport,
   RenderingEngine,
   StackViewport,
   Types,
-  getRenderingEngine,
-  utilities as csUtils,
   VolumeViewport,
   VolumeViewport3D,
   cache,
   Enums as csEnums,
-  BaseVolumeViewport,
+  utilities as csUtils,
+  getRenderingEngine,
 } from '@cornerstonejs/core';
+import { Types as OhifTypes, PubSubService } from '@ohif/core';
 
-import { utilities as csToolsUtils, Enums as csToolsEnums } from '@cornerstonejs/tools';
-import { IViewportService } from './IViewportService';
-import { RENDERING_ENGINE_ID } from './constants';
-import ViewportInfo, {
-  DisplaySetOptions,
-  PublicViewportOptions,
-  ViewportOptions,
-} from './Viewport';
+import { Enums as csToolsEnums, utilities as csToolsUtils } from '@cornerstonejs/tools';
 import { StackViewportData, VolumeViewportData } from '../../types/CornerstoneCacheService';
 import {
   LutPresentation,
@@ -29,14 +21,21 @@ import {
   SegmentationPresentation,
   SegmentationPresentationItem,
 } from '../../types/Presentation';
+import { RENDERING_ENGINE_ID } from './constants';
+import { IViewportService } from './IViewportService';
+import ViewportInfo, {
+  DisplaySetOptions,
+  PublicViewportOptions,
+  ViewportOptions,
+} from './Viewport';
 
-import JumpPresets from '../../utils/JumpPresets';
 import { ViewportProperties } from '@cornerstonejs/core/types';
+import { VOLUME_LOADER_SCHEME } from '../../constants';
 import { useLutPresentationStore } from '../../stores/useLutPresentationStore';
 import { usePositionPresentationStore } from '../../stores/usePositionPresentationStore';
-import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
 import { useSegmentationPresentationStore } from '../../stores/useSegmentationPresentationStore';
-import { VOLUME_LOADER_SCHEME } from '../../constants';
+import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
+import JumpPresets from '../../utils/JumpPresets';
 
 const EVENTS = {
   VIEWPORT_DATA_CHANGED: 'event::cornerstoneViewportService:viewportDataChanged',
@@ -671,9 +670,63 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         overlayProcessingResult.addOverlayFn();
       }
 
+      // Wait for viewport to be fully initialized before setting display area
+      const setDisplayAreaSafely = (retryCount = 0, maxRetries = 10) => {
+        if (retryCount >= maxRetries) {
+          console.warn(
+            `Failed to set display area for viewport ${viewport.id} after ${maxRetries} attempts`
+          );
+          return;
+        }
+
+        try {
+          // Check if viewport has image data and camera is initialized
+          const imageData = viewport.getImageData();
+          if (!imageData) {
+            // Retry after a short delay if image data is not ready
+            setTimeout(() => setDisplayAreaSafely(retryCount + 1, maxRetries), 100);
+            return;
+          }
+
+          // Check if camera is initialized by trying to get it
+          // Note: getCamera() might throw if viewMatrix is null, so wrap in try-catch
+          let camera;
+          try {
+            camera = viewport.getCamera();
+            // Check if camera has required properties
+            if (!camera || !camera.position || !camera.focalPoint) {
+              setTimeout(() => setDisplayAreaSafely(retryCount + 1, maxRetries), 100);
+              return;
+            }
+          } catch (cameraError) {
+            // Camera not ready yet, retry
+            setTimeout(() => setDisplayAreaSafely(retryCount + 1, maxRetries), 100);
+            return;
+          }
+
+          // Now it's safe to set display area
+          if (displayArea) {
+            try {
+              viewport.setDisplayArea(displayArea);
+            } catch (displayAreaError) {
+              // If setDisplayArea fails, it might be because camera isn't fully ready
+              console.warn('Failed to set display area, retrying:', displayAreaError);
+              setTimeout(() => setDisplayAreaSafely(retryCount + 1, maxRetries), 100);
+            }
+          }
+        } catch (error) {
+          // If there's an error, retry after a delay
+          console.warn(`Error setting display area (attempt ${retryCount + 1}), retrying:`, error);
+          setTimeout(() => setDisplayAreaSafely(retryCount + 1, maxRetries), 100);
+        }
+      };
+
+      // Initial attempt to set display area
       if (displayArea) {
-        viewport.setDisplayArea(displayArea);
+        // Use a small delay to ensure viewport is ready
+        // setTimeout(() => setDisplayAreaSafely(0), 50);
       }
+
       if (rotation) {
         viewport.setProperties({ rotation });
       }

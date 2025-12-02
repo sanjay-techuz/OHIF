@@ -104,6 +104,7 @@ function modeFactory({ modeConfiguration }) {
         'Crosshairs',
         'MoreTools',
         'HangingProtocol',
+        'MRHangingProtocol',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
