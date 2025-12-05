@@ -1,7 +1,11 @@
 import { annotation } from '@cornerstonejs/tools';
 import log from '../../log';
 import guid from '../../utils/guid';
+import { getCustomParams } from '../../utils/urlUtils';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
+import { apiService } from '../ApiService/ApiService';
+import DisplaySetService from '../DisplaySetService';
+
 /**
  * Measurement source schema
  *
@@ -78,6 +82,8 @@ const EVENTS = {
   JUMP_TO_MEASUREMENT_VIEWPORT: 'event:jump_to_measurement_viewport',
   // Give the layout a chance to jump to the measurement
   JUMP_TO_MEASUREMENT_LAYOUT: 'event:jump_to_measurement_layout',
+  SHOW_MEASUREMENT_MODAL: 'event::show_measurement_modal', // <-- To show the measurement modal
+  SHOW_RECALL_MODAL: 'event::show_recall_modal', // <-- To show the recall modal
 };
 
 const VALUE_TYPES = {
@@ -135,6 +141,8 @@ class MeasurementService extends PubSubService {
   constructor() {
     super(EVENTS);
   }
+
+  // public _sendEvent = this._broadcastEvent;
 
   /**
    * Adds the given schema to the measurement service schema list.
@@ -477,7 +485,7 @@ class MeasurementService extends PubSubService {
    * @param {boolean} isUpdate is this an update or an add/completed instead?
    * @return {string} A measurement uid
    */
-  annotationToMeasurement(source, annotationType, sourceAnnotationDetail, isUpdate = false) {
+  async annotationToMeasurement(source, annotationType, sourceAnnotationDetail, isUpdate = false) {
     if (!this._isValidSource(source)) {
       throw new Error('Invalid source.');
     }
@@ -573,6 +581,57 @@ class MeasurementService extends PubSubService {
           source,
           measurement: newMeasurement,
         });
+        const { courseId, caseId, studentId, viewType, moduleId, userType, facultyId, isPreview } =
+          getCustomParams();
+
+        // Create the measurement on the server
+        if (localStorage.getItem('ohif-viewType') === 'diagnostic' && !isPreview) {
+          this._broadcastEvent(this.EVENTS.SHOW_MEASUREMENT_MODAL, {
+            measurementUid: newMeasurement.uid || {},
+            measurement: newMeasurement,
+          });
+
+          const annotationData = annotation.state.getAnnotation(internalUID);
+          const displaySet = new DisplaySetService().getDisplaySetByUID(
+            newMeasurement.displaySetInstanceUID
+          );
+
+          if (annotationData) {
+            annotationData.data.color = userType === 'student' ? 'red' : 'blue';
+            annotationData.data.label = userType === 'student' ? 'Student ROI' : 'Faculty ROI';
+          }
+
+          const body = {
+            course_id: courseId,
+            module_id: moduleId,
+            case_id: caseId,
+            view_type: viewType,
+            study_instance_uid: newMeasurement.referenceStudyUID,
+            measurement_uid: newMeasurement.uid,
+            tool_name: newMeasurement.toolName,
+            measurement_data: newMeasurement,
+            annotation_data: annotationData,
+            modality: displaySet?.Modality || '',
+            student_id: '',
+            faculty_id: '',
+          };
+          if (userType === 'student') {
+            body.student_id = studentId;
+            delete body.faculty_id;
+            await apiService.post('/student/annotation-measurements', body);
+          } else {
+            body.faculty_id = facultyId;
+            delete body.student_id;
+            await apiService.post('/faculty/annotation-measurements', body);
+          }
+        }
+        // Show the recall modal
+        if (localStorage.getItem('ohif-viewType') === 'screening' && !isPreview) {
+          this._broadcastEvent(this.EVENTS.SHOW_RECALL_MODAL, {
+            measurementUid: newMeasurement.uid || {},
+            measurement: newMeasurement,
+          });
+        }
       }
     } else {
       log.info('Measurement started.', newMeasurement);

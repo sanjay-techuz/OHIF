@@ -20,7 +20,7 @@ import {
 } from '@cornerstonejs/tools';
 
 import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
-import { Types as OhifTypes, utils } from '@ohif/core';
+import { apiService, getCustomParams, Types as OhifTypes, utils } from '@ohif/core';
 import {
   callInputDialog,
   callInputDialogAutoComplete,
@@ -550,10 +550,20 @@ function commandsModule({
       }
     },
 
-    removeMeasurement: ({ uid }) => {
+    removeMeasurement: async ({ uid }) => {
       if (Array.isArray(uid)) {
         measurementService.removeMany(uid);
       } else {
+        // To remove the measurement from the server
+        const { userType, isPreview } = getCustomParams();
+        if (isPreview) {
+          return;
+        }
+        if (userType === 'student') {
+          await apiService.delete(`/user/cases/annotation-measurements/${uid}`);
+        } else {
+          await apiService.delete(`/admin/cases/annotation-measurements/${uid}`);
+        }
         measurementService.remove(uid);
       }
     },
@@ -2184,6 +2194,28 @@ function commandsModule({
         deleting,
       });
     },
+    // Show the question modal for Circle ROI - pass measurementUid
+    showCircleROIQuestionModal: async ({ uid }) => {
+      const measurement = measurementService.getMeasurement(uid);
+      if (measurement && measurement.toolName === 'CircleROI') {
+        // Show the question modal for Circle ROI in diagnostic mode - pass measurementUid
+        measurementService._broadcastEvent(measurementService.EVENTS.SHOW_MEASUREMENT_MODAL, {
+          measurementUid: uid,
+          measurement: measurement,
+        });
+      }
+    },
+    // Show the recall modal for Circle ROI in screening mode - pass measurementUid
+    showRecallModal: async ({ uid }) => {
+      const measurement = measurementService.getMeasurement(uid);
+      if (measurement && measurement.toolName === 'CircleROI') {
+        // Show the recall modal for Circle ROI in screening mode
+        measurementService._broadcastEvent(measurementService.EVENTS.SHOW_RECALL_MODAL, {
+          measurementUid: uid,
+          measurement: measurement,
+        });
+      }
+    },
   };
 
   const definitions = {
@@ -2469,6 +2501,8 @@ function commandsModule({
     hydrateSecondaryDisplaySet: actions.hydrateSecondaryDisplaySet,
     getVolumeIdForDisplaySet: actions.getVolumeIdForDisplaySet,
     triggerCreateAnnotationMemo: actions.triggerCreateAnnotationMemo,
+    showCircleROIQuestionModal: actions.showCircleROIQuestionModal,
+    showRecallModal: actions.showRecallModal,
   };
 
   return {
