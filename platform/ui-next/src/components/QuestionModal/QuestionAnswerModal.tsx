@@ -2,6 +2,7 @@ import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { apiCall, apiService } from '@ohif/core';
 import { Button, Modal } from '@ohif/ui-next';
 import React, { useEffect, useState } from 'react';
+import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import MammographyQuestions from './MammographyQuestions';
 import MRIQuestion from './MRIQuestion';
 import USQuestion from './USQuestion';
@@ -82,7 +83,7 @@ const QuestionAnswerModal = ({
   const { displaySetService, measurementService } = servicesManager.services;
   const { courseId, moduleId, caseId, studentId, userType, facultyId, isPreview } =
     useCustomParams();
-
+  const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   // Get form data from MeasurementService using measurementUid
   const [formType, setFormType] = useState<'mammography' | 'mri' | 'usg'>('mammography');
   const [form, setForm] = useState<Record<string, unknown>>(formData || {});
@@ -290,23 +291,34 @@ const QuestionAnswerModal = ({
         faculty_id: '',
       };
 
-      let result = null;
       if (userType === 'student') {
         body.student_id = studentId;
         delete body.faculty_id;
-        result = await apiCall(() => apiService.post('/student/submit-form-data', body));
+        const result = await apiCall(() => apiService.post('/user/cases/submit-form-data', body));
+
+        if (result.success) {
+          console.log('Form data submitted successfully');
+          onClose();
+        } else {
+          console.error('Failed to submit form data:', (result as any).error);
+          // Handle error - could show notification or set error state
+        }
       } else {
         body.faculty_id = facultyId;
         delete body.student_id;
-        result = await apiCall(() => apiService.post('/faculty/submit-form-data', body));
-      }
+        if (isAddAnswerClicked) {
+          const result = await apiCall(() =>
+            apiService.post('/admin/cases/submit-form-data', body)
+          );
 
-      if (result.success) {
-        console.log('Form data submitted successfully');
-        onClose();
-      } else {
-        console.error('Failed to submit form data:', (result as any).error);
-        // Handle error - could show notification or set error state
+          if (result.success) {
+            console.log('Form data submitted successfully');
+            onClose();
+          } else {
+            console.error('Failed to submit form data:', (result as any).error);
+            // Handle error - could show notification or set error state
+          }
+        }
       }
     }
   };

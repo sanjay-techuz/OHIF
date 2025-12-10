@@ -4,6 +4,7 @@ window.config = {
   showStudyList: true,
   extensions: [],
   modes: [],
+  showPatientInfo: 'disabled', // Hide patient info from header
   // below flag is for performance reasons, but it might not work for all servers
   showWarningMessageForCrossOrigin: true,
   showCPUFallbackMessage: true,

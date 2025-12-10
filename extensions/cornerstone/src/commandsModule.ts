@@ -26,6 +26,7 @@ import {
   callInputDialogAutoComplete,
   colorPickerDialog,
   createReportAsync,
+  useUIStateStore,
 } from '@ohif/extension-default';
 import i18n from '@ohif/i18n';
 import { mat4, vec3 } from 'gl-matrix';
@@ -562,7 +563,10 @@ function commandsModule({
         if (userType === 'student') {
           await apiService.delete(`/user/cases/annotation-measurements/${uid}`);
         } else {
-          await apiService.delete(`/admin/cases/annotation-measurements/${uid}`);
+          const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
+          if (isAddAnswerClicked) {
+            await apiService.delete(`/admin/cases/annotation-measurements/${uid}`);
+          }
         }
         measurementService.remove(uid);
       }

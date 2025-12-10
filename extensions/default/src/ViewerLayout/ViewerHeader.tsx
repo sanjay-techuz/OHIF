@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { preserveQueryParameters } from '@ohif/app';
 import { getCustomParams, Types, useSystem } from '@ohif/core';
 import { Button, Header, useModal } from '@ohif/ui-next';
+import { useUIStateStore } from '../stores/useUIStateStore';
 import { Toolbar } from '../Toolbar/Toolbar';
 import HeaderPatientInfo from './HeaderPatientInfo';
 import { PatientInfoVisibility } from './HeaderPatientInfo/HeaderPatientInfo';
@@ -34,6 +35,8 @@ function ViewerHeader({
 }: ViewerHeaderProps) {
   const { servicesManager, extensionManager } = useSystem();
   const { customizationService } = servicesManager.services;
+  const { setUIState } = useUIStateStore();
+  const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,7 +62,7 @@ function ViewerHeader({
 
   const { t } = useTranslation();
   const { show } = useModal();
-  const { isPreview } = getCustomParams();
+  const { isPreview, userType } = getCustomParams();
 
   // Add state for validation modal
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -161,7 +164,7 @@ function ViewerHeader({
         SubmitButton={
           <div className="flex items-center space-x-2">
             {/* Case Navigation Buttons */}
-            {caseNavigation && (
+            {caseNavigation && caseNavigation.totalCases > 1 && (
               <div className="flex items-center space-x-2">
                 <Button
                   variant="ghost"
@@ -212,28 +215,52 @@ function ViewerHeader({
             )}
 
             {/* Submit Button */}
-            <Button
-              variant="default"
-              className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-              onClick={() => {
-                // Validate ACR form before submitting
-                if (validateACRForm(acrValues)) {
-                  // Proceed with submit logic and redirect to results
-                  console.log('Submit button clicked - validation passed');
+            {userType === 'student' && (
+              <Button
+                variant="default"
+                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                onClick={() => {
+                  // Validate ACR form before submitting
+                  if (validateACRForm(acrValues)) {
+                    // Proceed with submit logic and redirect to results
+                    console.log('Submit button clicked - validation passed');
 
-                  // Get current URL parameters
-                  const currentParams = new URLSearchParams(window.location.search).toString();
+                    // Get current URL parameters
+                    const currentParams = new URLSearchParams(window.location.search).toString();
 
-                  // Navigate to results page with same query params
-                  navigate({
-                    pathname: '/results',
-                    search: currentParams,
-                  });
-                }
-              }}
-            >
-              {isPreview ? 'Close' : 'Submit'}
-            </Button>
+                    // Navigate to results page with same query params
+                    navigate({
+                      pathname: '/results',
+                      search: currentParams,
+                    });
+                  }
+                }}
+              >
+                {isPreview ? 'Close' : 'Submit'}
+              </Button>
+            )}
+            {userType === 'faculty' && !isAddAnswerClicked && (
+              <Button
+                variant="default"
+                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                onClick={() => {
+                  setUIState('addAnswerClicked', true);
+                }}
+              >
+                Add Answer
+              </Button>
+            )}
+            {isAddAnswerClicked && (
+              <Button
+                variant="default"
+                className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                onClick={() => {
+                  setUIState('addAnswerClicked', false);
+                }}
+              >
+                Submit Answer
+              </Button>
+            )}
           </div>
         }
       >

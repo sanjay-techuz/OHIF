@@ -3,6 +3,7 @@ import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { apiCall, apiService } from '@ohif/core';
 import { Button } from '@ohif/ui-next';
 import React, { useState } from 'react';
+import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import ACRSelectorModal, { ACRValues } from '../ACRSelectorModal';
 
 interface ACRDisplayProps {
@@ -30,7 +31,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     facultyId,
     isPreview,
   } = useCustomParams();
-
+  const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const handleSave = async (newValues: ACRValues) => {
     console.log('ACR values saved:', newValues);
     const body = {
@@ -45,24 +46,30 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
       study_instance_uid: StudyInstanceUIDs,
     };
 
-    let result = null;
     if (userType === 'student') {
       body.student_id = studentId;
       delete body.faculty_id;
-      result = await apiCall(() => apiService.post('/student/case-answer', body));
+      const result = await apiCall(() => apiService.post('/user/cases/case-answer', body));
+      if (result.success) {
+        console.log('ACR values saved successfully');
+        onValuesChange?.(newValues);
+      } else {
+        console.error('Failed to save ACR values:', (result as any).error);
+        // Handle error - could show notification or set error state
+      }
     } else {
       body.faculty_id = facultyId;
       delete body.student_id;
-      result = await apiCall(() => apiService.post('/faculty/case-answer', body));
-    }
-
-    console.log('result--------------', result);
-    if (result.success) {
-      console.log('ACR values saved successfully');
-      onValuesChange?.(newValues);
-    } else {
-      console.error('Failed to save ACR values:', (result as any).error);
-      // Handle error - could show notification or set error state
+      if (isAddAnswerClicked) {
+        const result = await apiCall(() => apiService.post('/admin/cases/case-answer', body));
+        if (result.success) {
+          console.log('ACR values saved successfully');
+          onValuesChange?.(newValues);
+        } else {
+          console.error('Failed to save ACR values:', (result as any).error);
+          // Handle error - could show notification or set error state
+        }
+      }
     }
   };
 

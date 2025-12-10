@@ -28,7 +28,7 @@ const Results: React.FC<ResultsProps> = ({
   useEffect(() => {
     const fetchResults = async () => {
       const result = await apiCall(() =>
-        apiService.get(`/evaluation/measurement/${courseId}/${moduleId}/${studentId}`)
+        apiService.get(`/user/cases/evaluation/measurement/${courseId}/${moduleId}/${studentId}`)
       );
 
       if (result.success) {
@@ -84,7 +84,7 @@ const Results: React.FC<ResultsProps> = ({
       };
       const result = await apiCall(() =>
         apiService.post(
-          `/evaluation/evaluate-multi-series/${courseId}/${moduleId}/${studentId}`,
+          `/user/cases/evaluation/evaluate-multi-series/${courseId}/${moduleId}/${studentId}`,
           body
         )
       );

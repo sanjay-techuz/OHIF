@@ -1,4 +1,5 @@
 import { annotation } from '@cornerstonejs/tools';
+import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import log from '../../log';
 import guid from '../../utils/guid';
 import { getCustomParams } from '../../utils/urlUtils';
@@ -618,11 +619,14 @@ class MeasurementService extends PubSubService {
           if (userType === 'student') {
             body.student_id = studentId;
             delete body.faculty_id;
-            await apiService.post('/student/annotation-measurements', body);
+            await apiService.post('/user/cases/annotation-measurements', body);
           } else {
             body.faculty_id = facultyId;
             delete body.student_id;
-            await apiService.post('/faculty/annotation-measurements', body);
+            const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
+            if (isAddAnswerClicked) {
+              await apiService.post('/admin/cases/annotation-measurements', body);
+            }
           }
         }
         // Show the recall modal
