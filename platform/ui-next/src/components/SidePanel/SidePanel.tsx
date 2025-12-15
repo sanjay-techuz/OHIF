@@ -1,8 +1,8 @@
 import classnames from 'classnames';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Icons } from '../Icons';
-import { TooltipTrigger, TooltipContent, Tooltip } from '../Tooltip';
 import { Separator } from '../Separator';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 
 /**
  * SidePanel component properties.
@@ -280,6 +280,12 @@ const SidePanel = ({
   }, [activeTabIndexProp, updateActiveTabIndex]);
 
   const getCloseStateComponent = () => {
+    // Hide entire closed state for left panel - it's now controlled from header
+    // Hide right panel completely as well
+    if (side === 'left' || side === 'right') {
+      return null;
+    }
+
     const _childComponents = Array.isArray(tabs) ? tabs : [tabs];
     return (
       <>
@@ -443,7 +449,10 @@ const SidePanel = ({
   const getOpenStateComponent = () => {
     return (
       <>
-        <div className="bg-bkg-med flex h-[40px] flex-shrink-0 select-none rounded-t p-2">
+        <div
+          className="flex h-[40px] flex-shrink-0 select-none rounded-t p-2"
+          style={{ backgroundColor: '#232323' }}
+        >
           {tabs.length === 1 ? getOneTabComponent() : getTabGridComponent()}
         </div>
         <Separator

@@ -1,9 +1,8 @@
-import React, { useEffect, useCallback, useRef } from 'react';
-import { Types, MeasurementService } from '@ohif/core';
-import { ViewportGrid, ViewportPane } from '@ohif/ui-next';
-import { useViewportGrid } from '@ohif/ui-next';
-import EmptyViewport from './EmptyViewport';
+import { MeasurementService, Types } from '@ohif/core';
+import { useViewportGrid, ViewportGrid, ViewportPane } from '@ohif/ui-next';
 import { useAppConfig } from '@state';
+import React, { useCallback, useEffect, useRef } from 'react';
+import EmptyViewport from './EmptyViewport';
 
 function ViewerViewportGrid(props: withAppTypes) {
   const { servicesManager, viewportComponents = [], dataSource, commandsManager } = props;
@@ -367,11 +366,11 @@ function ViewerViewportGrid(props: withAppTypes) {
         const tolerance = 0.01;
 
         if (x + width < 1 - tolerance) {
-          style.borderRight = '1px solid hsl(var(--input))';
+          style.borderRight = '1px solid hsl(var(--border))';
         }
 
         if (y + height < 1 - tolerance) {
-          style.borderBottom = '1px solid hsl(var(--input))';
+          style.borderBottom = '1px solid hsl(var(--border))';
         }
 
         return style;
@@ -435,7 +434,7 @@ function ViewerViewportGrid(props: withAppTypes) {
   }
 
   return (
-    <div className="border-input h-[calc(100%-0.25rem)] w-full border">
+    <div className="border-border h-[calc(100%-0.25rem)] w-full border">
       <ViewportGrid
         numRows={numRows}
         numCols={numCols}

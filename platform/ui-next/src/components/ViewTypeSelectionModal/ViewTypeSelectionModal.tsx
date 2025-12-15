@@ -70,7 +70,7 @@ const ViewTypeSelectionModal: React.FC<ViewTypeSelectionModalProps> = ({
       isOpen={open}
       onClose={onClose}
       title="Select View Type"
-      containerClassName="rounded-lg bg-gray-900 shadow-lg max-w-md"
+      containerClassName="rounded-lg bg-popover shadow-lg max-w-md"
     >
       <div className="p-6">
         <p className="mb-6 text-center text-white">How would you like to view this case?</p>

@@ -9,7 +9,7 @@ const biRadsOptions = ['0', '1 or 2', '4 or 5'];
 const labelClass = 'block mb-1 text-base font-semibold text-white font-sans tracking-wide';
 const radioLabelClass = 'flex items-center gap-2 text-sm font-medium text-gray-200 font-sans';
 const selectClass =
-  'w-full rounded border border-gray-600 bg-gray-900 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  'w-full rounded border border-[#6B6C6E] bg-gray-900 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-white';
 const errorClass = 'text-xs text-red-400 mt-1 font-sans';
 const sectionClass = 'mb-4';
 
@@ -36,7 +36,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
               value={opt}
               checked={form.definition === opt}
               onChange={e => handleChange('definition', e.target.value)}
-              className="accent-blue-500"
+              className="accent-white"
             />
             {opt}
           </label>
@@ -63,7 +63,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
                   value={opt}
                   checked={form.cryst === opt}
                   onChange={e => handleChange('cryst', e.target.value)}
-                  className="accent-blue-500"
+                  className="accent-white"
                 />
                 {opt}
               </label>
@@ -129,7 +129,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
                       value={opt}
                       checked={form.associatedAbnormalitySkin === opt}
                       onChange={e => handleChange('associatedAbnormalitySkin', e.target.value)}
-                      className="accent-blue-500"
+                      className="accent-white"
                     />
                     {opt}
                   </label>
@@ -153,7 +153,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
                       value={opt}
                       checked={form.associatedAbnormalityNipple === opt}
                       onChange={e => handleChange('associatedAbnormalityNipple', e.target.value)}
-                      className="accent-blue-500"
+                      className="accent-white"
                     />
                     {opt}
                   </label>
@@ -177,7 +177,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
                       value={opt}
                       checked={form.associatedAbnormalityLymphNode === opt}
                       onChange={e => handleChange('associatedAbnormalityLymphNode', e.target.value)}
-                      className="accent-blue-500"
+                      className="accent-white"
                     />
                     {opt}
                   </label>
@@ -207,7 +207,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
               value={opt}
               checked={form.biRads === opt}
               onChange={e => handleChange('biRads', e.target.value)}
-              className="accent-blue-500"
+              className="accent-white"
             />
             {opt}
           </label>
@@ -222,7 +222,7 @@ const USQuestion: React.FC<USQuestionProps> = ({ form, errors, handleChange }) =
       <textarea
         value={form.remarks}
         onChange={e => handleChange('remarks', e.target.value)}
-        className="w-full rounded border border-gray-600 bg-gray-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full rounded border border-[#6B6C6E] bg-gray-900 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-white"
         rows={3}
         placeholder="Enter remarks or notes"
         style={{ fontFamily: 'inherit', fontSize: '1rem' }}

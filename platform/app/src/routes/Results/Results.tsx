@@ -102,17 +102,17 @@ const Results: React.FC<ResultsProps> = ({
     navigate('/');
   };
 
-  const themeBg = 'rgba(4, 28, 74, 1)';
-  const cardBg = 'rgba(4, 28, 74, 0.8)';
-  const borderColor = 'rgba(255, 255, 255, 0.12)';
-  const gridHeaderBg = 'rgba(255, 255, 255, 0.06)';
+  const themeBg = '#0B0A0A';
+  const cardBg = '#232323';
+  const borderColor = '#6B6C6E';
+  const gridHeaderBg = '#232323';
 
   const SquareDot: React.FC<{ filled?: boolean; color?: string }> = ({ filled = false, color }) => (
     <div
       className="h-3 w-3 rounded-sm border"
       style={{
         borderColor: borderColor,
-        backgroundColor: filled ? color || '#e11d48' : 'transparent',
+        backgroundColor: filled ? color || 'hsl(var(--highlight))' : 'transparent',
       }}
     />
   );
@@ -125,7 +125,7 @@ const Results: React.FC<ResultsProps> = ({
       className="inline-flex min-w-[28px] items-center justify-center rounded-full px-2 py-[2px] text-xs"
       style={{
         backgroundColor: cardBg,
-        border: `1px solid ${variant === 'false' ? '#ec4899' : variant === 'correct' ? '#8b5cf6' : 'rgba(255, 255, 255, 0.3)'}`,
+        border: `1px solid ${variant === 'false' ? 'hsl(var(--highlight))' : variant === 'correct' ? '#10b981' : borderColor}`,
       }}
     >
       {label}
@@ -147,7 +147,16 @@ const Results: React.FC<ResultsProps> = ({
         <Button
           variant="secondary"
           onClick={handleBackToWorklist}
-          className="h-8 px-3 text-sm"
+          className="h-8 px-3 text-sm text-white"
+          style={{
+            backgroundColor: 'hsl(var(--highlight))',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+          }}
         >
           Close
         </Button>
@@ -311,7 +320,7 @@ const Results: React.FC<ResultsProps> = ({
                       true-negative (TN)
                       <div
                         className="mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                        style={{ backgroundColor: '#ec4899' }}
+                        style={{ backgroundColor: 'hsl(var(--highlight))' }}
                       >
                         {results?.TN || 0}
                       </div>
@@ -328,7 +337,7 @@ const Results: React.FC<ResultsProps> = ({
                       false-positive (FP){' '}
                       <div
                         className="mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                        style={{ backgroundColor: '#ec4899' }}
+                        style={{ backgroundColor: 'hsl(var(--highlight))' }}
                       >
                         {results?.FP || 0}
                       </div>
@@ -411,7 +420,7 @@ const Results: React.FC<ResultsProps> = ({
                       false-negative (FN){' '}
                       <div
                         className="mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                        style={{ backgroundColor: '#8b5cf6' }}
+                        style={{ backgroundColor: '#10b981' }}
                       >
                         {results?.FN || 0}
                       </div>
@@ -428,7 +437,7 @@ const Results: React.FC<ResultsProps> = ({
                       true-positive (TP){' '}
                       <div
                         className="mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                        style={{ backgroundColor: '#8b5cf6' }}
+                        style={{ backgroundColor: '#10b981' }}
                       >
                         {results?.TP || 0}
                       </div>
@@ -558,7 +567,16 @@ const Results: React.FC<ResultsProps> = ({
                       <td className="p-3">
                         <Button
                           variant="default"
-                          className="h-7 px-3 text-xs"
+                          className="h-7 px-3 text-xs text-white"
+                          style={{
+                            backgroundColor: 'hsl(var(--highlight))',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+                          }}
                           onClick={() => {
                             const currentParams = new URLSearchParams(window.location.search);
                             currentParams.set('caseId', row.id);
