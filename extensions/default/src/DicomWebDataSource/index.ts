@@ -1,21 +1,28 @@
+import {
+  classes,
+  decryptUrlParam,
+  DicomMetadataStore,
+  errorHandler,
+  IWebApiDataSource,
+  utils,
+} from '@ohif/core';
 import { api } from 'dicomweb-client';
-import { DicomMetadataStore, IWebApiDataSource, utils, errorHandler, classes } from '@ohif/core';
 
+import dcm4cheeReject from './dcm4cheeReject.js';
 import {
   mapParams,
-  search as qidoSearch,
-  seriesInStudy,
   processResults,
   processSeriesResults,
+  search as qidoSearch,
+  seriesInStudy,
 } from './qido.js';
-import dcm4cheeReject from './dcm4cheeReject.js';
 
-import getImageId from './utils/getImageId.js';
 import dcmjs from 'dcmjs';
-import { retrieveStudyMetadata, deleteStudyMetadataPromise } from './retrieveStudyMetadata.js';
-import StaticWadoClient from './utils/StaticWadoClient';
 import getDirectURL from '../utils/getDirectURL';
+import { deleteStudyMetadataPromise, retrieveStudyMetadata } from './retrieveStudyMetadata.js';
 import { fixBulkDataURI } from './utils/fixBulkDataURI';
+import getImageId from './utils/getImageId.js';
+import StaticWadoClient from './utils/StaticWadoClient';
 
 const { DicomMetaDictionary, DicomDict } = dcmjs.data;
 
@@ -658,11 +665,17 @@ function createDicomWebApi(dicomWebConfig: DicomWebConfig, servicesManager) {
       return dicomWebConfigCopy;
     },
     getStudyInstanceUIDs({ params, query }) {
-      const paramsStudyInstanceUIDs = params.StudyInstanceUIDs || params.studyInstanceUIDs;
+      // Decrypt params if they exist
+      const paramsStudyInstanceUIDs = params.StudyInstanceUIDs
+        ? decryptUrlParam(params.StudyInstanceUIDs)
+        : params.studyInstanceUIDs
+          ? decryptUrlParam(params.studyInstanceUIDs)
+          : null;
 
-      const queryStudyInstanceUIDs = utils.splitComma(
-        query.getAll('StudyInstanceUIDs').concat(query.getAll('studyInstanceUIDs'))
-      );
+      // Decrypt query params
+      const queryStudyInstanceUIDs = utils
+        .splitComma(query.getAll('StudyInstanceUIDs').concat(query.getAll('studyInstanceUIDs')))
+        .map(uid => decryptUrlParam(uid));
 
       const StudyInstanceUIDs =
         (queryStudyInstanceUIDs.length && queryStudyInstanceUIDs) || paramsStudyInstanceUIDs;

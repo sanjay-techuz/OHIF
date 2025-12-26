@@ -127,6 +127,7 @@ export {
 };
 
 export * from './apiUtils';
+export * from './cryptoUtils';
 export * from './urlUtils';
 
 export default utils;

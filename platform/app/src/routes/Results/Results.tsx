@@ -1,6 +1,13 @@
 /* eslint-disable */
 // platform/app/src/routes/Results/Results.tsx
-import { apiCall, apiService, getCustomParams } from '@ohif/core';
+import {
+  apiCall,
+  apiService,
+  decryptObject,
+  encrypt,
+  encryptObject,
+  getCustomParams,
+} from '@ohif/core';
 import { Button } from '@ohif/ui-next';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -561,11 +568,16 @@ const Results: React.FC<ResultsProps> = ({
                           className="h-7 px-3 text-xs"
                           onClick={() => {
                             const currentParams = new URLSearchParams(window.location.search);
-                            currentParams.set('caseId', row.id);
-                            currentParams.set('StudyInstanceUIDs', row.study_instance_uid);
+                            const encryptedData = currentParams.get('data');
+                            const decryptedData = decryptObject(encryptedData);
+                            const data = {
+                              ...decryptedData,
+                              caseId: row.id,
+                            };
+                            currentParams.set('data', encryptObject(data));
+                            const encryptedUid = encrypt(row.study_instance_uid || '');
+                            currentParams.set('StudyInstanceUIDs', encryptedUid);
                             currentParams.set('isPreview', 'true');
-
-                            console.log('currentParams =====>', currentParams.toString());
 
                             // Navigate to results page with same query params
                             navigate({

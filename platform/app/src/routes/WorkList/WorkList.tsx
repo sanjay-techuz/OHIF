@@ -7,7 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 //
-import { Types as coreTypes, utils } from '@ohif/core';
+import { Types as coreTypes, encrypt, utils } from '@ohif/core';
 import { useAppConfig } from '@state';
 import { useDebounce, useSearchParams } from '../../hooks';
 import filtersMeta from './filtersMeta.js';
@@ -184,7 +184,8 @@ function WorkList({
     if (filterValues.configUrl) {
       query.append('configUrl', filterValues.configUrl);
     }
-    query.append('StudyInstanceUIDs', selectedStudyInstanceUid);
+    const encryptedUid = encrypt(selectedStudyInstanceUid || '');
+    query.append('StudyInstanceUIDs', encryptedUid);
     query.append('viewType', viewType);
     preserveQueryParameters(query);
 

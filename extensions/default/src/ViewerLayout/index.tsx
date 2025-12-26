@@ -1,7 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
-import { apiCall, apiService, HangingProtocolService, HTTP_STATUS } from '@ohif/core';
+import {
+  apiCall,
+  apiService,
+  decryptObject,
+  encrypt,
+  encryptObject,
+  HangingProtocolService,
+  HTTP_STATUS,
+} from '@ohif/core';
 import {
   ACRDisplay,
   Button,
@@ -522,9 +530,17 @@ function ViewerLayout({
     console.log('targetCase--------------', targetCase);
 
     // Update URL parameters to trigger OHIF reload
+    const currentParams = new URLSearchParams(window.location.search);
     const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('caseId', targetCase.case_id);
-    currentUrl.searchParams.set('StudyInstanceUIDs', targetCase.study_instance_uid);
+    const encryptedData = currentParams.get('data');
+    const decryptedData = decryptObject(encryptedData);
+    const data = {
+      ...decryptedData,
+      caseId: targetCase.case_id,
+    };
+    const encryptedUid = encrypt(targetCase.study_instance_uid || '');
+    currentUrl.searchParams.set('data', encryptObject(data));
+    currentUrl.searchParams.set('StudyInstanceUIDs', encryptedUid);
 
     console.log('currentUrl--------------', currentUrl.toString());
     // Navigate to new URL (this will trigger OHIF to reload all data)
