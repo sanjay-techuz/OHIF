@@ -76,6 +76,8 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   // Check if any active display set is mammography (MG)
   const activeDisplaySets = displaySetService.getActiveDisplaySets();
   const isMammo = activeDisplaySets.some(ds => ds.Modality === 'MG');
+  // Check if any active display set is MRI (MR)
+  const isMR = activeDisplaySets.some(ds => ds.Modality === 'MR');
 
   // Check if it's DBT case by looking for DBT-specific series descriptions or SOP Class UID
   const isDBT = activeDisplaySets.some(ds => {
@@ -176,6 +178,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const [selected, setSelected] = useState(allHangingProtocols[0]?.stageIndex ?? 2);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
+  // Auto-apply mammography hanging protocol
   useEffect(() => {
     if (isMammo) {
       setTimeout(() => {
@@ -196,6 +199,34 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       }, 1000);
     }
   }, [isMammo, allHangingProtocols, commandsManager]);
+
+  // Auto-apply MRI hanging protocol (no dropdown, just apply automatically)
+  useEffect(() => {
+    if (!isMR) {
+      return;
+    }
+
+    // Check if MRI protocol is already applied to avoid re-applying
+    const currentProtocol = hangingProtocolService?.protocol;
+    if (currentProtocol?.id === '@ohif/hpMR') {
+      return;
+    }
+
+    // Apply MRI hanging protocol when MR display sets are detected
+    const timeoutId = setTimeout(() => {
+      commandsManager.run({
+        commandName: 'setHangingProtocol',
+        commandOptions: {
+          protocolId: '@ohif/hpMR',
+          stageIndex: 0, // Default stage (2x3 grid)
+        },
+      });
+    }, 1000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isMR, commandsManager, activeDisplaySets, hangingProtocolService]);
 
   // Reset currentStageIndex when case type or prior status changes
   useEffect(() => {
@@ -348,7 +379,8 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isMammo, handleNextStage, handlePreviousStage]);
 
-  // Hide the dropdown if not a mammography study OR if MR is present (MR dropdown will show instead)
+  // Hide the dropdown if not a mammography study
+  // MRI protocol applies automatically (no dropdown needed)
   if (!isMammo) {
     return null;
   }
