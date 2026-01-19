@@ -402,10 +402,12 @@ function VOIOverlayItem({ voi, customization }: OverlayItemProps) {
       className="overlay-item flex flex-row"
       style={{ color: customization?.color }}
     >
-      <span className="mr-0.5 shrink-0 opacity-[0.70]">W:</span>
-      <span className="mr-2.5 shrink-0">{windowWidth.toFixed(0)}</span>
-      <span className="mr-0.5 shrink-0 opacity-[0.70]">L:</span>
-      <span className="shrink-0">{windowCenter.toFixed(0)}</span>
+      <span className="mr-0.5 shrink-0 opacity-[0.80]">WW/WL:</span>
+      <span className="mr-2.5 shrink-0">
+        {windowWidth.toFixed(0)} / {windowCenter.toFixed(0)}
+      </span>
+      {/* <span className="mr-0.5 shrink-0 opacity-[0.80]">L:</span>
+      <span className="shrink-0">{windowCenter.toFixed(0)}</span> */}
     </div>
   );
 }
@@ -419,7 +421,7 @@ function ZoomOverlayItem({ scale, customization }: OverlayItemProps) {
       className="overlay-item flex flex-row"
       style={{ color: (customization && customization.color) || undefined }}
     >
-      <span className="mr-0.5 shrink-0 opacity-[0.70]">Zoom:</span>
+      <span className="mr-0.5 shrink-0 opacity-[0.80]">Zoom:</span>
       <span>{scale.toFixed(2)}x</span>
     </div>
   );
@@ -443,7 +445,7 @@ function InstanceNumberOverlayItem({
       <span>
         {instanceNumber !== undefined && instanceNumber !== null ? (
           <>
-            <span className="mr-0.5 shrink-0 opacity-[0.70]">I:</span>
+            <span className="mr-0.5 shrink-0 opacity-[0.80]">I:</span>
             <span>{`${instanceNumber} (${imageIndex + 1}/${numberOfSlices})`}</span>
           </>
         ) : (

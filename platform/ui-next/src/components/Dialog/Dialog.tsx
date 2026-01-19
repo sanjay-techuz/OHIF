@@ -93,13 +93,11 @@ const DialogContent = React.forwardRef<
   );
 
   const contentStyle = {
-    border: '1px solid #4F4F4F',
+    border: '',
     ...props.style,
   };
 
-  const style = isDraggable
-    ? { ...contentStyle, transform: initialTransform }
-    : contentStyle;
+  const style = isDraggable ? { ...contentStyle, transform: initialTransform } : contentStyle;
 
   const content = (
     <DialogPrimitive.Content

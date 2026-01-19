@@ -434,7 +434,7 @@ function ViewerViewportGrid(props: withAppTypes) {
   }
 
   return (
-    <div className="border-border h-[calc(100%-0.25rem)] w-full border-none">
+    <div className="h-full w-full border-none">
       <ViewportGrid
         numRows={numRows}
         numCols={numCols}

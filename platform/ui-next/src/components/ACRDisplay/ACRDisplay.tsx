@@ -100,11 +100,14 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
       >
         <div className="flex items-center gap-4">
           {/* ACR Section */}
-          <div className="flex-raw flex items-center gap-1.5">
-            <span className="text-xs font-medium text-gray-300">Breast Density</span>
+          <div className="flex-raw relative flex items-center gap-3">
+            <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
+              Your answer
+            </span>
+            <span className="text-base text-white/80">Breast Density</span>
             <button
               onClick={handleButtonClick}
-              className="rounded-md px-4 py-1 text-center text-sm font-medium text-white transition-colors"
+              className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
               style={{
                 backgroundColor: '#232323',
               }}
@@ -126,11 +129,11 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           </div>
 
           {/* R Section */}
-          <div className="flex-raw flex items-center gap-1.5">
-            <span className="text-xs font-medium text-gray-300">R</span>
+          <div className="flex-raw flex items-center gap-3">
+            <span className="text-base text-gray-300">R</span>
             <button
               onClick={handleButtonClick}
-              className="rounded-md px-4 py-0.5 text-center text-sm font-medium text-white transition-colors"
+              className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
               style={{
                 backgroundColor: '#232323',
               }}
@@ -152,11 +155,11 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           </div>
 
           {/* L Section */}
-          <div className="flex-raw flex items-center gap-1.5">
-            <span className="text-xs font-medium text-gray-300">L</span>
+          <div className="flex-raw flex items-center gap-3">
+            <span className="text-base text-gray-300">L</span>
             <button
               onClick={handleButtonClick}
-              className="rounded-md px-4 py-0.5 text-center text-sm font-medium text-white transition-colors"
+              className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
               style={{
                 backgroundColor: '#232323',
               }}
@@ -215,7 +218,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
         </div>
       </div>
 
-      {isPreview && (
+      {/* {isPreview && (
         <div
           className={`rounded-lg border ${className}`}
           style={{
@@ -227,9 +230,8 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           }}
         >
           <div className="flex items-center gap-6">
-            {/* ACR Section */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-gray-300">Breast Density</span>
+              <span className="text-base text-white/80">Breast Density</span>
               <button
                 onClick={handleButtonClick}
                 className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
@@ -253,7 +255,6 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
               </button>
             </div>
 
-            {/* R Section */}
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-gray-300">R</span>
               <button
@@ -279,7 +280,6 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
               </button>
             </div>
 
-            {/* L Section */}
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-gray-300">L</span>
               <button
@@ -305,7 +305,6 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
               </button>
             </div>
 
-            {/* Hamburger Menu Icon */}
             <button
               onClick={handleButtonClick}
               className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
@@ -340,6 +339,136 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                 />
               </svg>
             </button>
+          </div>
+        </div>
+      )} */}
+      {isPreview && (
+        <div
+          className={`rounded-lg border ${className}`}
+          style={{
+            padding: '0.5rem 1rem',
+            backgroundColor: 'rgba(11, 10, 10, 0.95)',
+            border: '1px solid #6B6C6E',
+            position: 'relative',
+          }}
+        >
+          <div className="flex items-center gap-4">
+            {/* ACR Section */}
+            <div className="flex-raw relative flex items-center gap-3">
+              <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
+                Faculty answer
+              </span>
+              <span className="text-base text-white/80">Breast Density</span>
+              <button
+                onClick={handleButtonClick}
+                className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {studentValues.acr || '-'}
+              </button>
+            </div>
+
+            {/* R Section */}
+            <div className="flex-raw flex items-center gap-3">
+              <span className="text-base text-gray-300">R</span>
+              <button
+                onClick={handleButtonClick}
+                className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {studentValues.r || '-'}
+              </button>
+            </div>
+
+            {/* L Section */}
+            <div className="flex-raw flex items-center gap-3">
+              <span className="text-base text-gray-300">L</span>
+              <button
+                onClick={handleButtonClick}
+                className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {studentValues.l || '-'}
+              </button>
+            </div>
+
+            {/* Hamburger Menu Icon */}
+            {/* <button
+            onClick={handleButtonClick}
+            className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line
+                x1="3"
+                y1="6"
+                x2="21"
+                y2="6"
+              />
+              <line
+                x1="3"
+                y1="12"
+                x2="21"
+                y2="12"
+              />
+              <line
+                x1="3"
+                y1="18"
+                x2="21"
+                y2="18"
+              />
+            </svg>
+          </button> */}
           </div>
         </div>
       )}

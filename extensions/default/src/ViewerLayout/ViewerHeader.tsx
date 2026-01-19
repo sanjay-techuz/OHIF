@@ -106,16 +106,31 @@ function ViewerHeader({
               onClick={onToggleStudiesPanel}
               title="Toggle Studies Panel"
               onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              <Icons.ByName
+              {/* <Icons.ByName
                 name="MenuHamburger"
-                className="h-5 w-5"
-              />
+                className="h-5 w-8"
+              /> */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="25"
+                height="17"
+                viewBox="0 0 25 17"
+                fill="none"
+              >
+                <path
+                  d="M1 8.5H23.5M1 1H23.5M1 16H23.5"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </Button>
           ) : null
         }
