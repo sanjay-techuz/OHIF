@@ -72,7 +72,7 @@ module.exports = {
           foreground: 'hsl(var(--accent-foreground))',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
+          DEFAULT: 'var(--popover)',
           foreground: 'hsl(var(--popover-foreground))',
         },
         card: {
@@ -102,15 +102,15 @@ module.exports = {
       bkg: {
         low: '#050615',
         med: '#090C29',
-        full: '#041C4A',
+        full: '#0b0a0a',
       },
       info: {
         primary: '#FFFFFF',
-        secondary: '#7BB2CE',
+        secondary: '#FFFFFF',
       },
       actions: {
         primary: '#348CFD',
-        highlight: '#5ACCE6',
+        highlight: '#f43f5e',
         hover: 'rgba(52, 140, 253, 0.2)',
       },
     },

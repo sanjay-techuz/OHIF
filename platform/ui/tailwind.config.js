@@ -25,11 +25,11 @@ module.exports = {
       inherit: 'inherit',
 
       aqua: {
-        pale: '#7bb2ce',
+        pale: '#ffffff',
       },
 
       primary: {
-        light: '#5acce6',
+        light: '#ffffff',
         main: '#0944b3',
         dark: '#090c29',
         active: '#348cfd',
@@ -42,9 +42,9 @@ module.exports = {
       },
 
       secondary: {
-        light: '#3a3f99',
+        light: '#2d2728',
         main: '#2b166b',
-        dark: '#041c4a',
+        dark: '#0b0a0a',
         active: '#1f1f27',
       },
 
@@ -62,7 +62,7 @@ module.exports = {
       bkg: {
         low: '#050615',
         med: '#090C29',
-        full: '#041C4A',
+        full: '#0b0a0a',
       },
       info: {
         primary: '#FFFFFF',
@@ -70,7 +70,7 @@ module.exports = {
       },
       actions: {
         primary: '#348CFD',
-        highlight: '#5ACCE6',
+        highlight: '#f43f5e',
         hover: 'rgba(52, 140, 253, 0.2)',
       },
       customgreen: {

@@ -40,7 +40,7 @@ export default class PortalTooltipCard extends Component {
   margin = 15;
 
   defaultArrowStyle = {
-    color: '#090c29', // primary-dark
+    color: '#232323', // tooltip background color
     borderColor: 'rgba(58, 63, 153, 1)', // secondary-light
   };
 
@@ -54,7 +54,7 @@ export default class PortalTooltipCard extends Component {
     const style = {
       position: 'absolute',
       //padding: '5px',
-      background: 'bg-primary-dark',
+      background: '#232323',
       //boxShadow: '0 0 4px rgba(0,0,0,.3)',
       borderRadius: '3px',
       //opacity: this.state.hover || this.props.active ? 1 : 0,

@@ -24,7 +24,7 @@ export function StudyBrowserViewOptions({ tabs, onSelectTab, activeTabName }: wi
         </TooltipTrigger>
         <TooltipContent>{activeTab?.label}</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent className="bg-black">
+      <DropdownMenuContent className="bg-popover">
         {tabs.map(tab => {
           const { name, label, studies } = tab;
           const isActive = activeTabName === name;

@@ -33,6 +33,7 @@ import MissingIcon from './Sources/MissingIcon';
 import More from './Sources/More';
 import MultiplePatients from './Sources/MultiplePatients';
 import NavigationPanelReveal from './Sources/NavigationPanelReveal';
+import MenuHamburger from './Sources/MenuHamburger';
 import OHIFLogo from './Sources/OHIFLogo';
 import Patient from './Sources/Patient';
 import Pin from './Sources/Pin';
@@ -469,6 +470,7 @@ export const Icons = {
   ListView,
   LoadingSpinner,
   Lock,
+  MenuHamburger,
   Minus,
   MissingIcon,
   More,

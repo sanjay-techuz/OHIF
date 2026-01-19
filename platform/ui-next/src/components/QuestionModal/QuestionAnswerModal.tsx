@@ -328,7 +328,7 @@ const QuestionAnswerModal = ({
       isOpen={open}
       onClose={onClose}
       title={`${formType === 'mammography' ? 'Mammography Question' : formType === 'mri' ? 'MRI Question' : 'USG Question'}`}
-      containerClassName="rounded-lg bg-gray-900 shadow-lg max-w-xl"
+      containerClassName="rounded-lg bg-popover shadow-lg max-w-xl"
     >
       <form
         className="space-y-5 overflow-y-auto p-6"

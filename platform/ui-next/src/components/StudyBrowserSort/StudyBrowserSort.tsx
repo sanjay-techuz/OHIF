@@ -61,7 +61,7 @@ export function StudyBrowserSort({ servicesManager }: withAppTypes) {
           </TooltipTrigger>
           <TooltipContent>{selectedSort.label}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent className="bg-black">
+        <DropdownMenuContent className="bg-popover">
           {sortFunctions.map(sort => (
             <DropdownMenuItem
               key={sort.label}

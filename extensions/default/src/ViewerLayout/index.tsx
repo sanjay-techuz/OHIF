@@ -9,10 +9,15 @@ import {
   encryptObject,
   HangingProtocolService,
   HTTP_STATUS,
+  Types,
 } from '@ohif/core';
 import {
   ACRDisplay,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   IconPresentationProvider,
   Icons,
   Onboarding,
@@ -22,11 +27,13 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
   ToolButton,
+  useModal,
 } from '@ohif/ui-next';
 import { useAppConfig } from '@state';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import SidePanelWithServices from '../Components/SidePanelWithServices';
 import { useUIStateStore } from '../stores/useUIStateStore';
-import { Toolbar } from '../Toolbar';
 import useResizablePanels from './ResizablePanelsHook';
 import ViewerHeader from './ViewerHeader';
 
@@ -74,9 +81,19 @@ function ViewerLayout({
   const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
   const [isLoadingCases, setIsLoadingCases] = useState(false);
   const [caseListError, setCaseListError] = useState(null);
+
+  // Add state for validation modal
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [validationMessage, setValidationMessage] = useState('');
+
   const { courseId, moduleId, caseId, studentId, viewType, userType, facultyId, isPreview } =
     useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
+  const { setUIState } = useUIStateStore();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { show } = useModal();
+
   // Get viewType from URL or localStorage
   useEffect(() => {
     if (viewType) {
@@ -106,6 +123,12 @@ function ViewerLayout({
     hasLeftPanels,
     hasRightPanels
   );
+
+  // Extract onOpen and onClose from leftPanelProps
+  const { onOpen: onLeftPanelOpen, onClose: onLeftPanelClose } = leftPanelProps as {
+    onOpen: () => void;
+    onClose: () => void;
+  };
 
   const handleMouseEnter = () => {
     (document.activeElement as HTMLElement)?.blur();
@@ -562,6 +585,56 @@ function ViewerLayout({
     }
   };
 
+  // Add validation function
+  const validateACRForm = (acrValues: { acr: string; r: string; l: string }) => {
+    if (!acrValues.acr || !acrValues.r || !acrValues.l) {
+      setValidationMessage(
+        `There are still some unfinished cases.\n Finish training and see the results?`
+      );
+      setShowValidationModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const UserPreferencesModal = customizationService.getCustomization(
+    'ohif.userPreferencesModal'
+  ) as Types.MenuComponentCustomization;
+
+  const menuOptions = [
+    // {
+    //   title: AboutModal?.menuTitle ?? t('Header:About'),
+    //   icon: 'info',
+    //   onClick: () =>
+    //     show({
+    //       content: AboutModal,
+    //       title: AboutModal?.title ?? t('AboutModal:About OHIF Viewer'),
+    //       containerClassName: AboutModal?.containerClassName ?? 'max-w-md',
+    //     }),
+    // },
+    {
+      title: UserPreferencesModal.menuTitle ?? t('Header:Preferences'),
+      icon: 'settings',
+      onClick: () =>
+        show({
+          content: UserPreferencesModal,
+          title: UserPreferencesModal.title ?? t('UserPreferencesModal:User preferences'),
+          containerClassName:
+            UserPreferencesModal?.containerClassName ?? 'flex max-w-4xl p-6 flex-col',
+        }),
+    },
+  ];
+
+  if (appConfig.oidc) {
+    menuOptions.push({
+      title: t('Header:Logout'),
+      icon: 'power-off',
+      onClick: async () => {
+        navigate(`/logout?redirect_uri=${encodeURIComponent(window.location.href)}`);
+      },
+    });
+  }
+
   // Fetch case list on mount
   useEffect(() => {
     if (userType === 'student') {
@@ -590,10 +663,19 @@ function ViewerLayout({
         }}
         onNextCase={handleNextCase}
         onPreviousCase={handlePreviousCase}
+        onToggleStudiesPanel={() => {
+          // Use the ResizablePanel API callbacks to properly expand/collapse
+          if (leftPanelClosedState) {
+            onLeftPanelOpen();
+          } else {
+            onLeftPanelClose();
+          }
+        }}
+        hasLeftPanels={hasLeftPanels}
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
-        style={{ height: 'calc(100vh - 110px' }}
+        style={{ height: 'calc(100vh - 96px' }}
       >
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
@@ -609,11 +691,14 @@ function ViewerLayout({
                     {...leftPanelProps}
                   />
                 </ResizablePanel>
-                <ResizableHandle
-                  onDragging={onHandleDragging}
-                  disabled={!leftPanelResizable}
-                  className={resizableHandleClassName}
-                />
+                {/* Hide the resize handle when left panel is closed */}
+                {!leftPanelClosedState && (
+                  <ResizableHandle
+                    onDragging={onHandleDragging}
+                    disabled={!leftPanelResizable}
+                    className={resizableHandleClassName}
+                  />
+                )}
               </>
             ) : null}
             {/* TOOLBAR + GRID */}
@@ -633,15 +718,18 @@ function ViewerLayout({
             </ResizablePanel>
             {hasRightPanels ? (
               <>
-                <ResizableHandle
-                  onDragging={onHandleDragging}
-                  disabled={!rightPanelResizable}
-                  className={resizableHandleClassName}
-                />
+                {/* Hide the resize handle for right panel - panel is always hidden */}
+                {false && (
+                  <ResizableHandle
+                    onDragging={onHandleDragging}
+                    disabled={!rightPanelResizable}
+                    className={resizableHandleClassName}
+                  />
+                )}
                 <ResizablePanel {...resizableRightPanelProps}>
                   <SidePanelWithServices
                     side="right"
-                    isExpanded={!rightPanelClosedState}
+                    isExpanded={false}
                     servicesManager={servicesManager}
                     {...rightPanelProps}
                   />
@@ -655,65 +743,286 @@ function ViewerLayout({
         size="large"
         IconContainer={ToolButton}
       >
-        {/* Main Toolbar */}
-        <div className="fixed bottom-0 left-1/2 -translate-x-1/2 transform">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="bg-bkg-full relative flex items-center justify-center gap-3 rounded-lg px-4 py-2 shadow-lg">
+        {/* Bottom Bar - Fixed at bottom with proper alignment */}
+        <div className="bg-bkg-full fixed bottom-0 left-0 right-0 z-50 flex h-[48px] items-center justify-between px-4 shadow-lg">
+          {/* Left Section */}
+          <div className="flex items-center gap-4">
+            {/* Settings Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-primary h-8 w-8"
+                  style={{
+                    backgroundColor: '#232323',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  <Icons.GearSettings />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {menuOptions.map((option, index) => {
+                  const IconComponent = option.icon
+                    ? Icons[option.icon as keyof typeof Icons]
+                    : null;
+                  return (
+                    <DropdownMenuItem
+                      key={index}
+                      onSelect={option.onClick}
+                      className="flex items-center gap-2 py-2"
+                    >
+                      {IconComponent && (
+                        <span className="flex h-4 w-4 items-center justify-center">
+                          <Icons.ByName name={IconComponent.name} />
+                        </span>
+                      )}
+                      <span className="flex-1">{option.title}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* //Center Section - Main Toolbar
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform">
+            <div className="bg-bkg-full flex items-center justify-center gap-3 rounded-lg px-4 py-2 shadow-lg">
               <Toolbar buttonSection="primary" />
             </div>
-          </div>
-        </div>
+          </div> */}
 
-        {/* ACR Display Component - Only visible in diagnostic mode */}
-        {currentViewType === 'diagnostic' && userType === 'faculty' && isAddAnswerClicked && (
-          <div
-            className="fixed bottom-0"
-            style={{ right: '13rem' }}
-          >
-            <ACRDisplay
-              studentValues={studentAcrValues}
-              facultyValues={facultyAcrValues}
-              onValuesChange={setStudentAcrValues}
-            />
+          <div className="flex items-center gap-4">
+            {/* ACR Display Component - Only visible in diagnostic mode */}
+            {currentViewType === 'diagnostic' && userType === 'faculty' && isAddAnswerClicked && (
+              <ACRDisplay
+                studentValues={studentAcrValues}
+                facultyValues={facultyAcrValues}
+                onValuesChange={setStudentAcrValues}
+              />
+            )}
+            {currentViewType === 'diagnostic' && userType === 'student' && (
+              <ACRDisplay
+                studentValues={studentAcrValues}
+                facultyValues={facultyAcrValues}
+                onValuesChange={setStudentAcrValues}
+              />
+            )}
           </div>
-        )}
 
-        {currentViewType === 'diagnostic' && userType === 'student' && (
-          <div
-            className="fixed bottom-0"
-            style={{ right: '13rem' }}
-          >
-            <ACRDisplay
-              studentValues={studentAcrValues}
-              facultyValues={facultyAcrValues}
-              onValuesChange={setStudentAcrValues}
-            />
-          </div>
-        )}
+          {/* Right Section */}
+          <div className="flex items-center gap-4">
+            {/* Case Navigation Buttons */}
+            {caseList.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  disabled={currentCaseIndex === 0 || isLoadingCases}
+                  onClick={handlePreviousCase}
+                  className="h-8 w-8 rounded-lg p-2 text-white disabled:opacity-50"
+                  title="Previous Case (Ctrl+Left)"
+                  style={{
+                    backgroundColor: '#232323',
+                  }}
+                  onMouseEnter={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                    }
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </Button>
+                <span className="min-w-[60px] text-center text-sm text-gray-400">
+                  {isLoadingCases ? '...' : `${currentCaseIndex + 1} / ${caseList.length}`}
+                </span>
+                <Button
+                  variant="ghost"
+                  disabled={currentCaseIndex === caseList.length - 1 || isLoadingCases}
+                  onClick={handleNextCase}
+                  className="h-8 w-8 rounded-lg p-2 text-white disabled:opacity-50"
+                  title="Next Case (Ctrl+Right)"
+                  style={{
+                    backgroundColor: '#232323',
+                  }}
+                  onMouseEnter={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                    }
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </Button>
+              </div>
+            )}
 
-        {/* Undo/Redo Buttons */}
-        <div className="fixed right-10 bottom-1 flex select-none items-center">
-          <div className="flex items-center justify-center space-x-2">
-            <div className="bg-bkg-full relative flex items-center justify-center gap-3 rounded-lg px-4 py-2 shadow-lg">
+            {/* Submit/Add Answer Button */}
+            {userType === 'student' && (
               <Button
-                variant="ghost"
-                className="hover:bg-primary-dark"
+                variant="default"
+                className="h-8 rounded px-4 py-2 text-white"
+                style={{
+                  backgroundColor: 'hsl(var(--highlight))',
+                }}
                 onClick={() => {
-                  commandsManager.run('undo');
+                  // Validate ACR form before submitting
+                  if (validateACRForm(studentAcrValues)) {
+                    // Proceed with submit logic and redirect to results
+                    console.log('Submit button clicked - validation passed');
+
+                    // Get current URL parameters
+                    const currentParams = new URLSearchParams(window.location.search).toString();
+
+                    // Navigate to results page with same query params
+                    navigate({
+                      pathname: '/results',
+                      search: currentParams,
+                    });
+                  }
                 }}
               >
-                <Icons.Undo className="" />
+                {isPreview ? 'Close' : 'Submit'}
               </Button>
+            )}
+            {userType === 'faculty' && !isAddAnswerClicked && (
               <Button
-                variant="ghost"
-                className="hover:bg-primary-dark"
+                variant="default"
+                className="h-8 rounded px-4 py-2 text-white"
+                style={{
+                  backgroundColor: 'hsl(var(--highlight))',
+                }}
                 onClick={() => {
-                  commandsManager.run('redo');
+                  setUIState('addAnswerClicked', true);
                 }}
               >
-                <Icons.Redo className="" />
+                Add Answer
               </Button>
-            </div>
+            )}
+            {isAddAnswerClicked && (
+              <Button
+                variant="default"
+                className="h-8 rounded px-4 py-2 text-white"
+                style={{
+                  backgroundColor: 'hsl(var(--highlight))',
+                }}
+                onClick={() => {
+                  setUIState('addAnswerClicked', false);
+                }}
+              >
+                Submit Answer
+              </Button>
+            )}
+
+            {/* // Undo/Redo Buttons
+            <div className="flex items-center gap-2">
+              <div className="bg-bkg-full flex items-center justify-center gap-2 rounded-lg px-2 py-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-primary h-7 w-7"
+                  onClick={() => {
+                    commandsManager.run('undo');
+                  }}
+                  style={{
+                    backgroundColor: '#232323',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  <Icons.Undo className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-primary h-7 w-7"
+                  onClick={() => {
+                    commandsManager.run('redo');
+                  }}
+                  style={{
+                    backgroundColor: '#232323',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  <Icons.Redo className="h-4 w-4" />
+                </Button>
+              </div>
+            </div> */}
           </div>
         </div>
       </IconPresentationProvider>
@@ -736,6 +1045,47 @@ function ViewerLayout({
           open={showRecallModal}
           onClose={() => setShowRecallModal(false)}
         />
+      )}
+      {/* Validation Modal */}
+      {showValidationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-popover rounded-lg p-6 text-white">
+            <div className="mb-4 text-center">
+              <p className="text-lg">{validationMessage}</p>
+            </div>
+            <div className="flex justify-center gap-4">
+              <Button
+                variant="ghost"
+                className="rounded px-4 py-2 text-white"
+                style={{
+                  backgroundColor: 'hsl(var(--highlight))',
+                }}
+                onClick={() => setShowValidationModal(false)}
+              >
+                No
+              </Button>
+              <Button
+                variant="default"
+                className="rounded px-4 py-2 text-white"
+                style={{
+                  backgroundColor: 'hsl(var(--highlight))',
+                }}
+                onClick={() => {
+                  setShowValidationModal(false);
+
+                  const currentParams = new URLSearchParams(window.location.search);
+
+                  navigate({
+                    pathname: '/results',
+                    search: currentParams.toString(),
+                  });
+                }}
+              >
+                Yes, Finish
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -17,7 +17,7 @@ const RecallModal: React.FC<RecallModalProps> = ({ open, onClose }) => {
       isOpen={open}
       onClose={onClose}
       title="Screening Recall"
-      containerClassName="rounded-lg bg-gray-900 shadow-lg max-w-md"
+      containerClassName="rounded-lg bg-popover shadow-lg max-w-md"
     >
       <div className="p-6">
         <p className="mb-6 text-white">Do you want to recall this case for further review?</p>

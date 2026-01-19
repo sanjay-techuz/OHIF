@@ -1,7 +1,6 @@
 // ACRDisplay component
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { apiCall, apiService } from '@ohif/core';
-import { Button } from '@ohif/ui-next';
 import React, { useState } from 'react';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import ACRSelectorModal, { ACRValues } from '../ACRSelectorModal';
@@ -91,85 +90,97 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
   return (
     <>
       <div
-        className={`rounded-lg border shadow-lg ${className}`}
+        className={`rounded-lg border ${className}`}
         style={{
-          padding: '0.3rem 0.75rem',
-          backgroundColor: 'rgba(4, 28, 74, var(--tw-bg-opacity))',
-          border: '1px solid rgba(59, 130, 246, 0.5)',
+          padding: '0.5rem 1rem',
+          backgroundColor: 'rgba(11, 10, 10, 0.95)',
+          border: '1px solid #6B6C6E',
           position: 'relative',
         }}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            {/* ACR Section */}
-            <div className="relative flex flex-col items-center">
-              <span
-                className="text-primary-light absolute px-1 text-xs font-medium"
-                style={{
-                  backgroundColor: 'rgba(4, 28, 74, var(--tw-bg-opacity))',
-                  zIndex: 1,
-                }}
-              >
-                ACR
-              </span>
-              <Button
-                variant="ghost"
-                className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                style={{ backgroundColor: 'rgba(4, 28, 74, 0.8)' }}
-                onClick={handleButtonClick}
-              >
-                {studentValues.acr || '-'}
-              </Button>
-            </div>
+        <div className="flex items-center gap-4">
+          {/* ACR Section */}
+          <div className="flex-raw flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-300">Breast Density</span>
+            <button
+              onClick={handleButtonClick}
+              className="rounded-md px-4 py-1 text-center text-sm font-medium text-white transition-colors"
+              style={{
+                backgroundColor: '#232323',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+              onFocus={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onBlur={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+            >
+              {studentValues.acr || '-'}
+            </button>
+          </div>
 
-            {/* R Section */}
-            <div className="relative flex flex-col items-center">
-              <span
-                className="text-primary-light absolute px-1 text-xs font-medium"
-                style={{
-                  backgroundColor: 'rgba(4, 28, 74, var(--tw-bg-opacity))',
-                  zIndex: 1,
-                }}
-              >
-                R
-              </span>
-              <Button
-                variant="ghost"
-                className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                style={{ backgroundColor: 'rgba(4, 28, 74, 0.8)' }}
-                onClick={handleButtonClick}
-              >
-                {studentValues.r || '-'}
-              </Button>
-            </div>
+          {/* R Section */}
+          <div className="flex-raw flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-300">R</span>
+            <button
+              onClick={handleButtonClick}
+              className="rounded-md px-4 py-0.5 text-center text-sm font-medium text-white transition-colors"
+              style={{
+                backgroundColor: '#232323',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+              onFocus={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onBlur={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+            >
+              {studentValues.r || '-'}
+            </button>
+          </div>
 
-            {/* L Section */}
-            <div className="relative flex flex-col items-center">
-              <span
-                className="text-primary-light absolute px-1 text-xs font-medium"
-                style={{
-                  backgroundColor: 'rgba(4, 28, 74, var(--tw-bg-opacity))',
-                  zIndex: 1,
-                }}
-              >
-                L
-              </span>
-              <Button
-                variant="ghost"
-                className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                style={{ backgroundColor: 'rgba(4, 28, 74, 0.8)' }}
-                onClick={handleButtonClick}
-              >
-                {studentValues.l || '-'}
-              </Button>
-            </div>
+          {/* L Section */}
+          <div className="flex-raw flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-300">L</span>
+            <button
+              onClick={handleButtonClick}
+              className="rounded-md px-4 py-0.5 text-center text-sm font-medium text-white transition-colors"
+              style={{
+                backgroundColor: '#232323',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+              onFocus={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onBlur={e => {
+                e.currentTarget.style.backgroundColor = '#232323';
+              }}
+            >
+              {studentValues.l || '-'}
+            </button>
           </div>
 
           {/* Hamburger Menu Icon */}
-          <Button
-            variant="ghost"
-            className="text-primary-light hover:bg-primary-dark p-1"
+          {/* <button
             onClick={handleButtonClick}
+            className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
           >
             <svg
               width="16"
@@ -200,91 +211,104 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                 y2="18"
               />
             </svg>
-          </Button>
+          </button> */}
         </div>
       </div>
 
       {isPreview && (
         <div
-          className={`rounded-lg border shadow-lg ${className}`}
+          className={`rounded-lg border ${className}`}
           style={{
-            padding: '0.3rem 0.75rem',
-            backgroundColor: 'rgba(4, 74, 28, var(--tw-bg-opacity))',
-            border: '1px solid rgba(34, 197, 94, 0.5)',
+            padding: '0.75rem 1rem',
+            backgroundColor: 'rgba(4, 74, 28, 0.95)',
+            border: '1px solid rgba(34, 197, 94, 0.3)',
             position: 'relative',
+            marginTop: '0.5rem',
           }}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-              {/* ACR Section */}
-              <div className="relative flex flex-col items-center">
-                <span
-                  className="text-primary-light absolute px-1 text-xs font-medium"
-                  style={{
-                    backgroundColor: 'rgba(4, 74, 28, var(--tw-bg-opacity))',
-                    zIndex: 1,
-                  }}
-                >
-                  ACR
-                </span>
-                <Button
-                  variant="ghost"
-                  className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                  style={{ backgroundColor: 'rgba(4, 74, 28, 0.8)' }}
-                  onClick={handleButtonClick}
-                >
-                  {facultyValues.acr || '-'}
-                </Button>
-              </div>
+          <div className="flex items-center gap-6">
+            {/* ACR Section */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-gray-300">Breast Density</span>
+              <button
+                onClick={handleButtonClick}
+                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {facultyValues.acr || '-'}
+              </button>
+            </div>
 
-              {/* R Section */}
-              <div className="relative flex flex-col items-center">
-                <span
-                  className="text-primary-light absolute px-1 text-xs font-medium"
-                  style={{
-                    backgroundColor: 'rgba(4, 74, 28, var(--tw-bg-opacity))',
-                    zIndex: 1,
-                  }}
-                >
-                  R
-                </span>
-                <Button
-                  variant="ghost"
-                  className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                  style={{ backgroundColor: 'rgba(4, 74, 28, 0.8)' }}
-                  onClick={handleButtonClick}
-                >
-                  {facultyValues.r || '-'}
-                </Button>
-              </div>
+            {/* R Section */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-gray-300">R</span>
+              <button
+                onClick={handleButtonClick}
+                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {facultyValues.r || '-'}
+              </button>
+            </div>
 
-              {/* L Section */}
-              <div className="relative flex flex-col items-center">
-                <span
-                  className="text-primary-light absolute px-1 text-xs font-medium"
-                  style={{
-                    backgroundColor: 'rgba(4, 74, 28, var(--tw-bg-opacity))',
-                    zIndex: 1,
-                  }}
-                >
-                  L
-                </span>
-                <Button
-                  variant="ghost"
-                  className="border-primary-light text-primary-light hover:bg-primary-dark mt-2 h-8 min-w-[40px] rounded border px-2"
-                  style={{ backgroundColor: 'rgba(4, 74, 28, 0.8)' }}
-                  onClick={handleButtonClick}
-                >
-                  {facultyValues.l || '-'}
-                </Button>
-              </div>
+            {/* L Section */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-gray-300">L</span>
+              <button
+                onClick={handleButtonClick}
+                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#232323',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {facultyValues.l || '-'}
+              </button>
             </div>
 
             {/* Hamburger Menu Icon */}
-            <Button
-              variant="ghost"
-              className="text-primary-light hover:bg-primary-dark p-1"
+            <button
               onClick={handleButtonClick}
+              className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
             >
               <svg
                 width="16"
@@ -315,7 +339,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                   y2="18"
                 />
               </svg>
-            </Button>
+            </button>
           </div>
         </div>
       )}

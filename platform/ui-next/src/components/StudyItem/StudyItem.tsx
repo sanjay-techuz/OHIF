@@ -34,8 +34,24 @@ const StudyItem = ({
       tabIndex={0}
       defaultValue={isActive ? 'study-item' : undefined}
     >
-      <AccordionItem value="study-item">
-        <AccordionTrigger className={classnames('hover:bg-accent bg-popover group w-full rounded')}>
+      <AccordionItem
+        value="study-item"
+        className="mb-[4px]"
+      >
+        <AccordionTrigger
+          className={classnames('group w-full rounded mb-[4px]')}
+          style={{
+            backgroundColor: isActive ? '#232323' : '#151515',
+          }}
+          onMouseEnter={e => {
+            if (!isActive) {
+              e.currentTarget.style.backgroundColor = '#1A1A1A';
+            }
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.backgroundColor = isActive ? '#232323' : '#151515';
+          }}
+        >
           <div className="flex h-[40px] w-full flex-row overflow-hidden">
             <div className="flex w-full flex-row items-center justify-between">
               <div className="flex min-w-0 flex-col items-start text-[13px]">

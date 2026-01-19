@@ -1,15 +1,7 @@
 import { IconPresentationProvider } from '@ohif/ui-next';
 import classNames from 'classnames';
 import React, { ReactNode } from 'react';
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Icons,
-  ToolButton,
-} from '../';
+import { Icons, ToolButton } from '../';
 
 import NavBar from '../NavBar';
 
@@ -17,11 +9,11 @@ import NavBar from '../NavBar';
 
 interface HeaderProps {
   children?: ReactNode;
-  menuOptions: Array<{
-    title: string;
-    icon?: string;
-    onClick: () => void;
-  }>;
+  // menuOptions: Array<{
+  //   title: string;
+  //   icon?: string;
+  //   onClick: () => void;
+  // }>;
   isReturnEnabled?: boolean;
   onClickReturnButton?: () => void;
   isSticky?: boolean;
@@ -31,12 +23,12 @@ interface HeaderProps {
   PatientInfo?: ReactNode;
   Secondary?: ReactNode;
   UndoRedo?: ReactNode;
-  SubmitButton?: ReactNode;
+  StudiesToggle?: ReactNode;
 }
 
 function Header({
   children,
-  menuOptions,
+  // menuOptions,
   isReturnEnabled = true,
   onClickReturnButton,
   isSticky = false,
@@ -44,7 +36,7 @@ function Header({
   PatientInfo,
   UndoRedo,
   Secondary,
-  SubmitButton,
+  StudiesToggle,
   ...props
 }: HeaderProps): ReactNode {
   const onClickReturn = () => {
@@ -77,19 +69,22 @@ function Header({
                 {WhiteLabeling?.createLogoComponentFn?.(React, props) || <Icons.OHIFLogo />}
               </div>
             </div>
+            {StudiesToggle}
+            {Secondary}
           </div>
-          <div className="absolute top-1/2 left-[250px] h-8 -translate-y-1/2">{Secondary}</div>
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform">
+          {/* <div className="absolute top-1/2 left-[250px] flex h-8 -translate-y-1/2 items-center gap-2">
+            {StudiesToggle}
+            {Secondary}
+          </div> */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 transform">
             <div className="flex items-center justify-center space-x-2">{children}</div>
           </div>
           <div className="absolute right-0 top-1/2 flex -translate-y-1/2 select-none items-center">
             {UndoRedo}
             <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>
-            {SubmitButton}
-            <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>
             {PatientInfo}
             <div className="border-primary-dark mx-1.5 h-[25px] border-r"></div>
-            <div className="flex-shrink-0">
+            {/* <div className="flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -122,7 +117,7 @@ function Header({
                   })}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            </div> */}
           </div>
         </div>
       </NavBar>
