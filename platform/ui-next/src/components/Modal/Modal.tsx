@@ -35,7 +35,7 @@ const Modal: React.FC<ModalProps> = ({
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
         )}
-        <div className={cn('mt-2')}>{children}</div>
+        <div className={cn('')}>{children}</div>
       </DialogContent>
     </Dialog>
   );

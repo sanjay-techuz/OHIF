@@ -328,11 +328,11 @@ const QuestionAnswerModal = ({
       isOpen={open}
       onClose={onClose}
       title={`${formType === 'mammography' ? 'Mammography Question' : formType === 'mri' ? 'MRI Question' : 'USG Question'}`}
-      containerClassName="rounded-lg bg-popover shadow-lg max-w-xl"
+      containerClassName="max-w-[520px] !rounded-2xl p-10 max-h-[90vh] overflow-auto"
     >
       <form
-        className="space-y-5 overflow-y-auto p-6"
-        style={{ maxHeight: '80vh' }}
+        className="overflow-y-auto"
+        // style={{ maxHeight: '80vh' }}
         onSubmit={e => {
           e.preventDefault();
           handleSubmit();
@@ -363,18 +363,36 @@ const QuestionAnswerModal = ({
         {!isPreview && (
           <div className="mt-6 flex justify-end gap-3">
             <Button
-              type="submit"
-              className="px-6 py-2 text-base font-semibold"
-            >
-              Save
-            </Button>
-            <Button
               variant="ghost"
               type="button"
               onClick={onClose}
-              className="px-6 py-2 text-base font-semibold"
+              className="px-4 py-2 text-xl font-medium text-white"
+              style={{
+                backgroundColor: 'transparent',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = '#2E2E2E';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               Close
+            </Button>
+            <Button
+              type="submit"
+              className="px-4 py-2 text-xl font-medium text-white"
+              style={{
+                backgroundColor: 'hsl(var(--highlight))',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+              }}
+            >
+              Save
             </Button>
           </div>
         )}

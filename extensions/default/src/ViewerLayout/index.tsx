@@ -675,7 +675,7 @@ function ViewerLayout({
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
-        style={{ height: 'calc(100vh - 128px' }}
+        style={{ height: 'calc(100vh - 131.5px' }}
       >
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
@@ -744,7 +744,7 @@ function ViewerLayout({
         IconContainer={ToolButton}
       >
         {/* Bottom Bar - Fixed at bottom with proper alignment */}
-        <div className="bg-bkg-full fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between border-t border-white/10 py-2.5 px-7 shadow-lg">
+        <div className="bg-bkg-full fixed bottom-0 left-0 right-0 z-50 flex h-[66.5px] items-center justify-between border-t border-white/10 py-2.5 px-7 shadow-lg">
           {/* Left Section */}
           <div className="flex items-center gap-4">
             {/* Settings Dropdown */}
@@ -915,7 +915,7 @@ function ViewerLayout({
             {userType === 'student' && (
               <Button
                 variant="default"
-                className="h-8 rounded px-4 py-2 text-white"
+                className="h-auto rounded px-4 py-2 text-xl font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
@@ -942,7 +942,7 @@ function ViewerLayout({
             {userType === 'faculty' && !isAddAnswerClicked && (
               <Button
                 variant="default"
-                className="h-8 rounded px-4 py-2 text-white"
+                className="h-auto rounded px-4 py-2 text-xl font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
@@ -956,7 +956,7 @@ function ViewerLayout({
             {isAddAnswerClicked && (
               <Button
                 variant="default"
-                className="h-8 rounded px-4 py-2 text-white"
+                className="h-auto rounded px-4 py-2 text-xl font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}

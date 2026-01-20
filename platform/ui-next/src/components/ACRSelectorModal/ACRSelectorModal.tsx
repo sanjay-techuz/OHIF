@@ -58,32 +58,25 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
     <Modal
       isOpen={open}
       onClose={onClose}
-      containerClassName="max-w-md rounded-lg"
+      containerClassName="max-w-[640px] !rounded-2xl p-10"
     >
       {/* <div className="bg-bkg-primary border-primary-dark rounded-lg border p-6 shadow-lg"> */}
-      <div className="mb-6">
-        <h2 className="text-primary-light mb-2 text-xl font-semibold">ACR Classification</h2>
-        <p className="text-primary-light text-sm opacity-80">
+      <div className="mb-10 grid gap-2">
+        <h2 className="text-primary-light text-2xl font-bold leading-tight">ACR Classification</h2>
+        <p className="text-primary-light text-xl opacity-80">
           Select values for Breast Density, Right (R), and Left (L) classifications
         </p>
       </div>
 
       <div className="space-y-4">
         {/* ACR Selection */}
-        <div className="space-y-2">
-          <label className="text-primary-light text-sm font-medium">ACR (Breast Density)</label>
+        <div className="space-y-1.5">
+          <label className="text-primary-light text-base">ACR (Breast Density)</label>
           <Select
             value={values.acr}
             onValueChange={value => setValues(prev => ({ ...prev, acr: value }))}
           >
-            <SelectTrigger
-              className="w-full"
-              style={{
-                borderRadius: '8px',
-                border: '1px solid #4F4F4F',
-                boxShadow: '0 1px 2px 0 rgba(10, 13, 18, 0.05)',
-              }}
-            >
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Select Breast Density" />
             </SelectTrigger>
             <SelectContent>
@@ -100,8 +93,8 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
         </div>
 
         {/* R (Right) Selection */}
-        <div className="space-y-2">
-          <label className="text-primary-light text-sm font-medium">R (Right Breast)</label>
+        <div className="space-y-1.5">
+          <label className="text-primary-light text-base">R (Right Breast)</label>
           <Select
             value={values.r}
             onValueChange={value => setValues(prev => ({ ...prev, r: value }))}
@@ -130,8 +123,8 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
         </div>
 
         {/* L (Left) Selection */}
-        <div className="space-y-2">
-          <label className="text-primary-light text-sm font-medium">L (Left Breast)</label>
+        <div className="space-y-1.5">
+          <label className="text-primary-light text-base">L (Left Breast)</label>
           <Select
             value={values.l}
             onValueChange={value => setValues(prev => ({ ...prev, l: value }))}
@@ -161,11 +154,11 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="mt-6 flex justify-end space-x-3">
+      <div className="mt-8 flex justify-end space-x-3">
         <Button
           variant="ghost"
           onClick={handleCancel}
-          className="text-white"
+          className="px-4 py-2 text-xl font-medium text-white"
           style={{
             backgroundColor: 'transparent',
           }}
@@ -180,7 +173,7 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
         </Button>
         <Button
           onClick={handleSave}
-          className="text-white"
+          className="px-4 py-2 text-xl font-medium text-white"
           style={{
             backgroundColor: 'hsl(var(--highlight))',
           }}
