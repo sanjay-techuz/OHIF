@@ -1,4 +1,4 @@
-import { Icons, ToggleGroup, ToggleGroupItem } from '@ohif/ui-next';
+import { Icons } from '@ohif/ui-next';
 import React from 'react';
 import { actionIcon, viewPreset } from './types';
 
@@ -15,6 +15,19 @@ function PanelStudyBrowserHeader({
   updateActionIconValue: (actionIcon: actionIcon) => void;
   onClose?: () => void;
 }) {
+  // Find the currently selected view preset
+  const currentViewPreset = viewPresets?.find(preset => preset.selected) || viewPresets?.[0];
+
+  // Find the other view preset (the one that's not currently selected)
+  const otherViewPreset = viewPresets?.find(preset => preset.id !== currentViewPreset?.id);
+
+  // Handle toggle click - switch to the other view
+  const handleToggleClick = () => {
+    if (otherViewPreset) {
+      updateViewPresetValue(otherViewPreset);
+    }
+  };
+
   return (
     <div className="flex w-full items-center gap-[10px] pr-2">
       {/* Studies text on the left */}
@@ -36,32 +49,25 @@ function PanelStudyBrowserHeader({
           </div>
         </div>
       )}
-      {/* View preset buttons on the right */}
-      {viewPresets && viewPresets.length > 0 && (
+      {/* Single toggle button on the right */}
+      {currentViewPreset && (
         <div className="ml-auto flex shrink-0 items-center justify-center">
-          <ToggleGroup
-            type="single"
-            value={viewPresets.filter(preset => preset.selected)[0]?.id || viewPresets[0]?.id}
-            onValueChange={value => {
-              const selectedViewPreset = viewPresets.find(preset => preset.id === value);
-              if (selectedViewPreset) {
-                updateViewPresetValue(selectedViewPreset);
-              }
+          <button
+            onClick={handleToggleClick}
+            aria-label={`Switch to ${otherViewPreset?.id || 'other'} view`}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10"
+            style={{ backgroundColor: '#232323' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#2E2E2E';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = '#232323';
             }}
           >
-            {viewPresets.map((viewPreset: viewPreset, index) => (
-              <ToggleGroupItem
-                key={index}
-                aria-label={viewPreset.id}
-                value={viewPreset.id}
-                className="text-white"
-              >
-                {React.createElement(Icons[viewPreset.iconName] || Icons.MissingIcon, {
-                  style: { width: '20px', height: '20px', flexShrink: 0 },
-                })}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            {React.createElement(Icons[currentViewPreset.iconName] || Icons.MissingIcon, {
+              style: { width: '20px', height: '20px', flexShrink: 0 },
+            })}
+          </button>
         </div>
       )}
     </div>

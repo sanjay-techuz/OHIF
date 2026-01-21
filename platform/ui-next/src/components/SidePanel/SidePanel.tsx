@@ -458,7 +458,7 @@ const SidePanel = ({
             className="relative flex h-[40px] flex-shrink-0 select-none rounded-t p-2"
             style={{ backgroundColor: '#232323' }}
           >
-            {getCloseIcon()}
+            {/* {getCloseIcon()} */}
             <div
               className="flex w-full grow items-center"
               style={{
