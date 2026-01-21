@@ -59,7 +59,8 @@ const closeIconWidth = 30;
 const gridHorizontalPadding = 10;
 const tabSpacerWidth = 2;
 
-const baseClasses = 'bg-black border-black justify-start box-content flex flex-col';
+const baseClasses =
+  'bg-[#0B0A0A] border-black justify-start box-content flex flex-col pl-10 pr-6 !max-w-[calc(100%-64px)] !w-[calc(100%-64px)]';
 
 const openStateIconName = {
   left: 'SidePanelCloseLeft',
@@ -482,7 +483,7 @@ const SidePanel = ({
     return (
       <>
         <div
-          className="flex h-[40px] flex-shrink-0 select-none rounded-t p-2"
+          className="flex h-[40px] w-full flex-shrink-0 select-none rounded-t p-2"
           style={{ backgroundColor: '#232323' }}
         >
           {tabs.length === 1 ? getOneTabComponent() : getTabGridComponent()}

@@ -9,11 +9,7 @@ interface UserPreferencesModalProps {
 }
 
 export function UserPreferencesModal({ children, className }: UserPreferencesModalProps) {
-  return (
-    <div className={cn('flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden', className)}>
-      {children}
-    </div>
-  );
+  return <div className={cn('flex w-full max-w-4xl flex-col', className)}>{children}</div>;
 }
 
 /** Body
@@ -39,7 +35,11 @@ interface SubHeadingProps {
   className?: string;
 }
 function SubHeading({ children, className }: SubHeadingProps) {
-  return <span className={cn('text-muted-foreground text-lg', className)}>{children}</span>;
+  return (
+    <span className={cn('text-primary-light text-xl font-semibold opacity-80', className)}>
+      {children}
+    </span>
+  );
 }
 
 /** Responsive 3-column grid for hotkeys, etc. */
@@ -49,7 +49,7 @@ interface HotkeysGridProps {
 }
 function HotkeysGrid({ children, className }: HotkeysGridProps) {
   return (
-    <div className={cn('grid grid-cols-1 gap-3 gap-x-16 md:grid-cols-2 lg:grid-cols-3', className)}>
+    <div className={cn('grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4', className)}>
       {children}
     </div>
   );
@@ -95,11 +95,11 @@ function Hotkey({ label, placeholder, className, value, onChange, hotkeys }: Hot
   };
 
   return (
-    <div className={cn('flex items-center justify-between space-x-2', className)}>
+    <div className={cn('flex flex-col items-start justify-between gap-2', className)}>
       <Label className="whitespace-nowrap">{label}</Label>
       <Input
         className={cn(
-          'w-16 text-center transition-colors',
+          'ml-0 text-left',
           isRecording && 'bg-accent text-accent-foreground caret-accent-foreground'
         )}
         placeholder={isRecording ? 'Press keys...' : placeholder}
