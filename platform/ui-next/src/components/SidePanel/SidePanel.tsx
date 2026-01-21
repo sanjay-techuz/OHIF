@@ -28,6 +28,7 @@ type SidePanelProps = {
   collapsedInsideBorderSize: number;
   collapsedOutsideBorderSize: number;
   tabs: any;
+  customHeader?: React.ReactNode;
 };
 
 type StyleMap = {
@@ -193,6 +194,7 @@ const SidePanel = ({
   expandedInsideBorderSize = 4,
   collapsedInsideBorderSize = 8,
   collapsedOutsideBorderSize = 4,
+  customHeader,
 }: SidePanelProps) => {
   const [panelOpen, setPanelOpen] = useState(isExpanded);
   const [activeTabIndex, setActiveTabIndex] = useState(activeTabIndexProp ?? 0);
@@ -447,6 +449,36 @@ const SidePanel = ({
   };
 
   const getOpenStateComponent = () => {
+    // If customHeader is provided, use it instead of the default tab header
+    if (customHeader) {
+      return (
+        <>
+          <div
+            className="relative flex h-[40px] flex-shrink-0 select-none rounded-t p-2"
+            style={{ backgroundColor: '#232323' }}
+          >
+            {getCloseIcon()}
+            <div
+              className="flex w-full grow items-center"
+              style={{
+                paddingRight: side === 'left' ? `${closeIconWidth}px` : '0',
+                paddingLeft: side === 'right' ? `${closeIconWidth}px` : '0',
+                minWidth: 0,
+                overflow: 'visible',
+              }}
+            >
+              {customHeader}
+            </div>
+          </div>
+          <Separator
+            orientation="horizontal"
+            className="bg-black"
+            thickness="2px"
+          />
+        </>
+      );
+    }
+
     return (
       <>
         <div

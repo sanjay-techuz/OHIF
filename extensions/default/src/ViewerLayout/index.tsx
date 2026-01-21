@@ -36,6 +36,7 @@ import SidePanelWithServices from '../Components/SidePanelWithServices';
 import { useUIStateStore } from '../stores/useUIStateStore';
 import useResizablePanels from './ResizablePanelsHook';
 import ViewerHeader from './ViewerHeader';
+import { StudyBrowserHeaderProvider } from '../Panels/StudyBrowser/StudyBrowserHeaderContext';
 
 const resizableHandleClassName = 'mt-[1px] bg-black';
 
@@ -684,12 +685,14 @@ function ViewerLayout({
             {hasLeftPanels ? (
               <>
                 <ResizablePanel {...resizableLeftPanelProps}>
-                  <SidePanelWithServices
-                    side="left"
-                    isExpanded={!leftPanelClosedState}
-                    servicesManager={servicesManager}
-                    {...leftPanelProps}
-                  />
+                  <StudyBrowserHeaderProvider>
+                    <SidePanelWithServices
+                      side="left"
+                      isExpanded={!leftPanelClosedState}
+                      servicesManager={servicesManager}
+                      {...leftPanelProps}
+                    />
+                  </StudyBrowserHeaderProvider>
                 </ResizablePanel>
                 {/* Hide the resize handle when left panel is closed */}
                 {!leftPanelClosedState && (
