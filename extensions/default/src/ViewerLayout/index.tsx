@@ -620,7 +620,8 @@ function ViewerLayout({
           content: UserPreferencesModal,
           title: UserPreferencesModal.title ?? t('UserPreferencesModal:User preferences'),
           containerClassName:
-            UserPreferencesModal?.containerClassName ?? 'flex max-w-4xl p-6 flex-col',
+            UserPreferencesModal?.containerClassName ??
+            'flex max-w-4xl p-6 flex-col max-h-[80vh] overflow-auto',
         }),
     },
   ];
@@ -675,14 +676,14 @@ function ViewerLayout({
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
-        style={{ height: 'calc(100vh - 131.5px' }}
+        style={{ height: 'calc(100vh - 130.5px' }}
       >
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
           <ResizablePanelGroup {...resizablePanelGroupProps}>
             {/* LEFT SIDEPANELS */}
             {hasLeftPanels ? (
-              <>
+              <div className="bg-[#0B0A0A]">
                 <ResizablePanel {...resizableLeftPanelProps}>
                   <SidePanelWithServices
                     side="left"
@@ -699,7 +700,7 @@ function ViewerLayout({
                     className={resizableHandleClassName}
                   />
                 )}
-              </>
+              </div>
             ) : null}
             {/* TOOLBAR + GRID */}
             <ResizablePanel {...resizableViewportGridPanelProps}>

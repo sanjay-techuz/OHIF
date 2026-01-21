@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSystem, hotkeys as hotkeysModule } from '@ohif/core';
-import { UserPreferencesModal, FooterAction } from '@ohif/ui-next';
+import { UserPreferencesModal, FooterAction, Button } from '@ohif/ui-next';
 import { useTranslation } from 'react-i18next';
 import i18n from '@ohif/i18n';
 
@@ -62,7 +62,7 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
       <UserPreferencesModal.Body>
         {/* Language Section */}
         <div className="mb-3 flex items-center space-x-14">
-          <UserPreferencesModal.SubHeading>{t('Language')}</UserPreferencesModal.SubHeading>
+          {/* <UserPreferencesModal.SubHeading>{t('Language')}</UserPreferencesModal.SubHeading> */}
           <Select
             defaultValue={state.languageValue}
             onValueChange={onLanguageChangeHandler}
@@ -102,12 +102,15 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
       </UserPreferencesModal.Body>
       <FooterAction>
         <FooterAction.Left>
-          <FooterAction.Auxiliary onClick={onResetHandler}>
+          <FooterAction.Auxiliary
+            onClick={onResetHandler}
+            className="bg-primary/25 hover:bg-primary/40"
+          >
             {t('Reset to defaults')}
           </FooterAction.Auxiliary>
         </FooterAction.Left>
-        <FooterAction.Right>
-          <FooterAction.Secondary
+        <FooterAction.Right className="mt-8 flex justify-end space-x-3">
+          {/* <FooterAction.Secondary
             onClick={() => {
               hotkeysModule.stopRecord();
               hotkeysModule.unpause();
@@ -115,8 +118,28 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
             }}
           >
             {t('Cancel')}
-          </FooterAction.Secondary>
-          <FooterAction.Primary
+          </FooterAction.Secondary> */}
+          <Button
+            variant="ghost"
+            onClick={() => {
+              hotkeysModule.stopRecord();
+              hotkeysModule.unpause();
+              hide();
+            }}
+            className="px-4 py-2 text-xl font-medium text-white"
+            style={{
+              backgroundColor: 'transparent',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#2E2E2E';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            Cancel
+          </Button>
+          {/* <FooterAction.Primary
             onClick={() => {
               if (state.languageValue !== currentLanguage.value) {
                 i18n.changeLanguage(state.languageValue);
@@ -128,7 +151,30 @@ function UserPreferencesModalDefault({ hide }: { hide: () => void }) {
             }}
           >
             {t('Save')}
-          </FooterAction.Primary>
+          </FooterAction.Primary> */}
+          <Button
+            onClick={() => {
+              if (state.languageValue !== currentLanguage.value) {
+                i18n.changeLanguage(state.languageValue);
+              }
+              hotkeysManager.setHotkeys(state.hotkeyDefinitions);
+              hotkeysModule.stopRecord();
+              hotkeysModule.unpause();
+              hide();
+            }}
+            className="px-4 py-2 text-xl font-medium text-white"
+            style={{
+              backgroundColor: 'hsl(var(--highlight))',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+            }}
+          >
+            Save
+          </Button>
         </FooterAction.Right>
       </FooterAction>
     </UserPreferencesModal>

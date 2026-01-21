@@ -39,7 +39,7 @@ const StudyItem = ({
         className="mb-[4px]"
       >
         <AccordionTrigger
-          className={classnames('group w-full rounded mb-[4px]')}
+          className={classnames('group mb-4 w-full border-b border-white/30 pb-2')}
           style={{
             backgroundColor: isActive ? '#232323' : '#151515',
           }}
@@ -52,7 +52,7 @@ const StudyItem = ({
             e.currentTarget.style.backgroundColor = isActive ? '#232323' : '#151515';
           }}
         >
-          <div className="flex h-[40px] w-full flex-row overflow-hidden">
+          <div className="flex w-full flex-row overflow-hidden">
             <div className="flex w-full flex-row items-center justify-between">
               <div className="flex min-w-0 flex-col items-start text-[13px]">
                 <Tooltip>
@@ -61,7 +61,7 @@ const StudyItem = ({
                     className="w-full"
                     asChild
                   >
-                    <div className="h-[18px] w-full max-w-[160px] overflow-hidden truncate whitespace-nowrap text-left text-white">
+                    <div className="w-full max-w-[160px] overflow-hidden truncate whitespace-nowrap pb-1 text-left text-base text-white/80">
                       {date}
                     </div>
                   </TooltipTrigger>
@@ -72,15 +72,15 @@ const StudyItem = ({
                     className="w-full"
                     asChild
                   >
-                    <div className="text-muted-foreground h-[18px] w-full overflow-hidden truncate whitespace-nowrap text-left">
+                    <div className="w-full max-w-[160px] overflow-hidden truncate whitespace-nowrap text-left text-base text-white/80">
                       {description}
                     </div>
                   </TooltipTrigger>
                 </Tooltip>
               </div>
-              <div className="text-muted-foreground flex flex-col items-end pl-[10px] text-[12px]">
-                <div className="max-w-[150px] overflow-hidden text-ellipsis">{modalities}</div>
-                <div>{numInstances}</div>
+              <div className="flex items-end gap-1 pl-[10px] text-[12px] text-white/80">
+                <span className="max-w-[150px] overflow-hidden text-ellipsis">{modalities}</span>
+                <span>{numInstances}</span>
               </div>
               {StudyMenuItems && (
                 <div className="ml-2 flex items-center">

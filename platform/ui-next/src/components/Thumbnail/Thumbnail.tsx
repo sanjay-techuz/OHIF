@@ -62,28 +62,28 @@ const Thumbnail = ({
     return (
       <div
         className={classnames(
-          'flex h-full w-full flex-col items-center justify-center gap-[2px] p-[4px] rounded',
+          'flex h-full w-full flex-col items-center justify-center',
           isActive ? '' : ''
         )}
         style={{
           backgroundColor: isActive ? '#232323' : '#2E2E2E',
         }}
       >
-        <div className="h-[114px] w-[128px]">
+        <div className="h-[114px] w-full">
           <div className="relative bg-black">
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={imageAltText}
-                className="h-[114px] w-[128px] rounded object-contain"
+                className="h-[114px] w-full rounded object-contain"
                 crossOrigin="anonymous"
               />
             ) : (
-              <div className="bg-background h-[114px] w-[128px] rounded"></div>
+              <div className="bg-background h-[114px] w-full rounded"></div>
             )}
 
             {/* bottom left */}
-            <div className="absolute bottom-0 left-0 flex h-[14px] items-center gap-[4px] rounded-tr pt-[10px] pb-[10px] pr-[6px] pl-[5px]">
+            <div className="absolute bottom-2 left-3 flex items-center gap-[4px] rounded-tr">
               <div
                 className={classnames(
                   'h-[10px] w-[10px] rounded-[2px]',
@@ -138,18 +138,18 @@ const Thumbnail = ({
             </div>
           </div>
         </div>
-        <div className="flex h-[52px] w-[128px] flex-col justify-start pt-px">
+        <div className="flex w-full flex-col justify-start border-none bg-[#0B0A0A] p-3">
           <Tooltip>
             <TooltipContent>{description}</TooltipContent>
             <TooltipTrigger>
-              <div className="min-h-[18px] w-[128px] overflow-hidden text-ellipsis whitespace-nowrap pb-0.5 pl-1 text-left text-[12px] font-normal leading-4 text-white">
+              <div className="overflow-hidden text-ellipsis whitespace-nowrap pb-1.5 text-left text-[12px] font-normal leading-4 text-white/80">
                 {description}
               </div>
             </TooltipTrigger>
           </Tooltip>
-          <div className="flex h-[12px] items-center gap-[7px] overflow-hidden">
-            <div className="text-muted-foreground pl-1 text-[11px]"> S:{seriesNumber}</div>
-            <div className="text-muted-foreground text-[11px]">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="text-[11px] text-white/80"> S:{seriesNumber}</div>
+            <div className="text-[11px] text-white/80">
               <div className="flex items-center gap-[4px]">
                 {countIcon ? (
                   React.createElement(Icons[countIcon] || Icons.MissingIcon, { className: 'w-3' })
@@ -169,7 +169,7 @@ const Thumbnail = ({
     return (
       <div
         className={classnames(
-          'flex h-full w-full items-center justify-between pr-[8px] pl-[8px] pt-[4px] pb-[4px] rounded'
+          'flex h-full w-full items-center justify-between rounded pr-[8px] pl-[8px] pt-[4px] pb-[4px]'
         )}
         style={{
           backgroundColor: isActive ? '#232323' : '#2E2E2E',
@@ -189,16 +189,16 @@ const Thumbnail = ({
               <Tooltip>
                 <TooltipContent>{description}</TooltipContent>
                 <TooltipTrigger className="w-full overflow-hidden">
-                  <div className="max-w-[160px] overflow-hidden overflow-ellipsis whitespace-nowrap text-left text-[13px] font-normal text-white">
+                  <div className="max-w-[160px] overflow-hidden overflow-ellipsis whitespace-nowrap text-left text-[13px] font-normal text-white/80">
                     {description}
                   </div>
                 </TooltipTrigger>
               </Tooltip>
             </div>
 
-            <div className="flex h-[12px] items-center gap-[7px] overflow-hidden">
-              <div className="text-muted-foreground text-[12px]"> S:{seriesNumber}</div>
-              <div className="text-muted-foreground text-[12px]">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <div className="text-[12px] text-white/80"> S:{seriesNumber}</div>
+              <div className="text-[12px] text-white/80">
                 <div className="flex items-center gap-[4px]">
                   {' '}
                   {countIcon ? (
@@ -258,8 +258,8 @@ const Thumbnail = ({
     <div
       className={classnames(
         className,
-        'bg-muted hover:bg-primary/30 group flex cursor-pointer select-none flex-col rounded outline-none',
-        viewPreset === 'thumbnails' && 'h-[170px] w-[135px]',
+        'hover:bg-primary/30 group flex cursor-pointer select-none flex-col overflow-hidden rounded-lg border border-white/80 bg-[#000000] outline-none',
+        viewPreset === 'thumbnails' && '',
         viewPreset === 'list' && 'h-[40px] w-full'
       )}
       id={`thumbnail-${displaySetInstanceUID}`}

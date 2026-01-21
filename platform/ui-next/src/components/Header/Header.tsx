@@ -54,7 +54,7 @@ function Header({
         isSticky={isSticky}
         {...props}
       >
-        <div className="relative flex items-center justify-between px-7 py-2">
+        <div className="relative flex h-16 items-center justify-between px-7 py-2">
           <div className="flex items-center gap-6">
             <div
               className={classNames(
