@@ -61,7 +61,7 @@ const ThumbnailList = ({
       {listItems.length > 0 && (
         <div
           id="ohif-thumbnail-list"
-          className="bg-bkg-low"
+          className="bg-bkg-low grid gap-4 overflow-y-auto"
         >
           {listItems.map(item => {
             const { displaySetInstanceUID, componentType, numInstances, ...rest } = item;

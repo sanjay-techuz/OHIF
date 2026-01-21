@@ -168,14 +168,12 @@ const Thumbnail = ({
   const renderListPreset = () => {
     return (
       <div
-        className={classnames(
-          'flex h-full w-full items-center justify-between rounded pr-[8px] pl-[8px] pt-[4px] pb-[4px]'
-        )}
+        className={classnames('flex h-full w-full items-center justify-between rounded p-2.5')}
         style={{
           backgroundColor: isActive ? '#232323' : '#2E2E2E',
         }}
       >
-        <div className="relative flex h-[32px] w-full items-center gap-[8px] overflow-hidden">
+        <div className="relative flex w-full items-center gap-[8px] overflow-hidden">
           <div
             className={classnames(
               'h-[32px] w-[4px] min-w-[4px] rounded',
@@ -260,7 +258,7 @@ const Thumbnail = ({
         className,
         'hover:bg-primary/30 group flex cursor-pointer select-none flex-col overflow-hidden rounded-lg border border-white/80 bg-[#000000] outline-none',
         viewPreset === 'thumbnails' && '',
-        viewPreset === 'list' && 'h-[40px] w-full'
+        viewPreset === 'list' && 'w-full'
       )}
       id={`thumbnail-${displaySetInstanceUID}`}
       data-cy={
