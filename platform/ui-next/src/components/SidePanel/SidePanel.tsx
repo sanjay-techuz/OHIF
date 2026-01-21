@@ -455,27 +455,22 @@ const SidePanel = ({
       return (
         <>
           <div
-            className="relative flex h-[40px] flex-shrink-0 select-none rounded-t p-2"
-            style={{ backgroundColor: '#232323' }}
+            className="relative mt-4 mb-6 flex flex-shrink-0 select-none"
+            style={{ backgroundColor: '' }}
           >
             {/* {getCloseIcon()} */}
             <div
               className="flex w-full grow items-center"
-              style={{
-                paddingRight: side === 'left' ? `${closeIconWidth}px` : '0',
-                paddingLeft: side === 'right' ? `${closeIconWidth}px` : '0',
-                minWidth: 0,
-                overflow: 'visible',
-              }}
+              // style={{
+              //   paddingRight: side === 'left' ? `${closeIconWidth}px` : '0',
+              //   paddingLeft: side === 'right' ? `${closeIconWidth}px` : '0',
+              //   minWidth: 0,
+              //   overflow: 'visible',
+              // }}
             >
               {customHeader}
             </div>
           </div>
-          <Separator
-            orientation="horizontal"
-            className="bg-black"
-            thickness="2px"
-          />
         </>
       );
     }

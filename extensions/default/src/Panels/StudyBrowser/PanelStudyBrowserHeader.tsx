@@ -29,29 +29,44 @@ function PanelStudyBrowserHeader({
   };
 
   return (
-    <div className="flex w-full items-center gap-[10px] pr-2">
+    <div className="flex w-full items-center gap-[10px]">
       {/* Studies text on the left */}
       <div className="flex shrink-0 items-center justify-center">
-        <span className="text-[14px] font-medium text-white">Studies</span>
+        <span className="text-[18px] font-bold text-white">Studies</span>
       </div>
-      {/* Filter icons in the middle */}
-      {actionIcons && actionIcons.length > 0 && (
-        <div className="flex shrink-0 items-center justify-center">
-          <div className="flex items-center space-x-1">
-            {actionIcons.map((icon: actionIcon, index) =>
-              React.createElement(Icons[icon.iconName] || Icons.MissingIcon, {
-                key: index,
-                onClick: () => updateActionIconValue(icon),
-                className: `cursor-pointer text-white hover:text-highlight`,
-                style: { width: '20px', height: '20px', flexShrink: 0, color: 'white' },
-              })
-            )}
-          </div>
-        </div>
-      )}
+
       {/* Single toggle button on the right */}
       {currentViewPreset && (
-        <div className="ml-auto flex shrink-0 items-center justify-center">
+        <div className="ml-auto flex shrink-0 items-center justify-center gap-2">
+          {/* Filter icons in the middle */}
+          {actionIcons && actionIcons.length > 0 && (
+            <div className="flex shrink-0 items-center justify-center">
+              <div className="flex items-center space-x-1">
+                {actionIcons.map((icon: actionIcon, index) =>
+                  React.createElement(Icons[icon.iconName] || Icons.MissingIcon, {
+                    key: index,
+                    onClick: () => updateActionIconValue(icon),
+                    className:
+                      'flex h-8 w-8 items-center justify-center rounded-md text-white transition-colors hover:bg-white/10 bg-[#232323] p-2 cursor-pointer',
+                    // style={{ backgroundColor: '#232323' }}
+                    // onMouseEnter={e => {
+                    //   e.currentTarget.style.backgroundColor = '#2E2E2E';
+                    // }}
+                    // onMouseLeave={e => {
+                    //   e.currentTarget.style.backgroundColor = '#232323';
+                    // }}
+                    // style: {
+                    //   width: '20px',
+                    //   height: '20px',
+                    //   flexShrink: 0,
+                    //   color: 'white',
+                    //   backgroundColor: '#232323',
+                    // },
+                  })
+                )}
+              </div>
+            </div>
+          )}
           <button
             onClick={handleToggleClick}
             aria-label={`Switch to ${otherViewPreset?.id || 'other'} view`}
@@ -65,7 +80,7 @@ function PanelStudyBrowserHeader({
             }}
           >
             {React.createElement(Icons[currentViewPreset.iconName] || Icons.MissingIcon, {
-              style: { width: '20px', height: '20px', flexShrink: 0 },
+              // style: { width: '20px', height: '20px', flexShrink: 0 },
             })}
           </button>
         </div>

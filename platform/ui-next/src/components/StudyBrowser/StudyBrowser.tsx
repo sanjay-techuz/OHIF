@@ -69,7 +69,7 @@ const StudyBrowser = ({
         <div className="flex flex-col gap-[4px]">
           {showSettings && (
             <div
-              className="w-100 flex h-[48px] items-center justify-center gap-[10px] px-[8px] py-[10px]"
+              className="flex w-full items-center justify-center gap-[10px] rounded-lg px-[8px] py-[10px]"
               style={{ backgroundColor: '#232323' }}
             >
               <>

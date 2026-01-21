@@ -55,7 +55,7 @@ export function StudyBrowserSort({ servicesManager }: withAppTypes) {
       <DropdownMenu>
         <Tooltip>
           <TooltipTrigger className="w-full overflow-hidden">
-            <DropdownMenuTrigger className="border-inputfield-main focus:border-inputfield-main flex h-[26px] w-full items-center justify-start overflow-hidden whitespace-nowrap rounded border bg-black p-2 text-base text-white">
+            <DropdownMenuTrigger className="flex w-full items-center justify-start rounded border border-[#4f4f4f] px-2 py-1 text-base text-white">
               {selectedSort.label}
             </DropdownMenuTrigger>
           </TooltipTrigger>
@@ -77,12 +77,12 @@ export function StudyBrowserSort({ servicesManager }: withAppTypes) {
         <TooltipTrigger>
           <button
             onClick={toggleSortDirection}
-            className="flex h-[26px] items-center justify-center bg-black"
+            className="relative flex h-3 w-3 items-center justify-center text-xl text-white"
           >
             {sortDirection === 'ascending' ? (
-              <Icons.SortingAscending className="text-primary-main w-2" />
+              <Icons.SortingAscending className="absolute left-0 top-1/2 w-3" />
             ) : (
-              <Icons.SortingDescending className="text-primary-main w-2" />
+              <Icons.SortingDescending className="absolute left-0 -top-1/2 w-3" />
             )}
           </button>
         </TooltipTrigger>
