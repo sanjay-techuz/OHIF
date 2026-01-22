@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { SidePanel } from '@ohif/ui-next';
 import { Types } from '@ohif/core';
-import { useStudyBrowserHeader } from '../Panels/StudyBrowser/StudyBrowserHeaderContext';
 
 export type SidePanelWithServicesProps = {
   servicesManager: AppTypes.ServicesManager;
@@ -17,7 +16,6 @@ export type SidePanelWithServicesProps = {
   expandedInsideBorderSize?: number;
   collapsedInsideBorderSize?: number;
   collapsedOutsideBorderSize?: number;
-  customHeader?: React.ReactNode;
 };
 
 const SidePanelWithServices = ({
@@ -28,7 +26,6 @@ const SidePanelWithServices = ({
   tabs: tabsProp,
   onOpen,
   onClose,
-  customHeader,
   ...props
 }: SidePanelWithServicesProps) => {
   const panelService = servicesManager?.services?.panelService;
@@ -39,10 +36,6 @@ const SidePanelWithServices = ({
   const [activeTabIndex, setActiveTabIndex] = useState(activeTabIndexProp ?? 0);
   const [closedManually, setClosedManually] = useState(false);
   const [tabs, setTabs] = useState(tabsProp ?? panelService.getPanels(side));
-  const { headerContent } = useStudyBrowserHeader();
-
-  // Use headerContent from context if available, otherwise use customHeader prop
-  const effectiveCustomHeader = customHeader || (side === 'left' ? headerContent : null);
 
   const handleActiveTabIndexChange = useCallback(({ activeTabIndex }) => {
     setActiveTabIndex(activeTabIndex);
@@ -116,7 +109,6 @@ const SidePanelWithServices = ({
       onOpen={handleOpen}
       onClose={handleClose}
       onActiveTabIndexChange={handleActiveTabIndexChange}
-      customHeader={effectiveCustomHeader}
     />
   );
 };

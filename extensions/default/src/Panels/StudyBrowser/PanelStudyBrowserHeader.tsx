@@ -7,13 +7,11 @@ function PanelStudyBrowserHeader({
   updateViewPresetValue,
   actionIcons,
   updateActionIconValue,
-  onClose,
 }: {
   viewPresets: viewPreset[];
   updateViewPresetValue: (viewPreset: viewPreset) => void;
   actionIcons: actionIcon[];
   updateActionIconValue: (actionIcon: actionIcon) => void;
-  onClose?: () => void;
 }) {
   // Find the currently selected view preset
   const currentViewPreset = viewPresets?.find(preset => preset.selected) || viewPresets?.[0];
@@ -29,7 +27,7 @@ function PanelStudyBrowserHeader({
   };
 
   return (
-    <div className="flex w-full items-center gap-[10px]">
+    <div className="flex w-full items-center gap-[10px] pt-4 pb-4">
       {/* Studies text on the left */}
       <div className="flex shrink-0 items-center justify-center">
         <span className="text-[18px] font-bold text-white">Studies</span>

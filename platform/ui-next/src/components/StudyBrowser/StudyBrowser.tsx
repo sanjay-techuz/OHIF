@@ -62,7 +62,7 @@ const StudyBrowser = ({
   return (
     <ScrollArea>
       <div
-        className="flex flex-1 flex-col gap-[4px]"
+        className="flex flex-1 flex-col gap-[4px] pr-2"
         data-cy={'studyBrowser-panel'}
         style={{ backgroundColor: '#0b0a0a' }}
       >

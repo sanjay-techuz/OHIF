@@ -28,7 +28,6 @@ type SidePanelProps = {
   collapsedInsideBorderSize: number;
   collapsedOutsideBorderSize: number;
   tabs: any;
-  customHeader?: React.ReactNode;
 };
 
 type StyleMap = {
@@ -60,7 +59,7 @@ const gridHorizontalPadding = 10;
 const tabSpacerWidth = 2;
 
 const baseClasses =
-  'bg-[#0B0A0A] border-black justify-start box-content flex flex-col pl-10 pr-6 !max-w-[calc(100%-64px)] !w-[calc(100%-64px)]';
+  'bg-[#0B0A0A] border-black justify-start box-content flex flex-col pl-10 pr-6 !max-w-[calc(100%-64px)] !w-[calc(100%-64px)] !max-h-[calc(100vh-130.5px)] !h-[calc(100vh-130.5px)]';
 
 const openStateIconName = {
   left: 'SidePanelCloseLeft',
@@ -195,7 +194,6 @@ const SidePanel = ({
   expandedInsideBorderSize = 4,
   collapsedInsideBorderSize = 8,
   collapsedOutsideBorderSize = 4,
-  customHeader,
 }: SidePanelProps) => {
   const [panelOpen, setPanelOpen] = useState(isExpanded);
   const [activeTabIndex, setActiveTabIndex] = useState(activeTabIndexProp ?? 0);
@@ -450,31 +448,6 @@ const SidePanel = ({
   };
 
   const getOpenStateComponent = () => {
-    // If customHeader is provided, use it instead of the default tab header
-    if (customHeader) {
-      return (
-        <>
-          <div
-            className="relative mt-4 mb-6 flex flex-shrink-0 select-none"
-            style={{ backgroundColor: '' }}
-          >
-            {/* {getCloseIcon()} */}
-            <div
-              className="flex w-full grow items-center"
-              // style={{
-              //   paddingRight: side === 'left' ? `${closeIconWidth}px` : '0',
-              //   paddingLeft: side === 'right' ? `${closeIconWidth}px` : '0',
-              //   minWidth: 0,
-              //   overflow: 'visible',
-              // }}
-            >
-              {customHeader}
-            </div>
-          </div>
-        </>
-      );
-    }
-
     return (
       <>
         <div
@@ -499,7 +472,7 @@ const SidePanel = ({
     >
       {panelOpen ? (
         <>
-          {getOpenStateComponent()}
+          {/* {getOpenStateComponent()} */}
           {tabs.map((tab, tabIndex) => {
             if (tabIndex === activeTabIndex) {
               return <tab.content key={tabIndex} />;

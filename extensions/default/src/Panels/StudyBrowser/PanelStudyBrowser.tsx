@@ -1,13 +1,12 @@
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { useSystem, utils } from '@ohif/core';
-import { StudyBrowser, useImageViewer, useViewportGrid } from '@ohif/ui-next';
+import { Separator, StudyBrowser, useImageViewer, useViewportGrid } from '@ohif/ui-next';
 import { CallbackCustomization } from 'platform/core/src/types';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MoreDropdownMenu from '../../Components/MoreDropdownMenu';
 import { defaultActionIcons } from './constants';
 import { PanelStudyBrowserHeader } from './PanelStudyBrowserHeader';
-import { useStudyBrowserHeader } from './StudyBrowserHeaderContext';
 
 const { sortStudyInstances, formatDate, createStudyBrowserTabs } = utils;
 
@@ -92,7 +91,6 @@ function PanelStudyBrowser({
 
   const [actionIcons, setActionIcons] = useState(defaultActionIcons);
   const { viewType } = useCustomParams();
-  const { setHeaderContent } = useStudyBrowserHeader();
 
   // Sample annotation objects - in real implementation, fetch from API
   // const annotationObjs = [
@@ -743,24 +741,15 @@ function PanelStudyBrowser({
 
   const activeDisplaySetInstanceUIDs = viewports.get(activeViewportId)?.displaySetInstanceUIDs;
 
-  // Set the header content for SidePanel to use
-  useEffect(() => {
-    setHeaderContent(
+  return (
+    <>
       <PanelStudyBrowserHeader
         viewPresets={viewPresets}
         updateViewPresetValue={updateViewPresetValue}
         actionIcons={actionIcons}
         updateActionIconValue={updateActionIconValue}
       />
-    );
 
-    return () => {
-      setHeaderContent(null);
-    };
-  }, [viewPresets, actionIcons, setHeaderContent, updateViewPresetValue, updateActionIconValue]);
-
-  return (
-    <>
       <StudyBrowser
         tabs={tabs}
         servicesManager={servicesManager}
