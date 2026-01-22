@@ -39,7 +39,7 @@ const RowComponent = ({
     <div
       style={{ ...style, ...rowStyle }}
       className={classNames(
-        'hover:bg-secondary-main border-secondary-light text-foreground flex w-full flex-row items-center break-all bg-black text-base transition duration-300',
+        'hover:bg-popover border-secondary-light text-foreground flex w-full flex-row items-center break-all bg-black text-base transition duration-300',
         lineHeightClassName
       )}
       key={keyPrefix}
@@ -74,9 +74,7 @@ const RowComponent = ({
 function ColumnHeaders({ tagRef, vrRef, keywordRef, valueRef }) {
   return (
     <div
-      className={classNames(
-        'bg-secondary-dark ohif-scrollbar flex w-full flex-row overflow-y-scroll'
-      )}
+      className={classNames('bg-secondary-dark ohif-scrollbar flex w-full flex-row')}
       style={rowVerticalPaddingStyle}
     >
       <div className="w-4/24 px-3">

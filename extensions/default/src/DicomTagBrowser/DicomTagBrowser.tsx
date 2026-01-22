@@ -127,10 +127,8 @@ const DicomTagBrowser = ({
     <div className="dicom-tag-browser-content bg-muted">
       <div className="mb-6 flex flex-row items-start pl-1">
         <div className="flex w-full flex-row items-start gap-4">
-          <div className="flex w-1/3 flex-col">
-            <span className="text-muted-foreground flex h-6 items-center pb-2 text-base">
-              Series
-            </span>
+          <div className="flex max-w-[40%] flex-col">
+            <span className="flex items-center pb-2 text-base text-white/80">Series</span>
             <Select
               value={selectedDisplaySetInstanceUID}
               onValueChange={value => onSelectChange({ value })}
@@ -147,7 +145,7 @@ const DicomTagBrowser = ({
                       value={item.value}
                     >
                       {item.label}
-                      <span className="text-muted-foreground ml-1 text-xs">{item.description}</span>
+                      <span className="ml-1 text-xs text-white/80">{item.description}</span>
                     </SelectItem>
                   );
                 })}
@@ -155,8 +153,8 @@ const DicomTagBrowser = ({
             </Select>
           </div>
           {shouldShowInstanceList && (
-            <div className="mx-auto mt-0.5 flex w-1/4 flex-col">
-              <span className="text-muted-foreground flex h-6 items-center pb-2 text-base">
+            <div className="mx-auto mt-0.5 flex w-[26%] flex-col">
+              <span className="flex items-center pb-2 text-base text-white/80">
                 Instance Number ({instanceNumber} of {activeDisplaySet?.images?.length})
               </span>
               <Slider
@@ -171,18 +169,16 @@ const DicomTagBrowser = ({
               />
             </div>
           )}
-          <div className="ml-auto mr-1 flex w-1/3 flex-col">
-            <span className="text-muted-foreground flex h-6 items-center pb-2 text-base">
-              Search metadata
-            </span>
+          <div className="ml-auto mr-1 flex max-w-[34%] flex-col">
+            <span className="flex items-center pb-2 text-base text-white/80">Search metadata</span>
             <InputFilter
-              className="text-muted-foreground"
+              className="text-white/80"
               onChange={setFilterValue}
             >
               <InputFilter.SearchIcon />
               <InputFilter.Input
                 placeholder="Search metadata"
-                className="pl-9 pr-9"
+                className="h-auto px-3 py-3 pl-9 pr-9 shadow-none outline-none"
               />
               <InputFilter.ClearButton className="text-primary mr-0.5 p-0.5" />
             </InputFilter>

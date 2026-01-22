@@ -31,9 +31,9 @@ const SelectTrigger = React.forwardRef<
       style={triggerStyle}
       {...props}
     >
-      {children}
+      <span>{children}</span>
       <SelectPrimitive.Icon asChild>
-        <CaretSortIcon className="h-4 w-4 opacity-50" />
+        <CaretSortIcon className="min-h-4 min-w-4 h-4 w-4 opacity-50" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );

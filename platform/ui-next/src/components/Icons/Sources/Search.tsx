@@ -3,9 +3,9 @@ import type { IconProps } from '../types';
 
 export const Search = (props: IconProps) => (
   <svg
-    width="18"
-    height="18"
-    viewBox="0 0 18 18"
+    width="16"
+    height="16"
+    viewBox="0 0 16 16"
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
@@ -16,7 +16,7 @@ export const Search = (props: IconProps) => (
       <path d="M0 0h18v18H0z" />
       <g
         transform="translate(1 1)"
-        stroke="#348CFD"
+        stroke="#fff"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.5"
