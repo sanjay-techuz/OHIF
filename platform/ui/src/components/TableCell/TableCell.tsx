@@ -29,7 +29,7 @@ const TableCell = ({
   return (
     <div
       className={classnames(
-        'break-all px-2 last:border-r-0',
+        'break-all px-4 py-2 last:border-r-0',
         `w-${colSpan}/${cellsNum}`,
         classes.align[align],
         classes.isTableHead[isTableHead],

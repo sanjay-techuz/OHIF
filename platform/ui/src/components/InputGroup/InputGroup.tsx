@@ -123,7 +123,7 @@ const InputGroup = ({
           return (
             <div
               key={inputMeta.name}
-              className={classnames('pl-4 first:pl-12', getGridWidthClass(inputMeta.gridCol))}
+              className={classnames('pl-3', getGridWidthClass(inputMeta.gridCol))}
             >
               {renderFieldInputComponent(inputMeta)}
             </div>

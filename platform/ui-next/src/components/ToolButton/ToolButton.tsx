@@ -6,15 +6,16 @@ import { cn } from '../../lib/utils';
 import { useIconPresentation } from '../../contextProviders/IconPresentationProvider';
 
 const baseClasses = '!rounded-lg inline-flex items-center justify-center';
-const defaultClasses = 'bg-transparent text-foreground/80 hover:bg-background hover:text-highlight';
-const activeClasses = 'bg-highlight text-background hover:!bg-highlight/80';
+const defaultClasses =
+  'bg-transparent text-foreground/80 hover:bg-[#272525] hover:text-highlight rounded-lg';
+const activeClasses = 'bg-highlight text-background hover:!bg-highlight/80 rounded-lg';
 const disabledClasses =
-  'text-common-bright hover:bg-primary-dark hover:text-primary-light opacity-40 cursor-not-allowed';
+  'text-common-bright hover:bg-primary-dark hover:text-primary-light opacity-40  cursor-not-allowed';
 
 const sizeClasses = {
   default: {
-    buttonSizeClass: 'w-10 h-10',
-    iconSizeClass: 'h-7 w-7',
+    buttonSizeClass: 'w-10 h-10 p-2',
+    iconSizeClass: 'h-9 w-9',
   },
   small: {
     buttonSizeClass: 'w-8 h-8',

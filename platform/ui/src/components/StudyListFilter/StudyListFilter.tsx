@@ -32,12 +32,12 @@ const StudyListFilter = ({
     <React.Fragment>
       <div>
         <div className="bg-black">
-          <div className="container relative mx-auto flex flex-col pt-5">
+          <div className="container relative mx-auto flex max-w-[1170px] flex-col pt-10">
             <div className="mb-5 flex flex-row justify-between">
               <div className="flex min-w-[1px] shrink flex-row items-center gap-6">
                 <Typography
                   variant="h6"
-                  className="text-white"
+                  className="text-2xl font-bold text-white"
                 >
                   {t('StudyList')}
                 </Typography>
@@ -52,7 +52,7 @@ const StudyListFilter = ({
                   </div>
                 )}
               </div>
-              <div className="flex h-[34px] flex-row items-center">
+              <div className="flex flex-row items-center">
                 {/* TODO revisit the completely rounded style of button used for clearing the study list filter - for now use LegacyButton*/}
                 {isFiltering && (
                   <LegacyButton
@@ -86,26 +86,28 @@ const StudyListFilter = ({
           </div>
         </div>
       </div>
-      <div className="sticky -top-1 z-10 mx-auto border-b-4 border-black">
-        <div className="bg-primary-dark pt-3 pb-3">
-          <InputGroup
-            inputMeta={filtersMeta}
-            values={filterValues}
-            onValuesChange={onChange}
-            sorting={filterSorting}
-            onSortingChange={setFilterSorting}
-            isSortingEnabled={isSortingEnabled}
-          />
-        </div>
-        {numOfStudies > 100 && (
-          <div className="container m-auto">
-            <div className="bg-primary-main rounded-b py-1 text-center text-base">
-              <p className="text-white">
-                {t('Filter list to 100 studies or less to enable sorting')}
-              </p>
-            </div>
+      <div className="container relative mx-auto flex max-w-[1170px] flex-col pt-10">
+        <div className="sticky -top-1 z-10 mx-auto border-b-4 border-black">
+          <div className="bg-[#0B0A0A] pt-3 pb-3">
+            <InputGroup
+              inputMeta={filtersMeta}
+              values={filterValues}
+              onValuesChange={onChange}
+              sorting={filterSorting}
+              onSortingChange={setFilterSorting}
+              isSortingEnabled={isSortingEnabled}
+            />
           </div>
-        )}
+          {numOfStudies > 100 && (
+            <div className="">
+              <div className="bg-primary-main rounded-b py-1 text-center text-base">
+                <p className="text-white">
+                  {t('Filter list to 100 studies or less to enable sorting')}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </React.Fragment>
   );

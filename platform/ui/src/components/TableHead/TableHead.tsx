@@ -6,7 +6,7 @@ const TableHead = ({ children, className = '', style = {} }) => {
   return (
     <div
       className={classnames(
-        'bg-secondary-dark border-secondary-light flex border-b pr-2 font-bold',
+        'bg-secondary-dark flex border-b border-white/10 pr-2 pb-2 font-medium text-white',
         className
       )}
       style={style}

@@ -5,7 +5,7 @@ import classnames from 'classnames';
 const TableBody = ({ children, className = '', style = {} }) => {
   return (
     <div
-      className={classnames('ohif-scrollbar mt-2 max-h-48 overflow-y-scroll', className)}
+      className={classnames('ohif-scrollbar mt-2 max-h-48', className)}
       style={style}
     >
       {React.isValidElement(children)
