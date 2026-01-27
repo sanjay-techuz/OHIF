@@ -468,7 +468,7 @@ function WorkList({
                       disabled={!isValidMode}
                       startIconTooltip={
                         !isValidMode ? (
-                          <div className="font-inter flex w-[206px] whitespace-normal text-left text-xs font-normal text-white">
+                          <div className="font-inter flex whitespace-normal text-left text-xs font-normal text-white">
                             {invalidModeDescription}
                           </div>
                         ) : null
@@ -485,7 +485,7 @@ function WorkList({
                       className={
                         isValidMode
                           ? 'text-[13px]'
-                          : 'cursor-pointer bg-[#FF2768] text-base !text-white hover:bg-[#FF2768]/90'
+                          : '!bg-primary-main !hover:bg-customblue-80 cursor-pointer text-base !text-white'
                       }
                     >
                       {mode.displayName}

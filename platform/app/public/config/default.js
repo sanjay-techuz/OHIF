@@ -293,7 +293,7 @@ window.config = {
         },
         React.createElement('img', {
           src: './biedx.png',
-          className: 'w-10 h-10',
+          className: 'w-12 h-12',
         })
         // React.createElement(
         //   'p',
