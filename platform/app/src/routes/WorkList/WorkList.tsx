@@ -374,8 +374,8 @@ function WorkList({
             <>
               <Icons.GroupLayers
                 className={classnames('mr-2 inline-flex w-4', {
-                  'text-primary': isExpanded,
-                  'text-secondary-light': !isExpanded,
+                  'text-white/80': isExpanded,
+                  'text-white/80': !isExpanded,
                 })}
               />
               {instances}
@@ -468,21 +468,25 @@ function WorkList({
                       disabled={!isValidMode}
                       startIconTooltip={
                         !isValidMode ? (
-                          <div className="font-inter flex w-[206px] whitespace-normal text-left text-xs font-normal text-white">
+                          <div className="font-inter flex whitespace-normal text-left text-xs font-normal text-white">
                             {invalidModeDescription}
                           </div>
                         ) : null
                       }
                       startIcon={
                         isValidMode ? (
-                          <Icons.LaunchArrow className="!h-[20px] !w-[20px] text-black" />
+                          <Icons.LaunchArrow className="!h-[20px] !w-[20px] !text-white" />
                         ) : (
-                          <Icons.LaunchInfo className="!h-[20px] !w-[20px] text-black" />
+                          <Icons.LaunchInfo className="!h-[20px] !w-[20px] !text-white" />
                         )
                       }
                       onClick={() => {}}
                       dataCY={`mode-${mode.routeName}-${studyInstanceUid}`}
-                      className={isValidMode ? 'text-[13px]' : 'bg-[#222d44] text-[13px]'}
+                      className={
+                        isValidMode
+                          ? 'text-[13px]'
+                          : '!bg-primary-main !hover:bg-customblue-80 cursor-pointer text-base !text-white'
+                      }
                     >
                       {mode.displayName}
                     </Button>
@@ -614,7 +618,7 @@ function WorkList({
                 querying={querying}
                 filtersMeta={filtersMeta}
               />
-              <div className="grow">
+              <div className="container relative m-auto max-w-[1170px] grow">
                 <StudyListPagination
                   onChangePage={onPageNumberChange}
                   onChangePerPage={onResultsPerPageChange}

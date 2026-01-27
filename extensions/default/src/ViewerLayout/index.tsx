@@ -835,23 +835,23 @@ function ViewerLayout({
                   className="h-8 w-8 rounded-lg p-2 text-white disabled:opacity-50"
                   title="Previous Case (Ctrl+Left)"
                   style={{
-                    backgroundColor: '#232323',
+                    backgroundColor: 'transparent',
                   }}
                   onMouseEnter={e => {
                     if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = '#232323';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                   onFocus={e => {
                     if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
                   onBlur={e => {
-                    e.currentTarget.style.backgroundColor = '#232323';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
                   <svg
@@ -867,7 +867,7 @@ function ViewerLayout({
                     <path d="M15 18l-6-6 6-6" />
                   </svg>
                 </Button>
-                <span className="min-w-[60px] text-center text-sm text-gray-400">
+                <span className="min-w-[60px] rounded-md bg-white/10 px-2 py-1.5 text-center text-sm font-medium text-white">
                   {isLoadingCases ? '...' : `${currentCaseIndex + 1} / ${caseList.length}`}
                 </span>
                 <Button
@@ -877,23 +877,23 @@ function ViewerLayout({
                   className="h-8 w-8 rounded-lg p-2 text-white disabled:opacity-50"
                   title="Next Case (Ctrl+Right)"
                   style={{
-                    backgroundColor: '#232323',
+                    backgroundColor: 'transparent',
                   }}
                   onMouseEnter={e => {
                     if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = '#232323';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                   onFocus={e => {
                     if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = '#2E2E2E';
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }
                   }}
                   onBlur={e => {
-                    e.currentTarget.style.backgroundColor = '#232323';
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
                   <svg
@@ -1050,14 +1050,14 @@ function ViewerLayout({
       {/* Validation Modal */}
       {showValidationModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-popover rounded-lg p-6 text-white">
+          <div className="bg-popover max-w-[450px] rounded-lg p-6 text-white">
             <div className="mb-4 text-center">
-              <p className="text-lg">{validationMessage}</p>
+              <p className="text-xl font-medium">{validationMessage}</p>
             </div>
-            <div className="flex justify-center gap-4">
+            <div className="flex justify-center gap-4 pt-4">
               <Button
                 variant="ghost"
-                className="rounded px-4 py-2 text-white"
+                className="h-auto min-w-[70px] rounded px-4 py-2 font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
@@ -1067,7 +1067,7 @@ function ViewerLayout({
               </Button>
               <Button
                 variant="default"
-                className="rounded px-4 py-2 text-white"
+                className="h-auto min-w-[70px] rounded px-4 py-2 font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}

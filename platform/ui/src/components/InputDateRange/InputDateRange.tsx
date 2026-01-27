@@ -26,9 +26,9 @@ const InputDateRange = ({
       isSortable={isSortable}
       sortDirection={sortDirection}
       onLabelClick={onClickHandler}
-      className="xl:min-w-[284px]"
+      className=""
     >
-      <div className="relative xl:max-w-[246px]">
+      <div className="relative">
         <DatePickerWithRange
           className="mt-2"
           id={id}

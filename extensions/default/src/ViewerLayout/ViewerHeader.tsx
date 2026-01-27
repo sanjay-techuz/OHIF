@@ -166,7 +166,7 @@ function ViewerHeader({
           // </div>
         }
       >
-        <div className="relative flex justify-center gap-[4px]">
+        <div className="relative flex justify-center gap-4">
           <Toolbar buttonSection="primary" />
         </div>
       </Header>

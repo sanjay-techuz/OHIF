@@ -6,22 +6,24 @@ import StudyListTableRow from './StudyListTableRow';
 const StudyListTable = ({ tableDataSource, querying }) => {
   return (
     <div className="bg-black">
-      <div className="container relative m-auto">
-        <table className="w-full text-white">
-          <tbody
-            data-cy="study-list-results"
-            data-querying={querying}
-          >
-            {tableDataSource.map((tableData, i) => {
-              return (
-                <StudyListTableRow
-                  tableData={tableData}
-                  key={i}
-                />
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="container relative m-auto max-w-[1170px]">
+        <div className="overflow-hidden rounded-lg border border-white/10">
+          <table className="w-full min-w-[720px] border-collapse text-[14px] text-white">
+            <tbody
+              data-cy="study-list-results"
+              data-querying={querying}
+            >
+              {tableDataSource.map((tableData, i) => {
+                return (
+                  <StudyListTableRow
+                    tableData={tableData}
+                    key={i}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

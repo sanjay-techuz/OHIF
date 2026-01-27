@@ -120,88 +120,20 @@ export const ToolClickSegment = (props: IconProps) => (
 
 export const ToolLength = (props: IconProps) => (
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
+    width="33"
+    height="33"
+    viewBox="0 0 33 33"
+    fill="none"
     {...props}
   >
-    <g
-      id="tool-length"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <g
-        id="ruler"
-        transform="translate(2, 2.5)"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect
-          id="Rectangle"
-          strokeWidth="1.5"
-          transform="translate(11.5003, 11.5005) rotate(-45.001) translate(-11.5003, -11.5005)"
-          x="-0.874220029"
-          y="7.6109894"
-          width="24.749"
-          height="7.779"
-          rx="1"
-        ></rect>
-        <line
-          x1="5.11737261"
-          y1="12.3844231"
-          x2="7.13237261"
-          y2="14.3684231"
-          id="Path"
-        ></line>
-        <line
-          x1="7.68571234"
-          y1="9.81508336"
-          x2="10.1857123"
-          y2="12.3150834"
-          id="Path"
-        ></line>
-        <line
-          x1="10.1225521"
-          y1="7.37924362"
-          x2="11.8725521"
-          y2="9.12924362"
-          id="Path"
-        ></line>
-        <line
-          x1="12.5583918"
-          y1="4.94240389"
-          x2="15.0583918"
-          y2="7.44240389"
-          id="Path"
-        ></line>
-        <line
-          x1="15.1127315"
-          y1="2.38806416"
-          x2="17.1277315"
-          y2="4.37406416"
-          id="Path"
-        ></line>
-        <line
-          x1="2.56403288"
-          y1="14.9377628"
-          x2="5.06403288"
-          y2="17.4377628"
-          id="Path"
-        ></line>
-      </g>
-    </g>
+    <path
+      d="M20.414 6.16389L22.789 8.53889M15.664 10.9139L18.039 13.2889M10.914 15.6639L13.289 18.0389M6.16401 20.4139L8.53901 22.7889M1.51794 25.2679L7.64327 31.3933C7.95679 31.7068 8.11354 31.8635 8.2943 31.9223C8.45331 31.9739 8.62458 31.9739 8.78358 31.9223C8.96434 31.8635 9.1211 31.7068 9.43461 31.3933L31.3933 9.43461C31.7068 9.1211 31.8635 8.96434 31.9223 8.78358C31.9739 8.62458 31.9739 8.45331 31.9223 8.2943C31.8635 8.11354 31.7068 7.95679 31.3933 7.64328L25.2679 1.51794C24.9544 1.20443 24.7977 1.04767 24.6169 0.988942C24.4579 0.93728 24.2866 0.93728 24.1276 0.988942C23.9469 1.04767 23.7901 1.20443 23.4766 1.51794L1.51794 23.4766C1.20443 23.7901 1.04767 23.9469 0.988942 24.1276C0.93728 24.2866 0.93728 24.4579 0.988942 24.6169C1.04767 24.7977 1.20443 24.9544 1.51794 25.2679Z"
+      stroke="white"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -2046,85 +1978,20 @@ export const ToolMoreMenu = (props: IconProps) => (
 
 export const ToolMove = (props: IconProps) => (
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
+    width="34"
+    height="34"
+    viewBox="0 0 34 34"
+    fill="none"
     {...props}
   >
-    <g
-      id="tool-move"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <line
-        x1="13.8823529"
-        y1="22.5294118"
-        x2="13.8823529"
-        y2="4"
-        id="Line"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      ></line>
-      <line
-        x1="22.5294118"
-        y1="13.8823529"
-        x2="5.23529412"
-        y2="13.8823529"
-        id="Line"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      ></line>
-      <polyline
-        id="Path-28"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points="11.4117647 6.46832349 13.8800882 4 16.3642969 6.48420875"
-      ></polyline>
-      <polyline
-        id="Path-28"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        transform="translate(13.888, 22.5362) rotate(-180) translate(-13.888, -22.5362)"
-        points="11.4117647 23.7624411 13.8800882 21.2941176 16.3642969 23.7783264"
-      ></polyline>
-      <polyline
-        id="Path-28"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        transform="translate(5.2421, 13.888) rotate(-90) translate(-5.2421, -13.888)"
-        points="2.76583826 15.1142499 5.23416174 12.6459264 7.71837049 15.1301352"
-      ></polyline>
-      <polyline
-        id="Path-28"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        transform="translate(22.5362, 13.888) rotate(-270) translate(-22.5362, -13.888)"
-        points="20.0599559 15.1142499 22.5282794 12.6459264 25.0124881 15.1301352"
-      ></polyline>
-    </g>
+    <path
+      d="M5.80566 12.139L1.05566 16.889M1.05566 16.889L5.80566 21.639M1.05566 16.889H32.7223M12.139 5.80566L16.889 1.05566M16.889 1.05566L21.639 5.80566M16.889 1.05566V32.7223M21.639 27.9723L16.889 32.7223M16.889 32.7223L12.139 27.9723M27.9723 12.139L32.7223 16.889M32.7223 16.889L27.9723 21.639"
+      stroke="white"
+      strokeWidth="2.11111"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -2369,44 +2236,20 @@ export const ToolProbe = (props: IconProps) => (
 
 export const ToolReset = (props: IconProps) => (
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
+    width="32"
+    height="31"
+    viewBox="0 0 32 31"
+    fill="none"
     {...props}
   >
-    <g
-      id="tool-reset"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <polyline
-        id="Path"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points="15.7879373 10.9230769 22.7110142 10.9230769 22.7110142 4"
-      ></polyline>
-      <path
-        d="M22.1848604,10.9230769 C20.7833124,6.95640473 16.8769835,4.43920288 12.6856477,4.80187309 C8.49431195,5.16454329 5.07842549,8.3153258 4.37906817,12.4637863 C3.67971085,16.6122468 5.8738281,20.708777 9.71461129,22.4255209 C13.5553945,24.1422648 18.0710813,23.0448664 20.6956296,19.7569231"
-        id="Path"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      ></path>
-    </g>
+    <path
+      d="M31.0335 12.0335C31.0335 12.0335 27.859 7.70821 25.28 5.12741C22.7009 2.54662 19.137 0.950195 15.2002 0.950195C7.33014 0.950195 0.950195 7.33014 0.950195 15.2002C0.950195 23.0703 7.33014 29.4502 15.2002 29.4502C21.6968 29.4502 27.1779 25.1028 28.8932 19.1585M31.0335 12.0335V2.53353M31.0335 12.0335H21.5335"
+      stroke="white"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -2985,43 +2828,19 @@ export const ToolUltrasoundBidirectional = (props: IconProps) => (
 
 export const ToolWindowLevel = (props: IconProps) => (
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
+    width="38"
+    height="38"
+    viewBox="0 0 38 38"
+    fill="none"
     {...props}
   >
-    <g
-      id="tool-window-level"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
+    <path
       fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <circle
-        id="Oval-2"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        cx="14"
-        cy="14"
-        r="10"
-      ></circle>
-      <path
-        d="M21.4837076,7.36702528 C23.0493155,9.13213184 24,11.4550438 24,14 C24,19.5228475 19.5228475,24 14,24 C11.4550438,24 9.13213184,23.0493155 7.36702528,21.4837076 Z"
-        id="Combined-Shape"
-        fill="currentColor"
-      ></path>
-    </g>
+      clipRule="evenodd"
+      d="M17.8125 5.99075C11.1548 6.5907 5.9375 12.1861 5.9375 19C5.9375 25.8139 11.1548 31.4092 17.8125 32.0093V5.99075ZM3.5625 19C3.5625 10.4741 10.4741 3.5625 19 3.5625C27.5259 3.5625 34.4375 10.4741 34.4375 19C34.4375 27.5259 27.5259 34.4375 19 34.4375C10.4741 34.4375 3.5625 27.5259 3.5625 19Z"
+      fill="white"
+    />
   </svg>
 );
 
@@ -3077,50 +2896,20 @@ export const ToolWindowRegion = (props: IconProps) => (
 
 export const ToolZoom = (props: IconProps) => (
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
+    width="31"
+    height="31"
+    viewBox="0 0 31 31"
+    fill="none"
     {...props}
   >
-    <g
-      id="tool-zoom"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <ellipse
-        id="Oval-1"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        cx="11.5581395"
-        cy="12.0909091"
-        rx="7.81395349"
-        ry="7.63636364"
-      ></ellipse>
-      <line
-        x1="17.4186047"
-        y1="17.8181818"
-        x2="23.2790698"
-        y2="23.5454545"
-        id="Line"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      ></line>
-    </g>
+    <path
+      d="M29.4502 29.4502L23.9087 23.9085M27.8669 14.4085C27.8669 21.8414 21.8414 27.8669 14.4085 27.8669C6.9757 27.8669 0.950195 21.8414 0.950195 14.4085C0.950195 6.9757 6.9757 0.950195 14.4085 0.950195C21.8414 0.950195 27.8669 6.9757 27.8669 14.4085Z"
+      stroke="white"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 

@@ -27,7 +27,7 @@ const roundedClasses = {
 const variants = {
   text: {
     default:
-      'text-primary-light hover:bg-primary-light hover:text-white active:opacity-80 focus:bg-primary-light focus:text-white',
+      'text-white/80 hover:bg-primary-light hover:text-white active:opacity-80 focus:bg-primary-light focus:text-white',
     primary:
       'text-primary-main hover:bg-primary-main hover:text-white active:opacity-80 focus:bg-primary-main focus:text-white',
     secondary:
@@ -39,7 +39,7 @@ const variants = {
   },
   outlined: {
     default:
-      'text-primary-light hover:bg-primary-light hover:text-black focus:text-black focus:bg-primary-light active:opacity-80',
+      'text-white/80 hover:bg-primary-light hover:text-black focus:text-black focus:bg-primary-light active:opacity-80',
     primary: 'text-primary-main hover:opacity-80 active:opacity-100 focus:opacity-80',
     secondary: 'text-secondary-light hover:opacity-80 active:opacity-100 focus:opacity-80',
     translucent: 'text-white hover:opacity-80 active:opacity-100 focus:opacity-80',
@@ -47,14 +47,14 @@ const variants = {
       'text-black hover:bg-primary-main focus:bg-primary-main hover:border-black focus:border-black',
     black:
       'text-white hover:bg-primary-main focus:bg-primary-main hover:border-black focus:border-black',
-    primaryActive: 'text-primary-active hover:opacity-80 active:opacity-100 focus:opacity-80',
+    primaryActive: 'text-white/80 hover:opacity-80 active:opacity-100 focus:opacity-80',
     primaryLight:
       'border bg-transparent border-primary-main text-white hover:opacity-80 active:opacity-100 focus:opacity-80',
   },
   contained: {
     default: 'text-black hover:opacity-80 active:opacity-100 focus:opacity-80',
     primary: 'text-white hover:opacity-80 active:opacity-100 focus:opacity-80',
-    primaryDark: 'text-primary-active hover:opacity-80 active:opacity-100 focus:opacity-80',
+    primaryDark: 'text-white/80 hover:opacity-80 active:opacity-100 focus:opacity-80',
     secondary: 'text-white hover:opacity-80 active:opacity-100 focus:opacity-80',
     white: 'text-black hover:opacity-80 active:opacity-100 focus:opacity-80',
     black: 'text-white hover:opacity-80 active:opacity-100 focus:opacity-80',
@@ -118,7 +118,7 @@ const borderClasses = {
   none: '',
   light: 'border border-primary-light',
   primary: 'border border-primary-main',
-  primaryActive: 'border border-primary-active',
+  primaryActive: 'border border-white',
   secondary: 'border border-secondary-light',
   white: 'border border-white',
   black: 'border border-black',
