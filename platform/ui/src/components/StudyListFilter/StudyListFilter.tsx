@@ -1,11 +1,11 @@
-import React from 'react';
 import PropTypes from 'prop-types';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Icons } from '@ohif/ui-next';
+import InputGroup from '../InputGroup';
 import LegacyButton from '../LegacyButton';
 import Typography from '../Typography';
-import InputGroup from '../InputGroup';
-import { Icons } from '@ohif/ui-next';
 
 const StudyListFilter = ({
   filtersMeta,
@@ -42,7 +42,7 @@ const StudyListFilter = ({
                   {t('StudyList')}
                 </Typography>
                 {getDataSourceConfigurationComponent && getDataSourceConfigurationComponent()}
-                {onUploadClick && (
+                {/* {onUploadClick && (
                   <div
                     className="text-primary-active flex cursor-pointer items-center gap-2 self-center text-lg font-semibold"
                     onClick={onUploadClick}
@@ -50,7 +50,7 @@ const StudyListFilter = ({
                     <Icons.Upload />
                     <span>{t('Upload')}</span>
                   </div>
-                )}
+                )} */}
               </div>
               <div className="flex h-[34px] flex-row items-center">
                 {/* TODO revisit the completely rounded style of button used for clearing the study list filter - for now use LegacyButton*/}

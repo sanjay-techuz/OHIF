@@ -1,3 +1,4 @@
+import { apiService } from '../services/ApiService';
 import { decryptObject, decryptUrlParam } from './cryptoUtils';
 
 export interface CustomParams {
@@ -10,6 +11,7 @@ export interface CustomParams {
   isPreview: boolean;
   viewType?: 'diagnostic' | 'screening';
   StudyInstanceUIDs?: string;
+  token?: string;
 }
 
 /**
@@ -37,6 +39,8 @@ export function getCustomParams(): CustomParams {
     const decryptedData = decryptObject(encryptedData);
 
     if (decryptedData && typeof decryptedData === 'object') {
+      apiService.setAuthToken(decryptedData?.token as string);
+
       // Extract values from decrypted object
       return {
         courseId: decryptedData?.courseId ? `${decryptedData.courseId}` : undefined,
@@ -48,10 +52,12 @@ export function getCustomParams(): CustomParams {
         userType: (decryptedData?.userType as string) || 'student',
         isPreview: isPreviewParam === 'true',
         viewType: (decryptedData?.viewType as 'diagnostic' | 'screening') || 'diagnostic',
+        token: decryptedData?.token ? `${decryptedData.token}` : undefined,
       };
     }
   }
 
+  apiService.setAuthToken(null);
   // Fallback: return default values if no data parameter or decryption failed
   return {
     courseId: undefined,
@@ -63,6 +69,7 @@ export function getCustomParams(): CustomParams {
     userType: 'student',
     isPreview: isPreviewParam === 'true',
     viewType: 'diagnostic',
+    token: undefined,
   };
 }
 
@@ -85,6 +92,8 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
       const decryptedData = decryptObject(encryptedData);
 
       if (decryptedData && typeof decryptedData === 'object') {
+        apiService.setAuthToken(decryptedData?.token as string);
+
         // Extract values from decrypted object
         return {
           courseId: decryptedData?.courseId ? `${decryptedData.courseId}` : undefined,
@@ -96,10 +105,12 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
           userType: (decryptedData.userType as string) || 'student',
           isPreview: isPreviewParam === 'true',
           viewType: (decryptedData.viewType as 'diagnostic' | 'screening') || 'diagnostic',
+          token: decryptedData?.token ? `${decryptedData.token}` : undefined,
         };
       }
     }
 
+    apiService.setAuthToken(null);
     // Fallback: return default values if decryption failed
     return {
       courseId: undefined,
@@ -111,9 +122,11 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
       userType: 'student',
       isPreview: isPreviewParam === 'true',
       viewType: 'diagnostic',
+      token: undefined,
     };
   } catch (error) {
     // Invalid URL, return defaults
+    apiService.setAuthToken(null);
     return {
       courseId: undefined,
       moduleId: undefined,
@@ -124,6 +137,7 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
       userType: 'student',
       isPreview: false,
       viewType: 'diagnostic',
+      token: undefined,
     };
   }
 }

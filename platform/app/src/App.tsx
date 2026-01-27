@@ -1,41 +1,42 @@
 // External
 
-import React, { useEffect, useState } from 'react';
-import PropTypes from 'prop-types';
 import i18n from '@ohif/i18n';
+import PropTypes from 'prop-types';
+import React, { useEffect, useState } from 'react';
 import { I18nextProvider } from 'react-i18next';
 import { BrowserRouter } from 'react-router-dom';
 
-import Compose from './routes/Mode/Compose';
 import {
-  ExtensionManager,
   CommandsManager,
+  ExtensionManager,
   HotkeysManager,
   ServiceProvidersManager,
   SystemContextProvider,
   ViewportRefsProvider,
 } from '@ohif/core';
 import {
-  ThemeWrapper as ThemeWrapperNext,
-  NotificationProvider,
-  ViewportGridProvider,
-  DialogProvider,
   CineProvider,
-  TooltipProvider,
-  Modal as ModalNext,
+  DialogProvider,
   ManagedDialog,
+  Modal as ModalNext,
   ModalProvider,
-  ViewportDialogProvider,
+  NotificationProvider,
+  ThemeWrapper as ThemeWrapperNext,
+  TooltipProvider,
   UserAuthenticationProvider,
+  ViewportDialogProvider,
+  ViewportGridProvider,
 } from '@ohif/ui-next';
+import Compose from './routes/Mode/Compose';
 // Viewer Project
 // TODO: Should this influence study list?
 import { AppConfigProvider } from '@state';
-import createRoutes from './routes';
-import appInit from './appInit.js';
-import OpenIdConnectRoutes from './utils/OpenIdConnectRoutes';
 import { ShepherdJourneyProvider } from 'react-shepherd';
 import './App.css';
+import appInit from './appInit.js';
+import createRoutes from './routes';
+import { initUnauthorizedModal } from './utils/initUnauthorizedModal';
+import OpenIdConnectRoutes from './utils/OpenIdConnectRoutes';
 
 let commandsManager: CommandsManager,
   extensionManager: ExtensionManager,
@@ -139,6 +140,9 @@ function App({
 
   // Should there be a generic call to init on the extension manager?
   customizationService.init(extensionManager);
+
+  // Initialize unauthorized modal
+  initUnauthorizedModal(uiModalService);
 
   // Use config to create routes
   const appRoutes = createRoutes({

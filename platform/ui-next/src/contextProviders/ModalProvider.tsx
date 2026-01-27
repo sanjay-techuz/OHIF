@@ -7,6 +7,7 @@ interface ModalOptions {
   content?: React.ComponentType;
   contentProps?: Record<string, unknown>;
   containerClassName?: string;
+  unstyled?: boolean;
 }
 
 interface ModalContextType {
@@ -84,6 +85,7 @@ const ModalProvider: React.FC<ModalProviderProps> = ({
           isOpen={true}
           onClose={hide}
           title={t(title)}
+          unstyled={options.unstyled}
           {...options}
         >
           <ModalContent

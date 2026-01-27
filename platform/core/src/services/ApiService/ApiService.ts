@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { showUnauthorizedModal } from '../../utils/showUnauthorizedModal';
 
 export interface ApiResponse<T = unknown> {
   data: T;
@@ -49,6 +50,11 @@ export class ApiService {
         return response;
       },
       error => {
+        console.log('error', error);
+        if (error.response?.status === 401) {
+          this.clearAuthToken();
+          showUnauthorizedModal();
+        }
         const apiError: ApiError = {
           message: error.response?.data?.message || error.message || 'An error occurred',
           status: error.response?.status,

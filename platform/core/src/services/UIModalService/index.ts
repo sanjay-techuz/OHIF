@@ -30,6 +30,7 @@ class UIModalService {
     shouldCloseOnEsc = true,
     shouldCloseOnOverlayClick = true,
     containerClassName = null,
+    unstyled = false,
   }) {
     return serviceImplementation._show({
       content,
@@ -39,6 +40,7 @@ class UIModalService {
       className,
       shouldCloseOnOverlayClick,
       containerClassName,
+      unstyled,
     });
   }
 
