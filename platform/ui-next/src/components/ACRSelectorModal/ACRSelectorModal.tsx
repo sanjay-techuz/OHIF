@@ -158,7 +158,7 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
         <Button
           variant="ghost"
           onClick={handleCancel}
-          className="px-4 py-2 text-xl font-medium text-white"
+          className="min-w-28 h-auto rounded-[8px] px-4 py-2 text-xl font-medium text-white"
           style={{
             backgroundColor: 'transparent',
           }}
@@ -173,7 +173,7 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
         </Button>
         <Button
           onClick={handleSave}
-          className="px-4 py-2 text-xl font-medium text-white"
+          className="min-w-28 h-auto rounded-[8px] px-4 py-2 text-xl font-medium text-white"
           style={{
             backgroundColor: 'hsl(var(--highlight))',
           }}

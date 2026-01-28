@@ -95,7 +95,7 @@ const Thumbnail = ({
             </div>
 
             {/* top right */}
-            <div className="absolute top-0 right-0 flex items-center gap-[4px]">
+            <div className="absolute top-1 right-1 flex items-center gap-[4px]">
               <DisplaySetMessageListTooltip
                 messages={messages}
                 id={`display-set-tooltip-${displaySetInstanceUID}`}
@@ -104,7 +104,7 @@ const Thumbnail = ({
                 <Tooltip>
                   <TooltipTrigger>
                     <div className="group">
-                      <Icons.StatusTracking className="text-primary-light h-[15px] w-[15px] group-hover:hidden" />
+                      <Icons.StatusTracking className="h-[15px] w-[15px] fill-current text-white group-hover:hidden" />
                       <Icons.Cancel
                         className="text-primary-light hidden h-[15px] w-[15px] group-hover:block"
                         onClick={onClickUntrack}

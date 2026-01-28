@@ -361,7 +361,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
               <span className="text-base text-white/80">Breast Density</span>
               <button
                 onClick={handleButtonClick}
-                className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
+                className="h-auto rounded-[8px] px-4 py-1 text-center text-base text-white/80 transition-colors"
                 style={{
                   backgroundColor: '#232323',
                 }}

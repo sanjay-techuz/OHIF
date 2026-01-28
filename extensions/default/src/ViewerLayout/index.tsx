@@ -947,7 +947,7 @@ function ViewerLayout({
             {userType === 'faculty' && !isAddAnswerClicked && (
               <Button
                 variant="default"
-                className="h-auto rounded px-4 py-2 text-xl font-medium text-white"
+                className="h-auto rounded-[8px] px-4 py-2 text-xl font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
@@ -961,7 +961,7 @@ function ViewerLayout({
             {isAddAnswerClicked && (
               <Button
                 variant="default"
-                className="h-auto rounded px-4 py-2 text-xl font-medium text-white"
+                className="h-auto rounded-[8px] px-4 py-2 text-xl font-medium text-white"
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
