@@ -106,9 +106,9 @@ function modeFactory({ modeConfiguration }) {
         'HangingProtocol',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomMiddle, [
@@ -129,7 +129,7 @@ function modeFactory({ modeConfiguration }) {
         'navigationComponent',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'windowLevelMenu',
       ]);
 

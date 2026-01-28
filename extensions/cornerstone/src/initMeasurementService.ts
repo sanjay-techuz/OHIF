@@ -1,17 +1,17 @@
 import { eventTarget, Types } from '@cornerstonejs/core';
-import { Enums, annotation } from '@cornerstonejs/tools';
+import { annotation, Enums } from '@cornerstonejs/tools';
 import { DicomMetadataStore } from '@ohif/core';
 
-import * as CSExtensionEnums from './enums';
-import { toolNames } from './initCornerstoneTools';
-import { onCompletedCalibrationLine } from './tools/CalibrationLineTool';
-import measurementServiceMappingsFactory from './utils/measurementServiceMappings/measurementServiceMappingsFactory';
-import getSOPInstanceAttributes from './utils/measurementServiceMappings/utils/getSOPInstanceAttributes';
 import {
   setAnnotationLabel,
   triggerAnnotationRenderForViewportIds,
 } from '@cornerstonejs/tools/utilities';
+import * as CSExtensionEnums from './enums';
+import { toolNames } from './initCornerstoneTools';
+import { onCompletedCalibrationLine } from './tools/CalibrationLineTool';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import measurementServiceMappingsFactory from './utils/measurementServiceMappings/measurementServiceMappingsFactory';
+import getSOPInstanceAttributes from './utils/measurementServiceMappings/utils/getSOPInstanceAttributes';
 
 const { CORNERSTONE_3D_TOOLS_SOURCE_NAME, CORNERSTONE_3D_TOOLS_SOURCE_VERSION } = CSExtensionEnums;
 const { removeAnnotation } = annotation.state;
@@ -452,6 +452,14 @@ const connectMeasurementServiceToTools = ({
        * This is not the read-only annotation rendered by the SR viewport.
        */
       const annotationManager = annotation.state.getAnnotationManager();
+
+      // Determine color based on label if color is not set
+      // Student ROI = blue, Faculty ROI = green
+      let annotationColor = data.annotation.data?.color;
+      if (!annotationColor && data.annotation.data?.label) {
+        annotationColor = data.annotation.data.label.includes('Student') ? 'blue' : 'green';
+      }
+
       const newAnnotation = {
         annotationUID: measurement.uid,
         highlighted: false,
@@ -476,6 +484,11 @@ const connectMeasurementServiceToTools = ({
         },
       };
       annotationManager.addAnnotation(newAnnotation);
+
+      // Set annotation color using Cornerstone Tools style API
+      if (annotationColor) {
+        annotation.config.style.setAnnotationStyles(measurement.uid, { color: annotationColor });
+      }
       commandsManager.run('triggerCreateAnnotationMemo', {
         annotation: newAnnotation,
         FrameOfReferenceUID: newAnnotation.metadata.FrameOfReferenceUID,
@@ -506,7 +519,7 @@ const connectMeasurementServiceToTools = ({
 };
 
 export {
-  initMeasurementService,
-  connectToolsToMeasurementService,
   connectMeasurementServiceToTools,
+  connectToolsToMeasurementService,
+  initMeasurementService
 };

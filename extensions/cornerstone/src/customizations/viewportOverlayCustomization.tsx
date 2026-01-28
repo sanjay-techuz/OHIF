@@ -29,10 +29,6 @@ export default {
     {
       id: 'ZoomLevel',
       inheritsFrom: 'ohif.overlayItem.zoomLevel',
-      condition: props => {
-        const activeToolName = props.toolGroupService.getActiveToolForViewport(props.viewportId);
-        return activeToolName === 'Zoom';
-      },
     },
   ],
   'viewportOverlay.bottomRight': [

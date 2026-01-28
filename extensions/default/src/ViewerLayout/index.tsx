@@ -468,9 +468,13 @@ function ViewerLayout({
         ) {
           const { data } = result.data as any;
           if (data) {
+            if (isPreview) {
+              setFacultyAcrValues(data.faculty_result_data || { acr: '', r: '', l: '' });
+            }
             setStudentAcrValues(data.result_data || { acr: '', r: '', l: '' });
           }
         } else {
+          setFacultyAcrValues({ acr: '', r: '', l: '' });
           setStudentAcrValues({ acr: '', r: '', l: '' });
         }
       }

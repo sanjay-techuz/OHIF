@@ -1,14 +1,14 @@
 import React from 'react';
-import { Tooltip, TooltipTrigger, TooltipContent } from '../Tooltip';
-import { Icons } from '../Icons';
-import { Button } from '../Button';
-import { cn } from '../../lib/utils';
 import { useIconPresentation } from '../../contextProviders/IconPresentationProvider';
+import { cn } from '../../lib/utils';
+import { Button } from '../Button';
+import { Icons } from '../Icons';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 
 const baseClasses = '!rounded-lg inline-flex items-center justify-center';
 const defaultClasses =
   'bg-transparent text-foreground/80 hover:bg-[#272525] hover:text-highlight rounded-lg';
-const activeClasses = 'bg-highlight text-background hover:!bg-highlight/80 rounded-lg';
+const activeClasses = 'bg-[rgb(35,35,35)] text-background hover:opacity-80 rounded-lg';
 const disabledClasses =
   'text-common-bright hover:bg-primary-dark hover:text-primary-light opacity-40  cursor-not-allowed';
 

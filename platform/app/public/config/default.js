@@ -283,24 +283,28 @@ window.config = {
   },
   whiteLabeling: {
     createLogoComponentFn: function (React) {
-      return React.createElement(
-        'a',
-        {
-          target: '_self',
-          rel: 'noopener noreferrer',
-          className: 'text-purple-600 line-through',
-          href: '/',
-        },
-        React.createElement('img', {
-          src: './biedx.png',
-          className: 'w-12 h-12',
-        })
-        // React.createElement(
-        //   'p',
-        //   { className: '' }, // props
-        //   'Biedx'
-        // )
-      );
+      // return React.createElement(
+      //   'a',
+      //   {
+      //     target: '_self',
+      //     rel: 'noopener noreferrer',
+      //     className: 'text-purple-600 line-through',
+      //     href: '/',
+      //   },
+      //   React.createElement('img', {
+      //     src: './biedx.png',
+      //     className: 'w-12 h-12',
+      //   })
+      //   // React.createElement(
+      //   //   'p',
+      //   //   { className: '' }, // props
+      //   //   'Biedx'
+      //   // )
+      // );
+      return React.createElement('img', {
+        src: './biedx.png',
+        className: 'w-12 h-12',
+      });
     },
   },
 };

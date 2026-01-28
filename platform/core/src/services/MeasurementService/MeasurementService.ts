@@ -598,8 +598,12 @@ class MeasurementService extends PubSubService {
           );
 
           if (annotationData) {
-            annotationData.data.color = userType === 'student' ? 'red' : 'blue';
+            // Set colors based on userType: student = blue, faculty = green
+            const color = userType === 'student' ? 'blue' : 'rgb(0, 255, 0)';
             annotationData.data.label = userType === 'student' ? 'Student ROI' : 'Faculty ROI';
+
+            // Set annotation color using Cornerstone Tools style API
+            annotation.config.style.setAnnotationStyles(internalUID, { color });
           }
 
           const body = {

@@ -141,8 +141,8 @@ function App({
   // Should there be a generic call to init on the extension manager?
   customizationService.init(extensionManager);
 
-  // Initialize unauthorized modal
-  initUnauthorizedModal(uiModalService);
+  // Initialize unauthorized redirect
+  initUnauthorizedModal();
 
   // Use config to create routes
   const appRoutes = createRoutes({

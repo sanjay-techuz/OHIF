@@ -378,7 +378,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                   e.currentTarget.style.backgroundColor = '#232323';
                 }}
               >
-                {studentValues.acr || '-'}
+                {facultyValues.acr || '-'}
               </button>
             </div>
 
@@ -404,7 +404,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                   e.currentTarget.style.backgroundColor = '#232323';
                 }}
               >
-                {studentValues.r || '-'}
+                {facultyValues.r || '-'}
               </button>
             </div>
 
@@ -430,7 +430,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
                   e.currentTarget.style.backgroundColor = '#232323';
                 }}
               >
-                {studentValues.l || '-'}
+                {facultyValues.l || '-'}
               </button>
             </div>
 

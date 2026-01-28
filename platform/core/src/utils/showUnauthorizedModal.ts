@@ -1,19 +1,19 @@
 /**
- * Utility function to show unauthorized modal
- * This function should be set during app initialization with the UIModalService instance
+ * Utility function to redirect to unauthorized page
+ * This function should be set during app initialization with the navigate function
  */
-let showUnauthorizedModalFn: (() => void) | null = null;
+let redirectToUnauthorizedFn: (() => void) | null = null;
 
 export const setShowUnauthorizedModal = (fn: () => void) => {
-  showUnauthorizedModalFn = fn;
+  redirectToUnauthorizedFn = fn;
 };
 
 export const showUnauthorizedModal = () => {
-  if (showUnauthorizedModalFn) {
-    showUnauthorizedModalFn();
+  if (redirectToUnauthorizedFn) {
+    redirectToUnauthorizedFn();
   } else {
-    // Fallback to direct redirect if modal function is not set
-    console.warn('Unauthorized modal function not set, redirecting directly');
-    window.location.href = 'http://localhost:8081/login';
+    // Fallback to direct redirect if navigate function is not set
+    console.warn('Unauthorized redirect function not set, redirecting directly');
+    window.location.href = '/unauthorized';
   }
 };

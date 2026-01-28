@@ -20,16 +20,16 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
   const tools = {
     active: [
       {
+        toolName: toolNames.Zoom,
+        bindings: [{ mouseButton: Enums.MouseBindings.Primary }, { numTouchPoints: 2 }],
+      },
+      {
         toolName: toolNames.WindowLevel,
-        bindings: [{ mouseButton: Enums.MouseBindings.Primary }],
+        bindings: [{ mouseButton: Enums.MouseBindings.Secondary }],
       },
       {
         toolName: toolNames.Pan,
         bindings: [{ mouseButton: Enums.MouseBindings.Auxiliary }],
-      },
-      {
-        toolName: toolNames.Zoom,
-        bindings: [{ mouseButton: Enums.MouseBindings.Secondary }, { numTouchPoints: 2 }],
       },
       {
         toolName: toolNames.StackScroll,
@@ -94,10 +94,19 @@ function initSRToolGroup(extensionManager, toolGroupService, commandsManager) {
   const tools = {
     active: [
       {
-        toolName: toolNames.WindowLevel,
+        toolName: toolNames.Zoom,
         bindings: [
           {
             mouseButton: Enums.MouseBindings.Primary,
+          },
+          { numTouchPoints: 2 },
+        ],
+      },
+      {
+        toolName: toolNames.WindowLevel,
+        bindings: [
+          {
+            mouseButton: Enums.MouseBindings.Secondary,
           },
         ],
       },
@@ -107,15 +116,6 @@ function initSRToolGroup(extensionManager, toolGroupService, commandsManager) {
           {
             mouseButton: Enums.MouseBindings.Auxiliary,
           },
-        ],
-      },
-      {
-        toolName: toolNames.Zoom,
-        bindings: [
-          {
-            mouseButton: Enums.MouseBindings.Secondary,
-          },
-          { numTouchPoints: 2 },
         ],
       },
       {
@@ -157,16 +157,16 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
   const tools = {
     active: [
       {
+        toolName: toolNames.Zoom,
+        bindings: [{ mouseButton: Enums.MouseBindings.Primary }, { numTouchPoints: 2 }],
+      },
+      {
         toolName: toolNames.WindowLevel,
-        bindings: [{ mouseButton: Enums.MouseBindings.Primary }],
+        bindings: [{ mouseButton: Enums.MouseBindings.Secondary }],
       },
       {
         toolName: toolNames.Pan,
         bindings: [{ mouseButton: Enums.MouseBindings.Auxiliary }],
-      },
-      {
-        toolName: toolNames.Zoom,
-        bindings: [{ mouseButton: Enums.MouseBindings.Secondary }, { numTouchPoints: 2 }],
       },
       {
         toolName: toolNames.StackScroll,

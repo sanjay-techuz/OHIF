@@ -393,9 +393,10 @@ function OverlayItem(props) {
  */
 function VOIOverlayItem({ voi, customization }: OverlayItemProps) {
   const { windowWidth, windowCenter } = voi;
-  if (typeof windowCenter !== 'number' || typeof windowWidth !== 'number') {
-    return null;
-  }
+
+  // Always show WW/WL, display "-- / --" when values are not available
+  const displayWidth = typeof windowWidth === 'number' ? windowWidth.toFixed(0) : '--';
+  const displayCenter = typeof windowCenter === 'number' ? windowCenter.toFixed(0) : '--';
 
   return (
     <div
@@ -404,7 +405,7 @@ function VOIOverlayItem({ voi, customization }: OverlayItemProps) {
     >
       <span className="mr-0.5 shrink-0 opacity-[0.80]">WW/WL:</span>
       <span className="mr-2.5 shrink-0">
-        {windowWidth.toFixed(0)} / {windowCenter.toFixed(0)}
+        {displayWidth} / {displayCenter}
       </span>
       {/* <span className="mr-0.5 shrink-0 opacity-[0.80]">L:</span>
       <span className="shrink-0">{windowCenter.toFixed(0)}</span> */}

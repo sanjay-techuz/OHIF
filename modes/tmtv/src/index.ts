@@ -1,10 +1,10 @@
 import { classes } from '@ohif/core';
-import toolbarButtons from './toolbarButtons';
+import i18n from 'i18next';
 import { id } from './id.js';
 import initToolGroups from './initToolGroups.js';
+import toolbarButtons from './toolbarButtons';
 import setCrosshairsConfiguration from './utils/setCrosshairsConfiguration.js';
 import setFusionActiveVolume from './utils/setFusionActiveVolume.js';
-import i18n from 'i18next';
 
 const { MetadataProvider } = classes;
 
@@ -97,9 +97,9 @@ function modeFactory({ modeConfiguration }) {
         'Crosshairs',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomMiddle, [
@@ -120,7 +120,7 @@ function modeFactory({ modeConfiguration }) {
         'navigationComponent',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'windowLevelMenu',
       ]);
 

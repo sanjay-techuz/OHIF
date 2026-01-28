@@ -6,7 +6,7 @@ import {
   decryptObject,
   encrypt,
   encryptObject,
-  getCustomParams,
+  getCustomParams
 } from '@ohif/core';
 import { Button } from '@ohif/ui-next';
 import React, { useEffect, useState } from 'react';
@@ -205,7 +205,7 @@ const Results: React.FC<ResultsProps> = ({
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-center text-[20px] font-medium">Case Results</h2>
           <p className="border-l border-[#6B6C6E] pl-4 text-center text-base font-medium">
-            What does pathologist expect from a radiologist? - cases...
+            {/* What does pathologist expect from a radiologist? - cases... */}
           </p>
         </div>
         <Button
@@ -530,7 +530,7 @@ const Results: React.FC<ResultsProps> = ({
                           Left side
                           <div className="text-[10px] text-white/80">your answer / correct</div>
                         </th>
-                        <th className="px-5 py-3 text-left font-medium">Pathology Type</th>
+                        {/* <th className="px-5 py-3 text-left font-medium">Pathology Type</th> */}
                         <th className="px-5 py-3 text-left font-medium">Go to case</th>
                       </tr>
                     </thead>
@@ -610,76 +610,69 @@ const Results: React.FC<ResultsProps> = ({
                           </td>
                         </tr>
                       ))} */}
-                      <tr className="border-t border-white/10">
-                        <td className="px-5 py-3">8</td>
+                      {mistakesData.map(row => (
+                      <tr key={row.id} className="border-t border-white/10">
+                        <td className="px-5 py-3">{row.id}</td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <Pill label={'2'} />
-                            <span>/</span>
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
+
+                               <Pill
+                                label={row.right.yours}
+                                variant={
+                                  row.right.yours === row.right.correct ? 'correct' : 'false'
+                                }
+                              />
+                              <span >/</span>
+                              <Pill
+                                label={row.right.correct}
+                                variant={'normal'}
+                              />
                           </div>
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
-                            <span>/</span>
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3 capitalize">fsadf</td>
-                        <td className="px-5 py-3">
-                          <Button
-                            variant="default"
-                            className="h-7 bg-[#FF2768] px-3 text-xs text-white hover:bg-[#FF2768]/90"
-                          >
-                            View
-                          </Button>
-                        </td>
-                      </tr>
-                      <tr className="border-t border-white/10">
-                        <td className="px-5 py-3">8</td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2">
-                            <Pill label={'2'} />
-                            <span>/</span>
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2">
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
-                            <span>/</span>
-                            <Pill
-                              label={'8'}
-                              variant={'normal'}
-                            />
+
+                               <Pill
+                                label={row.left.yours}
+                                variant={row.left.yours === row.left.correct ? 'correct' : 'false'}
+                              />
+                              <span >/</span>
+                              <Pill
+                                label={row.left.correct}
+                                variant={'normal'}
+                              />
                           </div>
                         </td>
                         <td className="px-5 py-3 capitalize">fsadf</td>
                         <td className="px-5 py-3">
                           <Button
                             variant="default"
-                            className="h-7 bg-[#FF2768] px-3 text-xs text-white hover:bg-[#FF2768]/90"
+                              className="h-7 bg-[#FF2768] px-3 text-xs text-white hover:bg-[#FF2768]/90"
+                              onClick={() => {
+                                const currentParams = new URLSearchParams(window.location.search);
+                                const encryptedData = currentParams.get('data');
+                                const decryptedData = decryptObject(encryptedData);
+                                const data = {
+                                  ...decryptedData,
+                                  caseId: row.id,
+                                };
+                                currentParams.set('data', encryptObject(data));
+                                const encryptedUid = encrypt(row.study_instance_uid || '');
+                                currentParams.set('StudyInstanceUIDs', encryptedUid);
+                                currentParams.set('isPreview', 'true');
+
+                                // Navigate to results page with same query params
+                                navigate({
+                                  pathname: '/viewer',
+                                  search: currentParams.toString(),
+                                });
+                              }}
                           >
                             View
                           </Button>
                         </td>
                       </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

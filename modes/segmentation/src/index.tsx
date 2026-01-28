@@ -1,6 +1,6 @@
 import { id } from './id';
-import toolbarButtons from './toolbarButtons';
 import initToolGroups from './initToolGroups';
+import toolbarButtons from './toolbarButtons';
 
 const ohif = {
   layout: '@ohif/extension-default.layoutTemplateModule.viewerLayout',
@@ -74,9 +74,9 @@ function modeFactory({ modeConfiguration }) {
         'MoreTools',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomMiddle, [
@@ -97,7 +97,7 @@ function modeFactory({ modeConfiguration }) {
         'navigationComponent',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'windowLevelMenu',
       ]);
 

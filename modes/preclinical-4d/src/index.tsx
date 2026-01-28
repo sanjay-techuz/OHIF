@@ -1,6 +1,6 @@
 import { id } from './id';
-import initWorkflowSteps from './initWorkflowSteps';
 import initToolGroups from './initToolGroups';
+import initWorkflowSteps from './initWorkflowSteps';
 import toolbarButtons from './toolbarButtons';
 
 const extensionDependencies = {
@@ -58,14 +58,14 @@ function modeFactory({ modeConfiguration }) {
 
       toolbarService.updateSection(toolbarService.sections.secondary, ['ProgressDropdown']);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomMiddle, [
@@ -86,7 +86,7 @@ function modeFactory({ modeConfiguration }) {
         'navigationComponent',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'windowLevelMenu',
       ]);
 

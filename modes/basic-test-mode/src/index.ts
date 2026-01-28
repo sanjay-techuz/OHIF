@@ -1,7 +1,7 @@
-import toolbarButtons from './toolbarButtons';
+import i18n from 'i18next';
 import { id } from './id';
 import initToolGroups from './initToolGroups';
-import i18n from 'i18next';
+import toolbarButtons from './toolbarButtons';
 
 // Allow this mode by excluding non-imaging modalities such as SR, SEG
 // Also, SM is not a simple imaging modalities, so exclude it.
@@ -112,9 +112,9 @@ function modeFactory() {
         'Brain',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
-        'orientationMenu',
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
         'dataOverlayMenu',
+        'orientationMenu',
       ]);
 
       toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomMiddle, [
@@ -134,7 +134,7 @@ function modeFactory() {
         'navigationComponent',
       ]);
 
-      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.bottomLeft, [
+      toolbarService.updateSection(toolbarService.sections.viewportActionMenu.topLeft, [
         'windowLevelMenu',
       ]);
 

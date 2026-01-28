@@ -14,6 +14,7 @@ import Local from './Local';
 import NotFound from './NotFound';
 import PrivateRoute from './PrivateRoute';
 import Results from './Results';
+import Unauthorized from './Unauthorized';
 import WorkList from './WorkList';
 
 const NotFoundServer = ({
@@ -70,6 +71,10 @@ const bakedInRoutes = [
   {
     path: `/notfoundstudy`,
     children: NotFoundStudy,
+  },
+  {
+    path: `/unauthorized`,
+    children: Unauthorized,
   },
   {
     path: `/debug`,
