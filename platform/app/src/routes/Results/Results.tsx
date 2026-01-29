@@ -6,7 +6,7 @@ import {
   decryptObject,
   encrypt,
   encryptObject,
-  getCustomParams
+  getCustomParams,
 } from '@ohif/core';
 import { Button } from '@ohif/ui-next';
 import React, { useEffect, useState } from 'react';
@@ -14,9 +14,8 @@ import { useNavigate } from 'react-router-dom';
 const MetricRing: React.FC<{
   title: string;
   value: number; // 0–100
-  subtitle: string;
   color: string;
-}> = ({ title, value, subtitle, color }) => {
+}> = ({ title, value, color }) => {
   const size = 160;
   const strokeWidth = 30;
   const radius = (size - strokeWidth) / 2;
@@ -25,7 +24,7 @@ const MetricRing: React.FC<{
   const offset = circumference - (Math.min(value, 100) / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center rounded-xl bg-[#0B0A0A] px-6 py-5 shadow-[0_10px_30px_rgba(0,0,0,0.6)]">
+    <div className="relative flex flex-col items-center rounded-2xl border border-[rgba(255,255,255,0.15)] bg-[linear-gradient(124deg,#1C1C1C_0%,#0B0A0A_99.91%)] px-6 py-5 shadow-[0_12px_71.8px_rgba(0,0,0,0.50)]">
       <div className="mb-3 text-lg font-semibold text-white">{title}</div>
 
       <div className="relative">
@@ -59,7 +58,7 @@ const MetricRing: React.FC<{
 
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          <div className="text-sm font-medium text-white/80">{subtitle}</div>
+          {/* <div className="text-sm font-medium text-white/80">{subtitle}</div> */}
           <div className="mt-1 text-2xl font-semibold text-white">{Math.round(value)}%</div>
         </div>
       </div>
@@ -165,7 +164,7 @@ const Results: React.FC<ResultsProps> = ({
 
   const themeBg = '#0B0A0A';
   const cardBg = '#232323';
-  const borderColor = '#6B6C6E';
+  const borderColor = 'rgba(0, 206, 140, 0.70)';
   const gridHeaderBg = '#232323';
 
   const SquareDot: React.FC<{ filled?: boolean; color?: string }> = ({ filled = false, color }) => (
@@ -183,10 +182,9 @@ const Results: React.FC<ResultsProps> = ({
     variant = 'normal',
   }) => (
     <span
-      className="inline-flex min-w-[28px] items-center justify-center rounded-full px-2 py-[2px] text-xs"
+      className={`min-w-10 inline-flex items-center justify-center rounded-full px-2 py-[2px] text-xs ${variant === 'false' ? 'bg-[linear-gradient(116deg,rgba(255,39,104,0.50)_7.52%,rgba(255,39,104,0.00)_89.14%)] shadow-[0_7px_21.2px_0_rgba(255,39,104,0.20)]' : variant === 'correct' ? 'bg-[linear-gradient(116deg,rgba(252,188,53,0.50)_7.52%,rgba(252,188,53,0.00)_89.14%)] shadow-[0_7px_21.2px_0_rgba(252,188,53,0.20)]' : 'bg-[linear-gradient(116deg,rgba(0,206,140,0.30)_7.52%,rgba(0,206,140,0.00)_89.14%)]'}`}
       style={{
-        backgroundColor: cardBg,
-        border: `1px solid ${variant === 'false' ? 'hsl(var(--highlight))' : variant === 'correct' ? '#10b981' : borderColor}`,
+        border: `1px solid ${variant === 'false' ? 'rgba(255, 39, 104, 0.70)' : variant === 'correct' ? 'rgba(252, 188, 53, 0.70)' : borderColor}`,
       }}
     >
       {label}
@@ -195,11 +193,11 @@ const Results: React.FC<ResultsProps> = ({
 
   return (
     <div
-      className="flex h-full w-full flex-col text-white"
+      className="relative flex h-full w-full flex-col text-white"
       style={{ backgroundColor: themeBg }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-[#0B0A0A] px-12 py-4">
+      <div className="relative z-10 flex items-center justify-between border-b border-white/10 bg-[#0B0A0A] px-12 py-4">
         {/* <div className="text-sm opacity-80">mammologicum</div> */}
 
         <div className="flex items-center justify-between gap-4">
@@ -227,7 +225,8 @@ const Results: React.FC<ResultsProps> = ({
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 bg-black">
+      <div className="relative flex flex-1 overflow-hidden bg-black">
+        <div className="absolute right-[-50%] h-[677px] w-[1260px] -rotate-90 bg-[rgba(52,106,255,0.70)] blur-[300px]"></div>
         {/* Sidebar */}
         {/* <aside
           className="hidden w-64 flex-shrink-0 flex-col gap-6 p-6 md:flex"
@@ -300,7 +299,7 @@ const Results: React.FC<ResultsProps> = ({
 
         {/* Main */}
         <div className="m-auto w-[1170px] max-w-full">
-          <main className="flex-1 overflow-y-auto py-10">
+          <main className="relative z-10 flex-1 py-10">
             {/* Results cards */}
             <div className="mb-10">
               <div className="mb-8 grid gap-1">
@@ -326,22 +325,19 @@ const Results: React.FC<ResultsProps> = ({
               <div className="grid grid-cols-3 gap-6">
                 <MetricRing
                   title="Specificity"
-                  subtitle="True-negatives"
                   value={specificity}
                   color="#10b981"
                 />
 
                 <MetricRing
                   title="Sensitivity"
-                  subtitle="True-positives"
                   value={sensitivity}
                   color="#3b82f6"
                 />
 
                 <MetricRing
                   title="Accuracy"
-                  subtitle="Critical Miss"
-                  value={50} // replace with your accuracy calc
+                  value={(specificity + sensitivity) / 2} // replace with your accuracy calc
                   color="#fbbf24"
                 />
               </div>
@@ -393,7 +389,7 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="border-r border-white/10 px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>true-negative (TN)</span>
-                            <div className="flex h-5 w-8 items-center justify-center rounded-full bg-[#FF2768]/60 text-sm font-medium text-white">
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(255,39,104,0.70)] bg-[linear-gradient(116deg,rgba(255,39,104,0.50)_7.52%,rgba(255,39,104,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(255,39,104,0.20)]">
                               {results?.TN || 0}
                             </div>
                           </div>
@@ -403,7 +399,7 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>false-positive (FP)</span>
-                            <div className="flex h-5 w-8 items-center justify-center rounded-full bg-[#FF2768]/60 text-sm font-medium text-white">
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(255,39,104,0.70)] bg-[linear-gradient(116deg,rgba(255,39,104,0.50)_7.52%,rgba(255,39,104,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(255,39,104,0.20)]">
                               {results?.FP || 0}
                             </div>
                           </div>
@@ -437,10 +433,7 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="border-r border-white/10 px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>false-negative (FN)</span>
-                            <div
-                              className="flex h-5 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                              style={{ backgroundColor: '#10b981' }}
-                            >
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(252,188,53,0.70)] bg-[linear-gradient(116deg,rgba(252,188,53,0.50)_7.52%,rgba(252,188,53,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(252,188,53,0.20)]">
                               {results?.FN || 0}
                             </div>
                           </div>
@@ -450,10 +443,7 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>true-positive (TP)</span>
-                            <div
-                              className="flex h-5 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-                              style={{ backgroundColor: '#10b981' }}
-                            >
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(252,188,53,0.70)] bg-[linear-gradient(116deg,rgba(252,188,53,0.50)_7.52%,rgba(252,188,53,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(252,188,53,0.20)]">
                               {results?.TP || 0}
                             </div>
                           </div>
@@ -484,24 +474,66 @@ const Results: React.FC<ResultsProps> = ({
                 </p>
               </div>
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="rounded-lg bg-[#0B0A0A] p-6">
-                  <div className="mb-2 text-xl font-medium">Specificity</div>
-                  <div className="text-base text-white/80">
-                    percentage of true-negative answers relative to the total number of
-                    true-negatives and false-positives:
-                  </div>
-                  <div className="mt-3 text-base">
-                    <span className="font-medium">Specificity = TN / (TN + FP)</span>
+                <div className="rounded-[16px] border border-[rgba(255,255,255,0.15)] bg-[linear-gradient(124deg,#1C1C1C_0%,#0B0A0A_99.91%)] p-6 shadow-[0_12px_71.8px_0_rgba(0,0,0,0.50)]">
+                  <div className="grid grid-cols-[24px_auto] gap-4">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#00CE8C] shadow-[0_7px_32.5px_0_rgba(13,174,122,0.50)]">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="17"
+                        height="17"
+                        viewBox="0 0 17 17"
+                        fill="none"
+                      >
+                        <path
+                          d="M14.1305 4.23914L6.35878 12.0109L2.82617 8.47827"
+                          stroke="white"
+                          stroke-width="1.17754"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div className="grid">
+                      <div className="mb-2 text-[18px] font-medium">Specificity</div>
+                      <div className="text-base text-white/80">
+                        percentage of true-negative answers relative to the total number of
+                        true-negatives and false-positives:
+                      </div>
+                      <div className="mt-3 text-base">
+                        <span className="font-medium">Specificity = TN / (TN + FP)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#0B0A0A] p-6">
-                  <div className="mb-2 text-xl font-medium">Sensitivity</div>
-                  <div className="text-base text-white/80">
-                    percentage of true-positive answers relative to the total number of
-                    true-positives and false-negatives:
-                  </div>
-                  <div className="mt-3 text-base">
-                    <span className="font-medium">Sensitivity = TP / (TP + FN)</span>
+                <div className="rounded-[16px] border border-[rgba(255,255,255,0.15)] bg-[linear-gradient(124deg,#1C1C1C_0%,#0B0A0A_99.91%)] p-6 shadow-[0_12px_71.8px_0_rgba(0,0,0,0.50)]">
+                  <div className="grid grid-cols-[24px_auto] gap-4">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#00CE8C] shadow-[0_7px_32.5px_0_rgba(13,174,122,0.50)]">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="17"
+                        height="17"
+                        viewBox="0 0 17 17"
+                        fill="none"
+                      >
+                        <path
+                          d="M14.1305 4.23914L6.35878 12.0109L2.82617 8.47827"
+                          stroke="white"
+                          stroke-width="1.17754"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div className="grid">
+                      <div className="mb-2 text-[18px] font-medium">Sensitivity</div>
+                      <div className="text-base text-white/80">
+                        percentage of true-positive answers relative to the total number of
+                        true-positives and false-negatives:
+                      </div>
+                      <div className="mt-3 text-base">
+                        <span className="font-medium">Sensitivity = TP / (TP + FN)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -611,43 +643,43 @@ const Results: React.FC<ResultsProps> = ({
                         </tr>
                       ))} */}
                       {mistakesData.map(row => (
-                      <tr key={row.id} className="border-t border-white/10">
-                        <td className="px-5 py-3">{row.id}</td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2">
-
-                               <Pill
+                        <tr
+                          key={row.id}
+                          className="border-t border-white/10"
+                        >
+                          <td className="px-5 py-3">{row.id}</td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2">
+                              <Pill
                                 label={row.right.yours}
                                 variant={
                                   row.right.yours === row.right.correct ? 'correct' : 'false'
                                 }
                               />
-                              <span >/</span>
+                              <span>/</span>
                               <Pill
                                 label={row.right.correct}
                                 variant={'normal'}
                               />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2">
-
-                               <Pill
+                            </div>
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2">
+                              <Pill
                                 label={row.left.yours}
                                 variant={row.left.yours === row.left.correct ? 'correct' : 'false'}
                               />
-                              <span >/</span>
+                              <span>/</span>
                               <Pill
                                 label={row.left.correct}
                                 variant={'normal'}
                               />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3 capitalize">fsadf</td>
-                        <td className="px-5 py-3">
-                          <Button
-                            variant="default"
-                              className="h-7 bg-[#FF2768] px-3 text-xs text-white hover:bg-[#FF2768]/90"
+                            </div>
+                          </td>
+                          <td className="px-5 py-3">
+                            <Button
+                              variant="default"
+                              className="h-auto rounded-lg bg-[#FF2768] px-3 py-1 text-base text-white hover:bg-[#FF2768]/90"
                               onClick={() => {
                                 const currentParams = new URLSearchParams(window.location.search);
                                 const encryptedData = currentParams.get('data');
@@ -667,11 +699,11 @@ const Results: React.FC<ResultsProps> = ({
                                   search: currentParams.toString(),
                                 });
                               }}
-                          >
-                            View
-                          </Button>
-                        </td>
-                      </tr>
+                            >
+                              View
+                            </Button>
+                          </td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
