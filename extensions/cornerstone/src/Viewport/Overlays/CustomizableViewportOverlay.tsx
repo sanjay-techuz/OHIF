@@ -370,7 +370,7 @@ function _getInstanceNumberFromVolume(
 
 function OverlayItem(props) {
   const { instance, customization = {} } = props;
-  const { color, attribute, title, label, background } = customization;
+  const { id, color, attribute, title, label, background } = customization;
   const value = customization.contentF?.(props, customization) ?? instance?.[attribute];
   if (value === undefined || value === null) {
     return null;
@@ -382,7 +382,11 @@ function OverlayItem(props) {
       title={title}
     >
       {label ? <span className="mr-1 shrink-0">{label}</span> : null}
-      <span className="ml-0 mr-2 shrink-0">{value}</span>
+      <span
+        className={`ml-0 mr-2 shrink-0 font-medium ${id === 'SeriesDescription' ? 'text-white/60' : 'text-white/80'}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
