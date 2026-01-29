@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
   IconPresentationProvider,
   Icons,
+  InstructionModal,
   Onboarding,
   QuestionAnswerModal,
   RecallModal,
@@ -85,6 +86,7 @@ function ViewerLayout({
   // Add state for validation modal
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
 
   const { courseId, moduleId, caseId, studentId, viewType, userType, facultyId, isPreview } =
     useCustomParams();
@@ -758,7 +760,7 @@ function ViewerLayout({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-primary h-8 w-8"
+                  className="text-primary h-10 w-10 rounded-lg"
                   style={{
                     backgroundColor: '#232323',
                   }}
@@ -800,6 +802,29 @@ function ViewerLayout({
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="ghost"
+              onClick={() => setShowInstructionsModal(true)}
+              className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="25"
+                height="25"
+                viewBox="0 0 25 25"
+                fill="none"
+              >
+                <path
+                  d="M12.4997 21.875L12.3955 21.7187C11.6719 20.6333 11.3101 20.0906 10.8321 19.6977C10.4089 19.3499 9.92131 19.089 9.39718 18.9298C8.80514 18.75 8.15291 18.75 6.84845 18.75H5.41634C4.24957 18.75 3.66618 18.75 3.22053 18.5229C2.82852 18.3232 2.50981 18.0045 2.31008 17.6125C2.08301 17.1668 2.08301 16.5834 2.08301 15.4167V6.45833C2.08301 5.29156 2.08301 4.70817 2.31008 4.26252C2.50981 3.87052 2.82852 3.55181 3.22053 3.35207C3.66618 3.125 4.24957 3.125 5.41634 3.125H5.83301C8.16656 3.125 9.33334 3.125 10.2246 3.57914C11.0086 3.97861 11.6461 4.61603 12.0455 5.40004C12.4997 6.29134 12.4997 7.45811 12.4997 9.79167M12.4997 21.875V9.79167M12.4997 21.875L12.6039 21.7187C13.3275 20.6333 13.6893 20.0906 14.1673 19.6977C14.5904 19.3499 15.078 19.089 15.6022 18.9298C16.1942 18.75 16.8464 18.75 18.1509 18.75H19.583C20.7498 18.75 21.3332 18.75 21.7788 18.5229C22.1708 18.3232 22.4895 18.0045 22.6893 17.6125C22.9163 17.1668 22.9163 16.5834 22.9163 15.4167V6.45833C22.9163 5.29156 22.9163 4.70817 22.6893 4.26252C22.4895 3.87052 22.1708 3.55181 21.7788 3.35207C21.3332 3.125 20.7498 3.125 19.583 3.125H19.1663C16.8328 3.125 15.666 3.125 14.7747 3.57914C13.9907 3.97861 13.3533 4.61603 12.9538 5.40004C12.4997 6.29134 12.4997 7.45811 12.4997 9.79167"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Instructions</span>
+            </Button>
           </div>
 
           {/* //Center Section - Main Toolbar
@@ -1092,6 +1117,11 @@ function ViewerLayout({
           </div>
         </div>
       )}
+
+      <InstructionModal
+        open={showInstructionsModal}
+        onClose={() => setShowInstructionsModal(false)}
+      />
     </div>
   );
 }
