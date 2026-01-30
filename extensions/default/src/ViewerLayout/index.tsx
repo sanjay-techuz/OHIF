@@ -679,6 +679,7 @@ function ViewerLayout({
           }
         }}
         hasLeftPanels={hasLeftPanels}
+        leftPanelClosedState={leftPanelClosedState}
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
