@@ -152,7 +152,7 @@ const ToolButtonListItem = React.forwardRef<
       {icon && (
         <Icons.ByName
           name={icon || 'MissingIcon'}
-          className="h-6 w-6"
+          className="h-5 w-5 text-white/60"
         />
       )}
       {children}
