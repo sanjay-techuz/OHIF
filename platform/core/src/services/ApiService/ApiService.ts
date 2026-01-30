@@ -72,11 +72,11 @@ export class ApiService {
     // Check for environment variables in order of priority
     if (typeof process !== 'undefined' && process.env) {
       // Node.js environment
-      return process.env.API_BASE_URL || 'http://20.198.254.147/api';
+      return process.env.API_BASE_URL || 'https://uatapi.biedx.com/api';
     }
 
     // Fallback to empty string
-    return 'http://20.198.254.147/api';
+    return 'https://uatapi.biedx.com/api';
   }
 
   /**
