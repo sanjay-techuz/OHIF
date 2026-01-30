@@ -138,76 +138,108 @@ export const ToolLength = (props: IconProps) => (
 );
 
 export const Tool3DRotate = (props: IconProps) => (
+  // <svg
+  //   width="28px"
+  //   height="28px"
+  //   viewBox="0 0 28 28"
+  //   version="1.1"
+  //   xmlns="http://www.w3.org/2000/svg"
+  //   {...props}
+  // >
+  //   <g
+  //     id="tool-3d-rotate"
+  //     stroke="none"
+  //     strokeWidth="1"
+  //     fill="none"
+  //     fillRule="evenodd"
+  //   >
+  //     <rect
+  //       id="Rectangle"
+  //       x="0"
+  //       y="0"
+  //       width="28"
+  //       height="28"
+  //     />
+  //     <g
+  //       id="Group"
+  //       transform="translate(4, 3)"
+  //       stroke="currentColor"
+  //       strokeLinecap="round"
+  //       strokeLinejoin="round"
+  //       strokeWidth="1.5"
+  //     >
+  //       <g id="group">
+  //         <polyline
+  //           id="Path"
+  //           points="6 21.996 8.5 19.998 6 17.996"
+  //         />
+  //         <path
+  //           d="M8.5,19.998 C5.038,20.652 1,18.498 0,14.998"
+  //           id="Path"
+  //         />
+  //         <polyline
+  //           id="Path"
+  //           points="14 0 11.5 1.998 14 4"
+  //         />
+  //         <path
+  //           d="M11.5,1.998 C14.962,1.344 19,3.498 20,6.998"
+  //           id="Path"
+  //         />
+  //       </g>
+  //       <g
+  //         id="3d"
+  //         transform="translate(5, 5.75)"
+  //       >
+  //         <polygon
+  //           id="Path"
+  //           points="5 0 0 2.1875 5 4.375 10 2.1875"
+  //         />
+  //         <polyline
+  //           id="Path"
+  //           points="0 2.1875 0 8.125 5 10.3125 10 8.125 10 2.1875"
+  //         />
+  //         <line
+  //           x1="5"
+  //           y1="4.375"
+  //           x2="5"
+  //           y2="10.3125"
+  //           id="Path"
+  //         />
+  //       </g>
+  //     </g>
+  //   </g>
+  // </svg>
+
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
-    {...props}
+    width="30"
+    height="30"
+    viewBox="0 0 30 30"
+    fill="none"
   >
-    <g
-      id="tool-3d-rotate"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
-        x="0"
-        y="0"
-        width="28"
-        height="28"
+    <g clipPath="url(#clip0_577_1437)">
+      <path
+        d="M25.9803 12.2208C25.5581 11.9815 25.0217 12.1299 24.7824 12.5523C24.5432 12.9746 24.6916 13.5109 25.1139 13.7502C27.1314 14.8931 28.2424 16.2732 28.2424 17.6364C28.2424 20.7526 23.17 22.6736 20.0993 23.295C19.6235 23.3914 19.3159 23.8551 19.4122 24.3309C19.5085 24.8069 19.9727 25.1143 20.448 25.0179C24.5521 24.1873 30.0002 21.8169 30.0002 17.6364C30.0002 15.6126 28.5726 13.6893 25.9803 12.2208Z"
+        fill="white"
       />
-      <g
-        id="Group"
-        transform="translate(4, 3)"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      >
-        <g id="group">
-          <polyline
-            id="Path"
-            points="6 21.996 8.5 19.998 6 17.996"
-          />
-          <path
-            d="M8.5,19.998 C5.038,20.652 1,18.498 0,14.998"
-            id="Path"
-          />
-          <polyline
-            id="Path"
-            points="14 0 11.5 1.998 14 4"
-          />
-          <path
-            d="M11.5,1.998 C14.962,1.344 19,3.498 20,6.998"
-            id="Path"
-          />
-        </g>
-        <g
-          id="3d"
-          transform="translate(5, 5.75)"
-        >
-          <polygon
-            id="Path"
-            points="5 0 0 2.1875 5 4.375 10 2.1875"
-          />
-          <polyline
-            id="Path"
-            points="0 2.1875 0 8.125 5 10.3125 10 8.125 10 2.1875"
-          />
-          <line
-            x1="5"
-            y1="4.375"
-            x2="5"
-            y2="10.3125"
-            id="Path"
-          />
-        </g>
-      </g>
+      <path
+        d="M10.6055 25.2072V28.1832C10.6055 28.5073 10.7839 28.8052 11.0696 28.9581C11.3548 29.1107 11.7015 29.0947 11.9719 28.9145L17.2453 25.3989C17.4898 25.2359 17.6367 24.9614 17.6367 24.6676C17.6367 24.3737 17.4898 24.0993 17.2453 23.9363L11.9719 20.4206C11.7022 20.2408 11.3554 20.2241 11.0696 20.3771C10.7839 20.53 10.6055 20.8278 10.6055 21.152V23.4259C7.32475 22.8658 1.75781 20.9463 1.75781 17.6363C1.75781 16.2732 2.86887 14.8931 4.88637 13.7502C5.30871 13.511 5.45713 12.9746 5.21789 12.5523C4.97865 12.1299 4.44229 11.9816 4.01994 12.2207C1.42764 13.6893 0 15.6126 0 17.6363C0 22.135 6.18205 24.5035 10.6055 25.2072ZM12.3633 22.7942L15.1733 24.6676L12.3633 26.5409V22.7942Z"
+        fill="white"
+      />
+      <path
+        d="M7.08984 14.1211C7.08984 14.454 7.27793 14.7583 7.5757 14.9073L14.607 18.4229C14.7283 18.4841 14.8697 18.5155 14.9998 18.5156H15.0002C15.1309 18.5155 15.2654 18.4861 15.393 18.4229L22.4243 14.9073C22.7221 14.7583 22.9102 14.454 22.9102 14.1211V5.33205C22.9102 4.99941 22.7192 4.6915 22.4243 4.54589L15.393 1.03027C15.1456 0.906577 14.8544 0.906577 14.607 1.03027L7.5757 4.54589C7.27717 4.69519 7.08984 5.0024 7.08984 5.33205V14.1211ZM8.84766 6.75418L14.1211 9.39089V16.2147L8.84766 13.5779V6.75418ZM21.1523 13.5779L15.8789 16.2146V9.39089L21.1523 6.75418V13.5779ZM15 2.7991L20.066 5.33205L15 7.865L9.93404 5.33205L15 2.7991Z"
+        fill="white"
+      />
     </g>
+    <defs>
+      <clipPath id="clip0_577_1437">
+        <rect
+          width="30"
+          height="30"
+          fill="white"
+        />
+      </clipPath>
+    </defs>
   </svg>
 );
 
@@ -796,72 +828,110 @@ export const ToolCreateThreshold = (props: IconProps) => (
 );
 
 export const ToolCrosshair = (props: IconProps) => (
+  // <svg
+  //   width="28px"
+  //   height="28px"
+  //   viewBox="0 0 28 28"
+  //   version="1.1"
+  //   xmlns="http://www.w3.org/2000/svg"
+  //   {...props}
+  // >
+  //   <g
+  //     id="tool-crosshair"
+  //     stroke="none"
+  //     strokeWidth="1"
+  //     fill="none"
+  //     fillRule="evenodd"
+  //   >
+  //     <rect
+  //       id="Rectangle"
+  //       x="0"
+  //       y="0"
+  //       width="28"
+  //       height="28"
+  //     ></rect>
+  //     <g
+  //       id="cursor-target-2"
+  //       transform="translate(3, 3)"
+  //       stroke="currentColor"
+  //       strokeLinecap="round"
+  //       strokeLinejoin="round"
+  //       strokeWidth="1.5"
+  //     >
+  //       <line
+  //         x1="11"
+  //         y1="-8.8817842e-16"
+  //         x2="11"
+  //         y2="6"
+  //         id="Path"
+  //       ></line>
+  //       <line
+  //         x1="0"
+  //         y1="11"
+  //         x2="6"
+  //         y2="11"
+  //         id="Path"
+  //       ></line>
+  //       <line
+  //         x1="11"
+  //         y1="22"
+  //         x2="11"
+  //         y2="16"
+  //         id="Path"
+  //       ></line>
+  //       <line
+  //         x1="22"
+  //         y1="11"
+  //         x2="16"
+  //         y2="11"
+  //         id="Path"
+  //       ></line>
+  //       <circle
+  //         id="Oval"
+  //         cx="11.001"
+  //         cy="11.001"
+  //         r="2"
+  //       ></circle>
+  //     </g>
+  //   </g>
+  // </svg>
   <svg
-    width="28px"
-    height="28px"
-    viewBox="0 0 28 28"
-    version="1.1"
     xmlns="http://www.w3.org/2000/svg"
-    {...props}
+    width="30"
+    height="30"
+    viewBox="0 0 30 30"
+    fill="none"
   >
-    <g
-      id="tool-crosshair"
-      stroke="none"
-      strokeWidth="1"
-      fill="none"
-      fillRule="evenodd"
-    >
-      <rect
-        id="Rectangle"
+    <g clipPath="url(#clip0_1_14)">
+      <mask
+        id="mask0_1_14"
+        maskUnits="userSpaceOnUse"
         x="0"
         y="0"
-        width="28"
-        height="28"
-      ></rect>
-      <g
-        id="cursor-target-2"
-        transform="translate(3, 3)"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
+        width="30"
+        height="30"
       >
-        <line
-          x1="11"
-          y1="-8.8817842e-16"
-          x2="11"
-          y2="6"
-          id="Path"
-        ></line>
-        <line
-          x1="0"
-          y1="11"
-          x2="6"
-          y2="11"
-          id="Path"
-        ></line>
-        <line
-          x1="11"
-          y1="22"
-          x2="11"
-          y2="16"
-          id="Path"
-        ></line>
-        <line
-          x1="22"
-          y1="11"
-          x2="16"
-          y2="11"
-          id="Path"
-        ></line>
-        <circle
-          id="Oval"
-          cx="11.001"
-          cy="11.001"
-          r="2"
-        ></circle>
+        <path
+          d="M30 0H0V30H30V0Z"
+          fill="white"
+        />
+      </mask>
+      <g mask="url(#mask0_1_14)">
+        <path
+          d="M15 21.125C15.8975 21.125 16.625 21.8525 16.625 22.75V28.375C16.625 29.2725 15.8975 30 15 30C14.1025 30 13.375 29.2725 13.375 28.375V22.75C13.375 21.8525 14.1025 21.125 15 21.125ZM15 10.625C17.4162 10.625 19.375 12.5838 19.375 15C19.375 17.4162 17.4162 19.375 15 19.375C12.5838 19.375 10.625 17.4162 10.625 15C10.625 12.5838 12.5838 10.625 15 10.625ZM15 13.125C13.9645 13.125 13.125 13.9645 13.125 15C13.125 16.0355 13.9645 16.875 15 16.875C16.0355 16.875 16.875 16.0355 16.875 15C16.875 13.9645 16.0355 13.125 15 13.125ZM7.25 13.375C8.14745 13.375 8.875 14.1025 8.875 15C8.875 15.8975 8.14745 16.625 7.25 16.625H1.625C0.727545 16.625 0 15.8975 0 15C0 14.1025 0.727545 13.375 1.625 13.375H7.25ZM28.375 13.375C29.2725 13.375 30 14.1025 30 15C30 15.8975 29.2725 16.625 28.375 16.625H22.75C21.8525 16.625 21.125 15.8975 21.125 15C21.125 14.1025 21.8525 13.375 22.75 13.375H28.375ZM15 0C15.8975 0 16.625 0.727545 16.625 1.625V7.25C16.625 8.14745 15.8975 8.875 15 8.875C14.1025 8.875 13.375 8.14745 13.375 7.25V1.625C13.375 0.727545 14.1025 0 15 0Z"
+          fill="white"
+        />
       </g>
     </g>
+    <defs>
+      <clipPath id="clip0_1_14">
+        <rect
+          width="30"
+          height="30"
+          fill="white"
+        />
+      </clipPath>
+    </defs>
   </svg>
 );
 

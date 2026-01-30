@@ -97,7 +97,7 @@ const ToolButtonListDropDown = React.forwardRef<HTMLDivElement, ToolButtonListDr
           variant="ghost"
           size="icon"
           className={cn(
-            'text-foreground/80 hover:bg-background hover:text-highlight border-primary',
+            '!text-foreground/80 hover:bg-background border-primary outline-none !ring-0',
             'inline-flex h-10 w-5 items-center justify-center',
             '!rounded-tr-lg !rounded-br-lg !rounded-tl-none !rounded-bl-none',
             'bg-transparent',

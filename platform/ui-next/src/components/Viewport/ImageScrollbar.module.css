@@ -32,7 +32,7 @@
 /* Thumb styles for WebKit browsers - more specific selector */
 input[type='range'].scrollbarInput::-webkit-slider-thumb {
   -webkit-appearance: none !important;
-  background-color: hsl(var(--neutral));
+  background-color: rgba(255, 255, 255, 0.5);
   opacity: 50%;
   border: none;
   border-radius: 57px;
@@ -44,15 +44,13 @@ input[type='range'].scrollbarInput::-webkit-slider-thumb {
 
 input[type='range'].scrollbarInput::-webkit-slider-thumb:active,
 input[type='range'].scrollbarInput::-webkit-slider-thumb:hover {
-  background-color: hsl(var(--primary));
-  opacity: 60%;
+  background-color: rgba(255, 255, 255, 0.5);
   cursor: -webkit-grabbing;
 }
 
 /* Thumb styles for Firefox - more specific selector */
 input[type='range'].scrollbarInput::-moz-range-thumb {
-  background-color: hsl(var(--neutral));
-  opacity: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
   border: none;
   border-radius: 57px;
   cursor: -moz-grab;
@@ -62,8 +60,7 @@ input[type='range'].scrollbarInput::-moz-range-thumb {
 
 input[type='range'].scrollbarInput::-moz-range-thumb:active,
 input[type='range'].scrollbarInput::-moz-range-thumb:hover {
-  background-color: hsl(var(--primary));
-  opacity: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
   cursor: -moz-grabbing;
 }
 
