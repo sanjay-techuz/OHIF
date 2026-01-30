@@ -6,7 +6,7 @@ const Unauthorized = () => {
   const [appConfig] = useAppConfig();
 
   const handleLogin = () => {
-    window.location.href = 'http://localhost:8081/login';
+    window.location.href = 'https://uatlms.biedx.com/login';
   };
 
   return (
