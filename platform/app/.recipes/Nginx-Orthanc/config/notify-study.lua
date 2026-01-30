@@ -106,7 +106,7 @@ function OnStableStudy(studyId, tags, metadata)
         ["Content-Type"] = "application/json"
     }
     SetHttpTimeout(30)
-    local success = HttpPost("http://20.198.254.147/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
+    local success = HttpPost("https://uatapi.biedx.com/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
     if success then
         print("INFO", "Webhook sent successfully for study: " .. studyId)
     else
@@ -125,7 +125,7 @@ function OnDeletedStudy(studyId)
         ["Content-Type"] = "application/json"
     }
     SetHttpTimeout(10)
-    local success = HttpPost("http://20.198.254.147/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
+    local success = HttpPost("https://uatapi.biedx.com/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
     if success then
         print("INFO", "Delete webhook sent successfully for study: " .. studyId)
     else
