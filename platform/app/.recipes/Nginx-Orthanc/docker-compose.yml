@@ -32,14 +32,21 @@ services:
   # TODO: Update to use Postgres
   # https://github.com/mrts/docker-postgresql-multiple-databases
   orthanc:
-    image: orthancteam/orthanc
+    # Azure/Google object-storage plugins are only shipped in "-full" images.
+    image: orthancteam/orthanc:latest-full
     hostname: orthanc
     container_name: orthancPACS
+    environment:
+      # Override sensitive values from .env (do not store secrets in orthanc.json).
+      ORTHANC__REGISTERED_USERS: '{"${ORTHANC_ADMIN_USERNAME:-admin}":"${ORTHANC_ADMIN_PASSWORD:?set ORTHANC_ADMIN_PASSWORD in .env}"}'
+      ORTHANC__AZURE_BLOB_STORAGE__CONNECTION_STRING: ${ORTHANC_AZURE_CONNECTION_STRING:?set ORTHANC_AZURE_CONNECTION_STRING in .env}
+      ORTHANC__AZURE_BLOB_STORAGE__CONTAINER_NAME: ${ORTHANC_AZURE_CONTAINER_NAME:?set ORTHANC_AZURE_CONTAINER_NAME in .env}
     volumes:
       # Config
       - ./config/orthanc.json:/etc/orthanc/orthanc.json:ro
       # Persist data
       - ./volumes/orthanc-db/:/var/lib/orthanc/db/
+      - ./config/notify-study.lua:/etc/orthanc/notify-study.lua:ro
     restart: unless-stopped
     ports:
       - '4242:4242' # Orthanc REST API

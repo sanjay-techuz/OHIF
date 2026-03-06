@@ -29,6 +29,10 @@ RUN yarn run build
 # # Stage 2: Bundle the built application into a Docker container which runs NGINX using Alpine Linux
 FROM nginx:alpine
 
+# Install ca-certificates so curl/libcurl in Orthanc plugins/Lua can verify Let's Encrypt certificates
+RUN apk add --no-cache ca-certificates && \
+    update-ca-certificates
+
 # # Create directories for logs and html content if they don't already exist
 RUN mkdir -p /var/log/nginx /var/www/html
 
