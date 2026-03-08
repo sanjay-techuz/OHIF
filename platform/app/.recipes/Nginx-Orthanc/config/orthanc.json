@@ -53,7 +53,7 @@
 
   "HttpTimeout": 600,
   "HttpsVerifyPeers": true,
-  "HttpsCACertificates": "",
+  "HttpsCACertificates": "/etc/ssl/certs/ca-certificates.crt",
   "UserContentType": {},
   "StableAge": 60,
   "StrictAetComparison": false,

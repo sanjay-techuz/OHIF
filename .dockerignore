@@ -35,3 +35,7 @@ dockerfile
 coverage/
 platform/docs/
 testdata/
+
+# SSL Certificates (mounted as volumes, not needed in build context)
+**/certificates/
+**/letsencrypt/
