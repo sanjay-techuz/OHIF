@@ -1,9 +1,17 @@
 -- notify-study.lua
-
+--
 -- This script is used to notify the backend when a study is stable
 -- It is called when a study is stable and is used to send the study to the backend
 -- It is called when a study is stable and is used to send the study to the backend
 
+
+-- ====================================
+--  Configuration: Webhook URL
+-- ====================================
+-- Webhook URL for backend API
+-- In Docker, use host.docker.internal to reach the host machine
+-- For production, change this to your actual backend URL (e.g., https://api.example.com)
+local WEBHOOK_URL = "http://host.docker.internal:4000/api/admin/cases/orthanc-webhook"
 
 -- ====================================
 --  Function: Handle study modifications
@@ -22,13 +30,13 @@ local function handleAutoModification(studyId)
     print("DEBUG: Parsed metadata", DumpJson(meta))
 
     -- Prevent infinite recursion
-    if meta["1025"] == "true" then
+    if meta["1025"] == "true" or meta["isModifiedByLua"] == "true" then
         print("INFO", "Study " .. studyId .. " already modified by Lua. Skipping.")
         return
     end
 
     -- Only modify if flag is true
-    if meta["1024"] == "true" then
+    if meta["1024"] == "true" or meta["isAnonymized"] == "true" then
         print("INFO", "Auto-modification enabled for study: " .. studyId)
 
         local dummyName = "DummyName_" .. tostring(math.random(100, 999))
@@ -106,11 +114,12 @@ function OnStableStudy(studyId, tags, metadata)
         ["Content-Type"] = "application/json"
     }
     SetHttpTimeout(30)
-    local success = HttpPost("https://uatapi.biedx.com/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
+
+    local success = HttpPost(WEBHOOK_URL, DumpJson(payload), headers)
     if success then
-        print("INFO", "Webhook sent successfully for study: " .. studyId)
+        print("INFO", "Webhook sent successfully for study: " .. studyId .. " to " .. WEBHOOK_URL)
     else
-        print("ERROR", "Failed to send webhook for study: " .. studyId)
+        print("ERROR", "Failed to send webhook for study: " .. studyId .. " to " .. WEBHOOK_URL)
     end
 end
 
@@ -125,10 +134,11 @@ function OnDeletedStudy(studyId)
         ["Content-Type"] = "application/json"
     }
     SetHttpTimeout(10)
-    local success = HttpPost("https://uatapi.biedx.com/api/admin/cases/orthanc-webhook", DumpJson(payload), headers)
+
+    local success = HttpPost(WEBHOOK_URL, DumpJson(payload), headers)
     if success then
-        print("INFO", "Delete webhook sent successfully for study: " .. studyId)
+        print("INFO", "Delete webhook sent successfully for study: " .. studyId .. " to " .. WEBHOOK_URL)
     else
-        print("ERROR", "Failed to send delete webhook for study: " .. studyId)
+        print("ERROR", "Failed to send delete webhook for study: " .. studyId .. " to " .. WEBHOOK_URL)
     end
 end

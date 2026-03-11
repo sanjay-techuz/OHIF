@@ -87,9 +87,19 @@ function ViewerLayout({
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [annotationData, setAnnotationData] = useState<any>(null);
 
-  const { courseId, moduleId, caseId, studentId, viewType, userType, facultyId, isPreview } =
-    useCustomParams();
+  const {
+    courseId,
+    moduleId,
+    caseId,
+    studentId,
+    viewType,
+    userType,
+    facultyId,
+    StudyInstanceUIDs,
+    isPreview,
+  } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const { setUIState } = useUIStateStore();
   const navigate = useNavigate();
@@ -261,8 +271,14 @@ function ViewerLayout({
     const { measurementService } = servicesManager.services;
     const { unsubscribe } = measurementService.subscribe(
       measurementService.EVENTS.SHOW_RECALL_MODAL,
-      (data: { measurementUid: string }) => {
+      (data: {
+        measurementUid: string;
+        annotationData: any;
+        modality: string;
+        measurement: any;
+      }) => {
         setCurrentMeasurementUid(data.measurementUid);
+        setAnnotationData(data.annotationData);
         console.log('SHOW_RECALL_MODAL event received in ViewerLayout', data);
         setShowRecallModal(true);
       }
@@ -462,7 +478,7 @@ function ViewerLayout({
     const getAcrValues = async () => {
       if (userType === 'student' || isPreview) {
         const result = await apiCall(() =>
-          apiService.get(`/user/cases/acr-values/${courseId}/${moduleId}/${caseId}`)
+          apiService.get(`/user/cases/acr-values/${courseId}/${moduleId}/${caseId}/${studentId}`)
         );
         if (
           result.success &&
@@ -566,6 +582,7 @@ function ViewerLayout({
     const data = {
       ...decryptedData,
       caseId: targetCase.case_id,
+      viewType: targetCase.view_type === '1' ? 'diagnostic' : 'screening',
     };
     const encryptedUid = encrypt(targetCase.study_instance_uid || '');
     currentUrl.searchParams.set('data', encryptObject(data));
@@ -650,6 +667,58 @@ function ViewerLayout({
   }, [courseId, moduleId, userType]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
+
+  const handleSubmitAnswer = async () => {
+    const body = {
+      course_id: courseId,
+      module_id: moduleId,
+      case_id: caseId,
+      student_id: '',
+      result_data: studentAcrValues,
+      view_type: viewType,
+      user_type: userType,
+      faculty_id: '',
+      study_instance_uid: StudyInstanceUIDs,
+    };
+
+    body.faculty_id = facultyId;
+    delete body.student_id;
+    if (isAddAnswerClicked) {
+      const result = await apiCall(() => apiService.post('/admin/cases/case-answer', body));
+      if (!result.success) {
+        console.error('Failed to submit answer:', (result as any).error);
+      }
+    }
+    setUIState('addAnswerClicked', false);
+  };
+
+  const handleFinalSubmit = async () => {
+    try {
+      // Call the API first
+      const body = {
+        module_id: moduleId,
+        student_id: studentId,
+      };
+
+      const result = await apiCall(() =>
+        apiService.post('/user/cases/final-submit/case-type', body)
+      );
+
+      if (result.success) {
+        // Only navigate if API call is successful
+        setShowValidationModal(false);
+
+        const currentParams = new URLSearchParams(window.location.search);
+
+        navigate({
+          pathname: '/results',
+          search: currentParams.toString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting case type:', error);
+    }
+  };
 
   return (
     <div>
@@ -950,11 +1019,7 @@ function ViewerLayout({
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
                 onClick={() => {
-                  // Validate ACR form before submitting
-                  if (validateACRForm(studentAcrValues)) {
-                    // Proceed with submit logic and redirect to results
-                    console.log('Submit button clicked - validation passed');
-
+                  if (isPreview) {
                     // Get current URL parameters
                     const currentParams = new URLSearchParams(window.location.search).toString();
 
@@ -963,6 +1028,18 @@ function ViewerLayout({
                       pathname: '/results',
                       search: currentParams,
                     });
+                  } else {
+                    // Validate ACR form before submitting
+                    if (validateACRForm(studentAcrValues)) {
+                      // Get current URL parameters
+                      const currentParams = new URLSearchParams(window.location.search).toString();
+
+                      // Navigate to results page with same query params
+                      navigate({
+                        pathname: '/results',
+                        search: currentParams,
+                      });
+                    }
                   }
                 }}
               >
@@ -990,9 +1067,7 @@ function ViewerLayout({
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
-                onClick={() => {
-                  setUIState('addAnswerClicked', false);
-                }}
+                onClick={handleSubmitAnswer}
               >
                 Submit Answer
               </Button>
@@ -1067,6 +1142,12 @@ function ViewerLayout({
           servicesManager={servicesManager}
           open={showMeasurementModal}
           onClose={() => setShowMeasurementModal(false)}
+          onBreastDensityChange={value =>
+            setStudentAcrValues(prev => ({
+              ...prev,
+              acr: value,
+            }))
+          }
         />
       )}
 
@@ -1074,6 +1155,9 @@ function ViewerLayout({
         <RecallModal
           open={showRecallModal}
           onClose={() => setShowRecallModal(false)}
+          servicesManager={servicesManager}
+          measurementUid={currentMeasurementUid}
+          annotationData={annotationData}
         />
       )}
       {/* Validation Modal */}
@@ -1100,16 +1184,7 @@ function ViewerLayout({
                 style={{
                   backgroundColor: 'hsl(var(--highlight))',
                 }}
-                onClick={() => {
-                  setShowValidationModal(false);
-
-                  const currentParams = new URLSearchParams(window.location.search);
-
-                  navigate({
-                    pathname: '/results',
-                    search: currentParams.toString(),
-                  });
-                }}
+                onClick={handleFinalSubmit}
               >
                 Yes, Finish
               </Button>

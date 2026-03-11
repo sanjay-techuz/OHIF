@@ -584,6 +584,19 @@ class MeasurementService extends PubSubService {
         });
         const { courseId, caseId, studentId, viewType, moduleId, userType, facultyId, isPreview } =
           getCustomParams();
+        const annotationData = annotation.state.getAnnotation(internalUID);
+        if (annotationData) {
+          // Set colors based on userType: student = blue, faculty = green
+          const color = userType === 'student' ? 'blue' : 'rgb(0, 255, 0)';
+          annotationData.data.label = userType === 'student' ? 'Student ROI' : 'Faculty ROI';
+
+          // Set annotation color using Cornerstone Tools style API
+          annotation.config.style.setAnnotationStyles(internalUID, { color });
+        }
+
+        const displaySet = new DisplaySetService().getDisplaySetByUID(
+          newMeasurement.displaySetInstanceUID
+        );
 
         // Create the measurement on the server
         if (localStorage.getItem('ohif-viewType') === 'diagnostic' && !isPreview) {
@@ -591,20 +604,6 @@ class MeasurementService extends PubSubService {
             measurementUid: newMeasurement.uid || {},
             measurement: newMeasurement,
           });
-
-          const annotationData = annotation.state.getAnnotation(internalUID);
-          const displaySet = new DisplaySetService().getDisplaySetByUID(
-            newMeasurement.displaySetInstanceUID
-          );
-
-          if (annotationData) {
-            // Set colors based on userType: student = blue, faculty = green
-            const color = userType === 'student' ? 'blue' : 'rgb(0, 255, 0)';
-            annotationData.data.label = userType === 'student' ? 'Student ROI' : 'Faculty ROI';
-
-            // Set annotation color using Cornerstone Tools style API
-            annotation.config.style.setAnnotationStyles(internalUID, { color });
-          }
 
           const body = {
             course_id: courseId,
@@ -619,6 +618,7 @@ class MeasurementService extends PubSubService {
             modality: displaySet?.Modality || '',
             student_id: '',
             faculty_id: '',
+            is_recall: false,
           };
           if (userType === 'student') {
             body.student_id = studentId;
@@ -638,6 +638,8 @@ class MeasurementService extends PubSubService {
           this._broadcastEvent(this.EVENTS.SHOW_RECALL_MODAL, {
             measurementUid: newMeasurement.uid || {},
             measurement: newMeasurement,
+            annotationData: annotationData,
+            modality: displaySet?.Modality || '',
           });
         }
       }

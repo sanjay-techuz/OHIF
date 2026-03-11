@@ -13,6 +13,7 @@ export interface QuestionAnswerModalProps {
   onClose: () => void;
   servicesManager: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   measurementUid?: string; // Changed from currentMeasurement to measurementUid
+  onBreastDensityChange?: (value: string) => void;
 }
 
 // Initial states for both forms
@@ -79,6 +80,7 @@ const QuestionAnswerModal = ({
   servicesManager,
   open,
   onClose,
+  onBreastDensityChange,
 }: QuestionAnswerModalProps) => {
   const { displaySetService, measurementService } = servicesManager.services;
   const { courseId, moduleId, caseId, studentId, userType, facultyId, isPreview } =
@@ -298,6 +300,12 @@ const QuestionAnswerModal = ({
 
         if (result.success) {
           console.log('Form data submitted successfully');
+
+          // If this is a mammography form, propagate breast density to ACR
+          if (formType === 'mammography' && onBreastDensityChange && form.breastDensity) {
+            onBreastDensityChange(form.breastDensity as string);
+          }
+
           onClose();
         } else {
           console.error('Failed to submit form data:', (result as any).error);
@@ -313,6 +321,12 @@ const QuestionAnswerModal = ({
 
           if (result.success) {
             console.log('Form data submitted successfully');
+
+            // If this is a mammography form, propagate breast density to ACR
+            if (formType === 'mammography' && onBreastDensityChange && form.breastDensity) {
+              onBreastDensityChange(form.breastDensity as string);
+            }
+
             onClose();
           } else {
             console.error('Failed to submit form data:', (result as any).error);
