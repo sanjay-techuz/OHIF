@@ -79,7 +79,7 @@ const Thumbnail = ({
                 crossOrigin="anonymous"
               />
             ) : (
-              <div className="bg-background h-[114px] w-full rounded"></div>
+              <div className="h-[114px] w-full rounded bg-black"></div>
             )}
 
             {/* bottom left */}
