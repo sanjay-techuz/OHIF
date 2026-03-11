@@ -12,12 +12,14 @@ interface ViewerHeaderProps {
   appConfig: AppTypes.Config;
   onToggleStudiesPanel?: () => void;
   hasLeftPanels?: boolean;
+  leftPanelClosedState?: boolean;
 }
 
 function ViewerHeader({
   appConfig,
   onToggleStudiesPanel,
   hasLeftPanels = false,
+  leftPanelClosedState = false,
 }: ViewerHeaderProps) {
   const { servicesManager, extensionManager } = useSystem();
   const { customizationService } = servicesManager.services;
@@ -116,21 +118,39 @@ function ViewerHeader({
                 name="MenuHamburger"
                 className="h-5 w-8"
               /> */}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="25"
-                height="17"
-                viewBox="0 0 25 17"
-                fill="none"
-              >
-                <path
-                  d="M1 8.5H23.5M1 1H23.5M1 16H23.5"
-                  stroke="white"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {leftPanelClosedState ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="25"
+                  height="17"
+                  viewBox="0 0 25 17"
+                  fill="none"
+                >
+                  <path
+                    d="M1 8.5H23.5M1 1H23.5M1 16H23.5"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="40"
+                  height="40"
+                  viewBox="0 0 40 40"
+                  fill="none"
+                >
+                  <path
+                    d="M30 10L10 30M10 10L30 30"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
             </Button>
           ) : null
         }

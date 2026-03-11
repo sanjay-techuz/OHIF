@@ -1,15 +1,66 @@
+import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
+import { apiService } from '@ohif/core';
 import { Button, Modal } from '@ohif/ui-next';
 import React from 'react';
+import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 
 export interface RecallModalProps {
   open: boolean;
   onClose: () => void;
+  servicesManager: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  measurementUid?: string; // Changed from currentMeasurement to measurementUid
+  annotationData?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
-const RecallModal: React.FC<RecallModalProps> = ({ open, onClose }) => {
-  const handleRecall = () => {
+const RecallModal: React.FC<RecallModalProps> = ({
+  open,
+  onClose,
+  servicesManager,
+  measurementUid,
+  annotationData,
+}) => {
+  const { displaySetService, measurementService } = servicesManager.services;
+  const { courseId, caseId, studentId, viewType, moduleId, userType, facultyId, isPreview } =
+    useCustomParams();
+
+  const handleRecall = async () => {
     console.log('Recall button clicked - action needed');
     // Add any recall logic here
+
+    const measurement = measurementService?.getMeasurement(measurementUid);
+    if (measurement) {
+      const displaySetInstanceUID = measurement.displaySetInstanceUID;
+      const displaySet = displaySetService.getDisplaySetByUID(displaySetInstanceUID);
+
+      const body = {
+        course_id: courseId,
+        module_id: moduleId,
+        case_id: caseId,
+        view_type: viewType,
+        study_instance_uid: measurement.referenceStudyUID,
+        measurement_uid: measurement.uid,
+        tool_name: measurement.toolName,
+        measurement_data: measurement,
+        annotation_data: annotationData,
+        modality: displaySet?.Modality || '',
+        student_id: '',
+        faculty_id: '',
+        is_recall: true,
+      };
+      if (userType === 'student') {
+        body.student_id = studentId;
+        delete body.faculty_id;
+        await apiService.post('/user/cases/annotation-measurements', body);
+      } else {
+        body.faculty_id = facultyId;
+        delete body.student_id;
+        const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
+        if (isAddAnswerClicked) {
+          await apiService.post('/admin/cases/annotation-measurements', body);
+        }
+      }
+    }
+    onClose();
   };
 
   return (
