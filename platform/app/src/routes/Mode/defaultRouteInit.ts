@@ -59,9 +59,17 @@ export async function defaultRouteInit(
     const numCases = imageDisplaySets.length;
 
     // Calculate grid layout (rows x cols)
-    let numRows = 1,
-      numCols = 1;
-    if (numCases === 1) {
+    let numRows = 1;
+    let numCols = 1;
+
+    // If this is a mammography study (Modality "MG"), always start with a 1x4 layout.
+    // This matches the desired mammo layout and avoids a 2x2 -> 1x4 jump.
+    const isMammography = imageDisplaySets.some(ds => ds.Modality === 'MG');
+
+    if (isMammography) {
+      numRows = 1;
+      numCols = 4;
+    } else if (numCases === 1) {
       numRows = 1;
       numCols = 1;
     } else if (numCases === 2) {

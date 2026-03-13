@@ -50,6 +50,8 @@ const defineValues = {
   'process.env.LOCIZE_PROJECTID': JSON.stringify(process.env.LOCIZE_PROJECTID || ''),
   'process.env.LOCIZE_API_KEY': JSON.stringify(process.env.LOCIZE_API_KEY || ''),
   'process.env.REACT_APP_I18N_DEBUG': JSON.stringify(process.env.REACT_APP_I18N_DEBUG || ''),
+  'process.env.REACT_APP_CRYPTO_SECURE_KEY': JSON.stringify(process.env.REACT_APP_CRYPTO_SECURE_KEY || ''),
+  'process.env.REACT_APP_API_BASE_URL': JSON.stringify(process.env.REACT_APP_API_BASE_URL || ''),
   'process.env.TEST_ENV': JSON.stringify(process.env.TEST_ENV || ''),
 };
 

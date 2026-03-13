@@ -1,11 +1,11 @@
+import { Select } from '@radix-ui/react-select';
 import React from 'react';
 import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '../Select';
-import { Select } from '@radix-ui/react-select';
 
 const definitionOptions = ['Normal', 'Abnormal'];
 const yesNoOptions = ['Yes', 'No'];
-const solidOptions = ['Begin', 'Suspicpius'];
-const nonMassLesionOptions = ['Begin', 'Suspicpius'];
+const solidOptions = ['Benign', 'Suspicious'];
+const nonMassLesionOptions = ['Benign', 'Suspicious'];
 const biRadsOptions = ['0', '1 or 2', '4 or 5'];
 
 const labelClass = 'text-primary-light text-base';

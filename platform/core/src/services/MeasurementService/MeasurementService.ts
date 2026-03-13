@@ -588,7 +588,8 @@ class MeasurementService extends PubSubService {
         if (annotationData) {
           // Set colors based on userType: student = blue, faculty = green
           const color = userType === 'student' ? 'blue' : 'rgb(0, 255, 0)';
-          annotationData.data.label = userType === 'student' ? 'Student ROI' : 'Faculty ROI';
+          annotationData.data.label =
+            userType === 'student' ? 'Your Annotation' : 'Reference Annotation';
 
           // Set annotation color using Cornerstone Tools style API
           annotation.config.style.setAnnotationStyles(internalUID, { color });

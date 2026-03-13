@@ -37,14 +37,11 @@ const AnnotationTooltipsOverlay = ({ element, viewportId }) => {
         if (!label) {
           continue;
         }
-        // Use the first handle or center as anchor
+        // Prefer the textBox world position if available (this is where Cornerstone
+        // itself renders the label), otherwise fall back to a representative handle.
         let worldPos = null;
-        if (ann.data?.handles?.points?.length) {
+        if (ann?.data?.handles?.points?.length) {
           worldPos = ann.data.handles.points[0];
-        } else if (ann.data?.handles?.center) {
-          worldPos = ann.data.handles.center;
-        } else if (ann?.data?.handles?.textBox?.worldPosition) {
-          worldPos = ann.data.handles.textBox.worldPosition;
         }
         if (!worldPos) {
           continue;
@@ -57,7 +54,16 @@ const AnnotationTooltipsOverlay = ({ element, viewportId }) => {
     }
 
     updateTooltips();
+    // Recompute tooltips when annotations change or when the camera/viewport moves.
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_ADDED, updateTooltips);
+    eventTarget.addEventListener(csToolsEvents.ANNOTATION_MODIFIED, updateTooltips);
+    eventTarget.addEventListener(csToolsEvents.CAMERA_MODIFIED, updateTooltips);
+
+    return () => {
+      eventTarget.removeEventListener(csToolsEvents.ANNOTATION_ADDED, updateTooltips);
+      eventTarget.removeEventListener(csToolsEvents.ANNOTATION_MODIFIED, updateTooltips);
+      eventTarget.removeEventListener(csToolsEvents.CAMERA_MODIFIED, updateTooltips);
+    };
   }, [element, viewportId]);
 
   return (
@@ -72,27 +78,36 @@ const AnnotationTooltipsOverlay = ({ element, viewportId }) => {
         zIndex: 20,
       }}
     >
-      {tooltips.map(({ label, x, y, uid, color }) => (
-        <div
-          key={uid}
-          style={{
-            position: 'absolute',
-            left: x + 50,
-            top: y - 24,
-            background: `${color || 'rgba(0, 0, 0, 0.7)'}`,
-            color: '#fff',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: 14,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            fontWeight: 600,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          }}
-        >
-          {label}
-        </div>
-      ))}
+      {tooltips.map(({ label, x, y, uid, color }, index) => {
+        const isStudent = label?.includes('Your Annotation');
+        const isFaculty = label?.includes('Reference Annotation');
+
+        const left = x + 40;
+        const top = isStudent ? y + 10 : y - 20;
+        const textColor = isStudent ? 'blue' : isFaculty ? 'green' : color || '#fff';
+
+        return (
+          <div
+            key={uid}
+            style={{
+              position: 'absolute',
+              left,
+              top,
+              background: 'rgba(0, 0, 0, 0.7)',
+              color: textColor,
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 14,
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              fontWeight: 600,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            }}
+          >
+            {label}
+          </div>
+        );
+      })}
     </div>
   );
 };

@@ -454,10 +454,10 @@ const connectMeasurementServiceToTools = ({
       const annotationManager = annotation.state.getAnnotationManager();
 
       // Determine color based on label if color is not set
-      // Student ROI = blue, Faculty ROI = green
+      // Your Annotation = blue, Reference Annotation = green
       let annotationColor = data.annotation.data?.color;
       if (!annotationColor && data.annotation.data?.label) {
-        annotationColor = data.annotation.data.label.includes('Student') ? 'blue' : 'green';
+        annotationColor = data.annotation.data.label.includes('Your annotation') ? 'blue' : 'green';
       }
 
       const newAnnotation = {

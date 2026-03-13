@@ -110,6 +110,35 @@ function CustomizableViewportOverlay({
   }, [viewportData, viewportId, instanceNumber, cornerstoneViewportService]);
 
   /**
+   * Initialize VOI from the current viewport properties (voiRange) so that
+   * WW/WL is available immediately on load, even before any VOI_MODIFIED
+   * events are fired (e.g. in non-active viewports).
+   */
+  useEffect(() => {
+    const renderingEngine = cornerstoneViewportService.getRenderingEngine?.();
+    if (!renderingEngine) {
+      return;
+    }
+
+    const viewport = renderingEngine.getViewport?.(viewportId);
+    if (!viewport || !viewport.getProperties) {
+      return;
+    }
+
+    const props: any = viewport.getProperties();
+    const voiRange = props?.voiRange;
+    if (!voiRange) {
+      return;
+    }
+
+    const { windowWidth, windowCenter } = utilities.windowLevel.toWindowLevel(
+      voiRange.lower,
+      voiRange.upper
+    );
+    setVOI({ windowCenter, windowWidth });
+  }, [viewportId, cornerstoneViewportService]);
+
+  /**
    * Updating the VOI when the viewport changes its voi
    */
   useEffect(() => {

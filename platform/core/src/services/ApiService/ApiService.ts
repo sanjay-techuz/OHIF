@@ -69,14 +69,8 @@ export class ApiService {
    * Get base URL from environment variables
    */
   private getBaseURLFromEnv(): string {
-    // Check for environment variables in order of priority
-    if (typeof process !== 'undefined' && process.env) {
-      // Node.js environment
-      return process.env.API_BASE_URL || 'https://uatapi.biedx.com/api';
-    }
-
     // Fallback to empty string
-    return 'https://uatapi.biedx.com/api';
+    return process.env.REACT_APP_API_BASE_URL || '';
   }
 
   /**

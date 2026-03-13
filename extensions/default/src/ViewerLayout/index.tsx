@@ -57,6 +57,7 @@ function ViewerLayout({
   const [appConfig] = useAppConfig();
 
   const { panelService, hangingProtocolService, customizationService } = servicesManager.services;
+  // Use the app config flag as originally intended; do not force a loader on.
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(appConfig.showLoadingIndicator);
 
   const hasPanels = useCallback(
@@ -82,6 +83,7 @@ function ViewerLayout({
   const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
   const [isLoadingCases, setIsLoadingCases] = useState(false);
   const [caseListError, setCaseListError] = useState(null);
+  const [moduleTitle, setModuleTitle] = useState<string>('');
 
   // Add state for validation modal
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -542,7 +544,9 @@ function ViewerLayout({
       console.log('result--------------', result);
       if (result.success) {
         const cases = result.data.data.cases || [];
+        const moduleTitle = result.data.data.module_title || '';
         setCaseList(cases);
+        setModuleTitle(moduleTitle);
         console.log('cases--------------', cases);
 
         // Find current case index
@@ -749,6 +753,7 @@ function ViewerLayout({
         }}
         hasLeftPanels={hasLeftPanels}
         leftPanelClosedState={leftPanelClosedState}
+        moduleTitle={moduleTitle}
       />
       <div
         className="relative flex w-full flex-row flex-nowrap items-stretch overflow-hidden bg-black"
