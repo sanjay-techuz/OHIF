@@ -24,6 +24,7 @@ interface HeaderProps {
   Secondary?: ReactNode;
   UndoRedo?: ReactNode;
   StudiesToggle?: ReactNode;
+  ModuleTitle?: string;
 }
 
 function Header({
@@ -37,6 +38,7 @@ function Header({
   UndoRedo,
   Secondary,
   StudiesToggle,
+  ModuleTitle,
   ...props
 }: HeaderProps): ReactNode {
   const onClickReturn = () => {
@@ -71,6 +73,9 @@ function Header({
             </div>
             {StudiesToggle}
             {Secondary}
+            {ModuleTitle && (
+              <div className="text-primary ml-4 text-lg font-medium">{ModuleTitle}</div>
+            )}
           </div>
           {/* <div className="absolute top-1/2 left-[250px] flex h-8 -translate-y-1/2 items-center gap-2">
             {StudiesToggle}

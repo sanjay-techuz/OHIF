@@ -1,12 +1,12 @@
+import { Select } from '@radix-ui/react-select';
 import React from 'react';
 import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '../Select';
-import { Select } from '@radix-ui/react-select';
 
 const fgtOptions = ['A', 'B', 'C', 'D'];
 const bpeOptions = ['Mild', 'Minimal', 'Moderate', 'Marked'];
 const definitionOptions = ['Normal', 'Abnormal'];
-const massOptions = ['Begin', 'Suspicpius'];
-const nmeOptions = ['Begin', 'Suspicpius'];
+const massOptions = ['Benign', 'Suspicious'];
+const nmeOptions = ['Benign', 'Suspicious'];
 const yesNoOptions = ['Yes', 'No'];
 const biRadsOptions = ['0', '1 or 2', '4 or 5'];
 

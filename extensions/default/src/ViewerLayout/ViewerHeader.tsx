@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { preserveQueryParameters } from '@ohif/app';
 import { useSystem } from '@ohif/core';
-import { Button, Header, Icons } from '@ohif/ui-next';
+import { Button, Header } from '@ohif/ui-next';
 import { Toolbar } from '../Toolbar/Toolbar';
 import HeaderPatientInfo from './HeaderPatientInfo';
 import { PatientInfoVisibility } from './HeaderPatientInfo/HeaderPatientInfo';
@@ -13,6 +13,7 @@ interface ViewerHeaderProps {
   onToggleStudiesPanel?: () => void;
   hasLeftPanels?: boolean;
   leftPanelClosedState?: boolean;
+  moduleTitle?: string;
 }
 
 function ViewerHeader({
@@ -20,6 +21,7 @@ function ViewerHeader({
   onToggleStudiesPanel,
   hasLeftPanels = false,
   leftPanelClosedState = false,
+  moduleTitle = '',
 }: ViewerHeaderProps) {
   const { servicesManager, extensionManager } = useSystem();
   const { customizationService } = servicesManager.services;
@@ -99,6 +101,7 @@ function ViewerHeader({
         onClickReturnButton={onClickReturnButton}
         WhiteLabeling={appConfig.whiteLabeling}
         Secondary={<Toolbar buttonSection="secondary" />}
+        ModuleTitle={moduleTitle}
         StudiesToggle={
           hasLeftPanels && onToggleStudiesPanel ? (
             <Button

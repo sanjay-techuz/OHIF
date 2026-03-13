@@ -102,7 +102,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           {/* ACR Section */}
           <div className="flex-raw relative flex items-center gap-3">
             <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
-              Your answer
+              Your Interpretation
             </span>
             <span className="text-base text-white/80">Breast Density</span>
             <button
@@ -356,7 +356,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
             {/* ACR Section */}
             <div className="flex-raw relative flex items-center gap-3">
               <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
-                Faculty answer
+                Expert Interpretation
               </span>
               <span className="text-base text-white/80">Breast Density</span>
               <button

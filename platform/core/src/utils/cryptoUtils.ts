@@ -1,16 +1,19 @@
 import * as CryptoJS from 'crypto-js';
 
 /**
- * Get the encryption key from environment variables
- * Supports Webpack (REACT_APP_CRYPTO_SECURE_KEY) and direct (CRYPTO_SECURE_KEY) formats
- * For Vite projects, use VITE_CRYPTO_SECURE_KEY and configure webpack to expose it as REACT_APP_CRYPTO_SECURE_KEY
+ * Get the encryption key from environment variable.
+ *
+ * `process.env.REACT_APP_CRYPTO_SECURE_KEY` is replaced at build time by
+ * webpack DefinePlugin / dotenv-webpack with the actual value from .env.
+ * There is NO `process` object at runtime in the browser – webpack only does
+ * text-replacement of the full `process.env.VARIABLE_NAME` expression.
  */
 function getSecureKey(): string {
-  if (typeof process !== 'undefined' && process.env) {
-    // Node.js environment
-    return process.env.CRYPTO_SECURE_KEY || 'Techuz@123';
-  }
-  return 'Techuz@123';
+  // webpack DefinePlugin replaces `process.env.REACT_APP_CRYPTO_SECURE_KEY`
+  // with the actual value at build time (e.g. "YourSecureKey").
+  // Do NOT use `process.env` standalone — it is NOT replaced and `process`
+  // does not exist in the browser.
+  return process.env.REACT_APP_CRYPTO_SECURE_KEY || '';
 }
 
 /**

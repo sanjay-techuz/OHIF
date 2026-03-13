@@ -8,10 +8,9 @@
 -- ====================================
 --  Configuration: Webhook URL
 -- ====================================
--- Webhook URL for backend API
--- In Docker, use host.docker.internal to reach the host machine
--- For production, change this to your actual backend URL (e.g., https://api.example.com)
-local WEBHOOK_URL = "http://host.docker.internal:4000/api/admin/cases/orthanc-webhook"
+-- Read from environment variable (set in docker-compose.yml → .env)
+-- Fallback to default if not set
+local WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 
 -- ====================================
 --  Function: Handle study modifications

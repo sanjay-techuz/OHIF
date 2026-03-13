@@ -4,11 +4,11 @@ import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '../Select
 
 const breastDensityOptions = ['A', 'B', 'C', 'D'];
 const definitionOptions = ['Normal', 'AbNormal'];
-const massOptions = ['Begin', 'Suspicpius'];
-const microlcalcificationOptions = ['Begin', 'Suspicpius'];
+const massOptions = ['Benign', 'Suspicious'];
+const microlcalcificationOptions = ['Benign', 'Suspicious'];
 const asymmetryOptions = ['Focal', 'Global', 'Developing'];
 const yesNoOptions = ['Yes', 'No'];
-const biRadsOptions = ['0', '1 or 2', '4 or 5'];
+const biRadsOptions = ['1', '2', '4', '5'];
 
 const labelClass = 'text-primary-light text-base';
 const radioLabelClass = 'flex items-center gap-0 text-base cursor-pointer text-white relative';
