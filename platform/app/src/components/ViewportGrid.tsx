@@ -1,7 +1,7 @@
 import { MeasurementService, Types } from '@ohif/core';
 import { useViewportGrid, ViewportGrid, ViewportPane } from '@ohif/ui-next';
 import { useAppConfig } from '@state';
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import EmptyViewport from './EmptyViewport';
 
 function ViewerViewportGrid(props: withAppTypes) {
@@ -12,6 +12,28 @@ function ViewerViewportGrid(props: withAppTypes) {
   const { layout, activeViewportId, viewports, isHangingProtocolLayout } = viewportGrid;
   const { numCols, numRows } = layout;
   const layoutHash = useRef(null);
+
+  // Track whether the active viewport border should be visible
+  // Border only shows when user clicks on a viewport, hidden by default and on outside click
+  const [showActiveBorder, setShowActiveBorder] = useState(false);
+  const viewportGridRef = useRef<HTMLDivElement>(null);
+
+  // Hide border when clicking outside the viewport grid area (header, footer, etc.)
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        viewportGridRef.current &&
+        !viewportGridRef.current.contains(event.target as Node)
+      ) {
+        setShowActiveBorder(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const {
     displaySetService,
@@ -341,6 +363,9 @@ function ViewerViewportGrid(props: withAppTypes) {
       });
 
       const onInteractionHandler = event => {
+        // Always show the border when clicking on any viewport
+        setShowActiveBorder(true);
+
         if (isActive) {
           return;
         }
@@ -399,7 +424,7 @@ function ViewerViewportGrid(props: withAppTypes) {
             height: viewportHeight * 100 + '%',
             ...getBorderStyle(i),
           }}
-          isActive={isActive}
+          isActive={isActive && showActiveBorder}
         >
           <div
             data-cy="viewport-pane"
@@ -424,7 +449,7 @@ function ViewerViewportGrid(props: withAppTypes) {
     }
 
     return viewportPanes;
-  }, [viewports, activeViewportId, viewportComponents, dataSource]);
+  }, [viewports, activeViewportId, viewportComponents, dataSource, showActiveBorder]);
 
   /**
    * Loading indicator until numCols and numRows are gotten from the HangingProtocolService
@@ -434,7 +459,10 @@ function ViewerViewportGrid(props: withAppTypes) {
   }
 
   return (
-    <div className="h-full w-full border-none">
+    <div
+      ref={viewportGridRef}
+      className="h-full w-full border-none"
+    >
       <ViewportGrid
         numRows={numRows}
         numCols={numCols}

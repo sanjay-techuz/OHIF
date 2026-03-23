@@ -92,43 +92,55 @@ const Results: React.FC<ResultsProps> = ({
       );
 
       if (result.success) {
-        console.log('response', result.data);
         const { data } = result.data as { data: any };
         if (data) {
           const { counts, details } = data.evaluation;
           setTotalMistakes(counts?.mistakes || 0);
 
-          const combinedMetrics = {
-            specificity:
-              (data.evaluation.metrics.R.specificity + data.evaluation.metrics.L.specificity) / 2,
-            sensitivity:
-              (data.evaluation.metrics.R.sensitivity + data.evaluation.metrics.L.sensitivity) / 2,
-          };
-          setSensitivity(combinedMetrics.sensitivity);
-          setSpecificity(combinedMetrics.specificity);
-          // Calculate sum of both L and R counts
+          // Use overall metrics from API
+          setSensitivity(data.evaluation.metrics.overall?.sensitivity || 0);
+          setSpecificity(data.evaluation.metrics.overall?.specificity || 0);
+
+          // Calculate sum of R, L, and screening counts
           const totalCounts = {
-            TN: (counts.R?.TN || 0) + (counts.L?.TN || 0),
-            FP: (counts.R?.FP || 0) + (counts.L?.FP || 0),
-            TP: (counts.R?.TP || 0) + (counts.L?.TP || 0),
-            FN: (counts.R?.FN || 0) + (counts.L?.FN || 0),
+            TN: (counts.R?.TN || 0) + (counts.L?.TN || 0) + (counts.screening?.TN || 0),
+            FP: (counts.R?.FP || 0) + (counts.L?.FP || 0) + (counts.screening?.FP || 0),
+            TP: (counts.R?.TP || 0) + (counts.L?.TP || 0) + (counts.screening?.TP || 0),
+            FN: (counts.R?.FN || 0) + (counts.L?.FN || 0) + (counts.screening?.FN || 0),
           };
           setResults(totalCounts);
 
           // Transform API data to mistakesData format
           if (details && details.length > 0) {
-            const mistakesData = details.map(detail => ({
-              id: detail.case_id,
-              study_instance_uid: detail.study_instance_uid,
-              right: {
-                yours: detail.R.studentValue,
-                correct: detail.R.facultyValue,
-              },
-              left: {
-                yours: detail.L.studentValue,
-                correct: detail.L.facultyValue,
-              },
-            }));
+            const mistakesData = details.map(detail => {
+              // Map view_type: "1" or "diagnostic" -> "Diagnostic", "2" or "screening" -> "Screening"
+              const viewTypeMap: Record<string, string> = {
+                '1': 'Diagnostic',
+                '2': 'Screening',
+                'diagnostic': 'Diagnostic',
+                'screening': 'Screening',
+              };
+              const viewType = viewTypeMap[detail.view_type?.toString().toLowerCase()] || 'Screening';
+
+              // Map case_type: 1 or "1" -> "Normal", 2 or "2" -> "Abnormal"
+              const caseType = detail.case_type === 1 || detail.case_type === '1' ? 'Normal' : 'Abnormal';
+
+              return {
+                id: detail.case_id,
+                study_instance_uid: detail.study_instance_uid,
+                view_type: viewType,
+                case_type: caseType,
+                decision: detail.decision || '-',
+                right: {
+                  yours: detail.R?.studentValue || '-',
+                  correct: detail.R?.facultyValue || '-',
+                },
+                left: {
+                  yours: detail.L?.studentValue || '-',
+                  correct: detail.L?.facultyValue || '-',
+                },
+              };
+            });
             setMistakesData(mistakesData);
           }
         }
@@ -148,9 +160,7 @@ const Results: React.FC<ResultsProps> = ({
           body
         )
       );
-      if (result.success) {
-        console.log('measurement results', result.data);
-      } else {
+      if (!result.success) {
         console.error('Failed to fetch measurement results:', (result as any).error);
       }
     };
@@ -176,6 +186,54 @@ const Results: React.FC<ResultsProps> = ({
       }}
     />
   );
+
+  // Helper: determine if student interpretation is correct
+  // Normal group = 1, 2 | Abnormal group = 4, 5
+  // Correct if both are in the same group
+  const isNormalValue = (val: string) => ['1', '2'].includes(val);
+  const isAbnormalValue = (val: string) => ['4', '5'].includes(val);
+  const isStudentCorrect = (studentVal: string, facultyVal: string): boolean => {
+    if (isNormalValue(studentVal) && isNormalValue(facultyVal)) return true;
+    if (isAbnormalValue(studentVal) && isAbnormalValue(facultyVal)) return true;
+    return false;
+  };
+
+  // Get pill variant for student interpretation
+  const getStudentPillVariant = (studentVal: string, facultyVal: string): 'false' | 'correct' | 'normal' => {
+    if (!studentVal || studentVal === '-' || studentVal === '') return 'correct'; // golden
+    if (!facultyVal || facultyVal === '-' || facultyVal === '') return 'correct'; // golden
+    return isStudentCorrect(studentVal, facultyVal) ? 'normal' : 'false'; // green or red
+  };
+
+  // Get outcome pill variant based on view type and correctness
+  const isEmpty = (val: string) => !val || val === '-' || val === '';
+
+  const isSideCorrect = (yours: string, correct: string): boolean | null => {
+    const yoursEmpty = isEmpty(yours);
+    const correctEmpty = isEmpty(correct);
+    // Both empty → both agree normal → correct
+    if (yoursEmpty && correctEmpty) return true;
+    // One has value, other doesn't → mismatch → incorrect
+    if (yoursEmpty !== correctEmpty) return false;
+    // Both have values → check group match
+    return isStudentCorrect(yours, correct);
+  };
+
+  const getOutcomePillVariant = (row: any): 'false' | 'correct' | 'normal' => {
+    if (row.view_type === 'Diagnostic') {
+      const rightResult = isSideCorrect(row.right.yours, row.right.correct);
+      const leftResult = isSideCorrect(row.left.yours, row.left.correct);
+      // If any side is wrong → red
+      if (rightResult === false || leftResult === false) return 'false';
+      // Both sides correct → green
+      return 'normal';
+    } else {
+      // Screening: TP/TN = green, FP/FN = red
+      if (row.decision === 'TP' || row.decision === 'TN') return 'normal';
+      if (row.decision === 'FP' || row.decision === 'FN') return 'false';
+      return 'normal';
+    }
+  };
 
   const Pill: React.FC<{ label: string; variant?: 'false' | 'correct' | 'normal' }> = ({
     label,
@@ -273,8 +331,8 @@ const Results: React.FC<ResultsProps> = ({
             <div className="flex gap-8 text-xs">
               <div>
                 <div className="mb-1">R</div>
-                <div className="grid grid-cols-5 gap-2">
-                  {['1', '2', '4a', '4b', '5'].map(key => (
+                <div className="grid grid-cols-4 gap-2">
+                  {['1', '2', '4', '5'].map(key => (
                     <Pill
                       key={`r-${key}`}
                       label={key}
@@ -284,8 +342,8 @@ const Results: React.FC<ResultsProps> = ({
               </div>
               <div>
                 <div className="mb-1">L</div>
-                <div className="grid grid-cols-5 gap-2">
-                  {['1', '2', '4a', '4b', '5'].map(key => (
+                <div className="grid grid-cols-4 gap-2">
+                  {['1', '2', '4', '5'].map(key => (
                     <Pill
                       key={`l-${key}`}
                       label={key}
@@ -305,7 +363,7 @@ const Results: React.FC<ResultsProps> = ({
               <div className="mb-8 grid gap-1">
                 <h2 className="text-2xl font-bold text-white">Your Performance Summary</h2>
                 <p className="text-lg font-medium text-white/80">
-                  Quick overview of your diagnostic accuracy of this case set
+                  Quick overview of your accuracy for this case set
                 </p>
               </div>
               {/* <div className="grid grid-cols-3 gap-6">
@@ -347,9 +405,9 @@ const Results: React.FC<ResultsProps> = ({
             <div className="mb-12">
               <div className="mb-8 grid gap-1">
                 <h2 className="text-2xl font-bold text-white">Decision Accuracy Matrix</h2>
-                <p className="text-lg font-medium text-white/80">
+                {/* <p className="text-lg font-medium text-white/80">
                   How your answers compared your diagnoses against pathology results
-                </p>
+                </p> */}
               </div>
               <div className="overflow-x-auto">
                 <div className="overflow-hidden rounded-lg border border-white/10">
@@ -363,14 +421,14 @@ const Results: React.FC<ResultsProps> = ({
                           True category
                         </th>
                         <th
-                          colSpan={5}
+                          colSpan={4}
                           className="border-b border-white/10 px-5 py-3 font-medium"
                         >
                           Your answer
                         </th>
                       </tr>
                       <tr>
-                        {['1', '2', '4a', '4b', '5'].map(col => (
+                        {['1', '2', '4', '5'].map(col => (
                           <th
                             key={col}
                             className="border-r border-white/10 px-5 py-3 text-left font-medium"
@@ -389,17 +447,16 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="border-r border-white/10 px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>true-negative (TN)</span>
-                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(255,39,104,0.70)] bg-[linear-gradient(116deg,rgba(255,39,104,0.50)_7.52%,rgba(255,39,104,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(255,39,104,0.20)]">
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(252,188,53,0.70)] bg-[linear-gradient(116deg,rgba(252,188,53,0.50)_7.52%,rgba(252,188,53,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(252,188,53,0.20)]">
                               {results?.TN || 0}
                             </div>
                           </div>
                         </td>
                         <td className="px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
                             <span>false-positive (FP)</span>
-                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(255,39,104,0.70)] bg-[linear-gradient(116deg,rgba(255,39,104,0.50)_7.52%,rgba(255,39,104,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(255,39,104,0.20)]">
+                            <div className="flex h-6 w-10 items-center justify-center rounded-full border border-[rgba(252,188,53,0.70)] bg-[linear-gradient(116deg,rgba(252,188,53,0.50)_7.52%,rgba(252,188,53,0.00)_89.14%)] text-sm font-medium text-white shadow-[0_7px_21.2px_0_rgba(252,188,53,0.20)]">
                               {results?.FP || 0}
                             </div>
                           </div>
@@ -413,21 +470,10 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="border-r border-white/10 px-5 py-3"></td>
                         <td className="px-5 py-3"></td>
                         <td className="px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
                       </tr>
                       <tr className="border-t border-white/10 text-left">
                         <td className="border-r border-white/10 px-5 py-3 text-left font-medium opacity-80">
-                          4a
-                        </td>
-                        <td className="px-5 py-3"></td>
-                        <td className="border-r border-white/10 px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
-                      </tr>
-                      <tr className="border-t border-white/10 text-left">
-                        <td className="border-r border-white/10 px-5 py-3 text-left font-medium opacity-80">
-                          4b
+                          4
                         </td>
                         <td className="px-5 py-3"></td>
                         <td className="border-r border-white/10 px-5 py-3">
@@ -438,7 +484,6 @@ const Results: React.FC<ResultsProps> = ({
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3"></td>
                         <td className="px-5 py-3"></td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
@@ -457,7 +502,6 @@ const Results: React.FC<ResultsProps> = ({
                         <td className="border-r border-white/10 px-5 py-3"></td>
                         <td className="px-5 py-3"></td>
                         <td className="px-5 py-3"></td>
-                        <td className="px-5 py-3"></td>
                       </tr>
                     </tbody>
                   </table>
@@ -469,9 +513,9 @@ const Results: React.FC<ResultsProps> = ({
             <div className="mb-12">
               <div className="mb-8 grid gap-1">
                 <h2 className="text-2xl font-bold text-white">How to Read Your Results</h2>
-                <p className="text-lg font-medium text-white/80">
+                {/* <p className="text-lg font-medium text-white/80">
                   How your answers compared your diagnoses against pathology results
-                </p>
+                </p> */}
               </div>
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="rounded-[16px] border border-[rgba(255,255,255,0.15)] bg-[linear-gradient(124deg,#1C1C1C_0%,#0B0A0A_99.91%)] p-6 shadow-[0_12px_71.8px_0_rgba(0,0,0,0.50)]">
@@ -496,8 +540,8 @@ const Results: React.FC<ResultsProps> = ({
                     <div className="grid">
                       <div className="mb-2 text-[18px] font-medium">Specificity</div>
                       <div className="text-base text-white/80">
-                        percentage of true-negative answers relative to the total number of
-                        true-negatives and false-positives:
+                        Percentage of true-negative answers relative to the total number of
+                        true-negatives and false-positives
                       </div>
                       <div className="mt-3 text-base">
                         <span className="font-medium">Specificity = TN / (TN + FP)</span>
@@ -527,8 +571,8 @@ const Results: React.FC<ResultsProps> = ({
                     <div className="grid">
                       <div className="mb-2 text-[18px] font-medium">Sensitivity</div>
                       <div className="text-base text-white/80">
-                        percentage of true-positive answers relative to the total number of
-                        true-positives and false-negatives:
+                        Percentage of true-positive answers relative to the total number of
+                        true-positives and false-negatives
                       </div>
                       <div className="mt-3 text-base">
                         <span className="font-medium">Sensitivity = TP / (TP + FN)</span>
@@ -545,24 +589,26 @@ const Results: React.FC<ResultsProps> = ({
               <div className="mb-8 grid gap-1">
                 <h2 className="text-2xl font-bold text-white">Case Review Breakdown</h2>
                 <p className="text-lg font-medium text-white/80">
-                  How your answers compared your diagnoses against pathology results
+                  How your answers compared against expected answers
                 </p>
               </div>
               <div className="overflow-x-auto">
                 <div className="overflow-hidden rounded-lg border border-white/10">
-                  <table className="w-full min-w-[720px] border-collapse text-[14px]">
+                  <table className="w-full min-w-[1000px] border-collapse text-[14px]">
                     <thead className="border-b border-none border-white/10 bg-[#0B0A0A]">
                       <tr>
                         <th className="px-5 py-3 text-left font-medium">Case</th>
+                        <th className="px-5 py-3 text-left font-medium">Case Type</th>
                         <th className="px-5 py-3 text-left font-medium">
                           Right side
-                          <div className="text-[10px] text-white/80">your answer / correct</div>
+                          <div className="text-[10px] text-white/80">Your Interpretation / Correct Interpretation</div>
                         </th>
                         <th className="px-5 py-3 text-left font-medium">
                           Left side
-                          <div className="text-[10px] text-white/80">your answer / correct</div>
+                          <div className="text-[10px] text-white/80">Your Interpretation / Correct Interpretation</div>
                         </th>
-                        {/* <th className="px-5 py-3 text-left font-medium">Pathology Type</th> */}
+                        <th className="px-5 py-3 text-left font-medium">Pathology</th>
+                        <th className="px-5 py-3 text-left font-medium">Outcome</th>
                         <th className="px-5 py-3 text-left font-medium">Go to case</th>
                       </tr>
                     </thead>
@@ -648,33 +694,43 @@ const Results: React.FC<ResultsProps> = ({
                           className="border-t border-white/10"
                         >
                           <td className="px-5 py-3">{row.id}</td>
+                          <td className="px-5 py-3">{row.view_type || '-'}</td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-2">
                               <Pill
-                                label={row.right.yours}
-                                variant={
-                                  row.right.yours === row.right.correct ? 'correct' : 'false'
-                                }
+                                label={row.right.yours || '-'}
+                                variant={getStudentPillVariant(row.right.yours, row.right.correct)}
                               />
                               <span>/</span>
                               <Pill
-                                label={row.right.correct}
-                                variant={'normal'}
+                                label={row.right.correct || '-'}
+                                variant={'correct'}
                               />
                             </div>
                           </td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-2">
                               <Pill
-                                label={row.left.yours}
-                                variant={row.left.yours === row.left.correct ? 'correct' : 'false'}
+                                label={row.left.yours || '-'}
+                                variant={getStudentPillVariant(row.left.yours, row.left.correct)}
                               />
                               <span>/</span>
                               <Pill
-                                label={row.left.correct}
-                                variant={'normal'}
+                                label={row.left.correct || '-'}
+                                variant={'correct'}
                               />
                             </div>
+                          </td>
+                          <td className="px-5 py-3">{row.case_type || '-'}</td>
+                          <td className="px-5 py-3">
+                            <Pill
+                              label={
+                                row.view_type === 'Diagnostic'
+                                  ? '-'
+                                  : row.decision || '-'
+                              }
+                              variant={getOutcomePillVariant(row)}
+                            />
                           </td>
                           <td className="px-5 py-3">
                             <Button

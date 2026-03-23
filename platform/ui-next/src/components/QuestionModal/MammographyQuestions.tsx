@@ -340,7 +340,7 @@ const MammographyQuestions: React.FC<MammographyQuestionsProps> = ({
 
     {/* Bi-RADS */}
     <div className={sectionClass}>
-      <label className={labelClass}>Bi-RADS</label>
+      <label className={labelClass}>BI-RADS</label>
       <div className="mt-2 flex gap-6">
         {biRadsOptions.map((opt, index) => (
           <div

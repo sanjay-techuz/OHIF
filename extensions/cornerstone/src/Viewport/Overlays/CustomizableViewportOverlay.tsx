@@ -412,7 +412,7 @@ function OverlayItem(props) {
     >
       {label ? <span className="mr-1 shrink-0">{label}</span> : null}
       <span
-        className={`ml-0 mr-2 shrink-0 font-medium ${id === 'SeriesDescription' ? 'text-white/60' : 'text-white/80'}`}
+        className={`ml-0 mr-2 shrink-0 font-medium ${id === 'CaseTitle' ? 'text-white/60' : 'text-white/80'}`}
       >
         {value}
       </span>

@@ -23,8 +23,8 @@ export interface ACRValues {
 }
 
 const ACR_OPTIONS = ['A', 'B', 'C', 'D'];
-const R_OPTIONS = ['1', '2', '4a', '4b', '5'];
-const L_OPTIONS = ['1', '2', '4a', '4b', '5'];
+const R_OPTIONS = ['1', '2', '4', '5'];
+const L_OPTIONS = ['1', '2', '4', '5'];
 
 const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
   open,
@@ -41,18 +41,14 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
   }, [open, initialValues]);
 
   const handleSave = () => {
-    console.log('ACRSelectorModal - Saving values:', values);
     onSave(values);
     onClose();
   };
 
   const handleCancel = () => {
-    console.log('ACRSelectorModal - Canceling');
     setValues(initialValues);
     onClose();
   };
-
-  console.log('ACRSelectorModal render - open:', open, 'values:', values);
 
   return (
     <Modal
@@ -62,7 +58,9 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
     >
       {/* <div className="bg-bkg-primary border-primary-dark rounded-lg border p-6 shadow-lg"> */}
       <div className="mb-10 grid gap-2">
-        <h2 className="text-primary-light text-2xl font-bold leading-tight">ACR Classification</h2>
+        <h2 className="text-primary-light text-2xl font-bold leading-tight">
+          ACR BI-RADS Classification
+        </h2>
         <p className="text-primary-light text-xl opacity-80">
           Select values for Breast Density, Right (R), and Left (L) classifications
         </p>
@@ -71,7 +69,7 @@ const ACRSelectorModal: React.FC<ACRSelectorModalProps> = ({
       <div className="space-y-4">
         {/* ACR Selection */}
         <div className="space-y-1.5">
-          <label className="text-primary-light text-base">ACR (Breast Density)</label>
+          <label className="text-primary-light text-base">Breast Density</label>
           <Select
             value={values.acr}
             onValueChange={value => setValues(prev => ({ ...prev, acr: value }))}
