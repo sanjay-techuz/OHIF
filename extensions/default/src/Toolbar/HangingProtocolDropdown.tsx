@@ -354,6 +354,36 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     }
   }, [currentStageIndex, commandsManager, allHangingProtocols]);
 
+  // Re-apply current hanging protocol when sidebar opens/closes to fix viewport blank space
+  useEffect(() => {
+    if (!isMammo) {
+      return;
+    }
+
+    const handleSidebarToggle = () => {
+      const protocol = allHangingProtocols[currentStageIndex];
+      if (!protocol) {
+        return;
+      }
+
+      // Delay to let sidebar panel transition complete, then re-apply the current HP
+
+      // Apply zoom for all protocols except partial views (stageIndex 16-21)
+      // const excludedStages = [16, 17, 18, 19, 20, 21];
+      // if (!excludedStages.includes(protocol.stageIndex)) {
+      setTimeout(() => {
+        commandsManager.run({
+          commandName: 'setMammographyZoomConditional',
+          commandOptions: {},
+        });
+      }, 300);
+      // }
+    };
+
+    window.addEventListener('ohif-sidebar-toggle', handleSidebarToggle);
+    return () => window.removeEventListener('ohif-sidebar-toggle', handleSidebarToggle);
+  }, [isMammo, currentStageIndex, allHangingProtocols, commandsManager]);
+
   // Keyboard shortcuts for stage navigation (only for mammography)
   useEffect(() => {
     if (!isMammo) {

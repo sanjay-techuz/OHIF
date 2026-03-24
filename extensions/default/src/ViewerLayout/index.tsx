@@ -167,6 +167,15 @@ function ViewerLayout({
     };
   }, []);
 
+  // Notify other components (e.g. HangingProtocolDropdown) when sidebar toggles
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('ohif-sidebar-toggle', {
+        detail: { isOpen: !leftPanelClosedState },
+      })
+    );
+  }, [leftPanelClosedState]);
+
   const getComponent = id => {
     const entry = extensionManager.getModuleEntry(id);
 
@@ -552,6 +561,10 @@ function ViewerLayout({
         // Find current case index
         const currentIndex = cases.findIndex(c => c.case_id === +caseId);
         setCurrentCaseIndex(currentIndex >= 0 ? currentIndex : 0);
+
+        // Store current case_title on window for viewport overlay access
+        (window as any).__currentCaseTitle =
+          cases[currentIndex >= 0 ? currentIndex : 0]?.case_title || '';
 
         console.log('Case list loaded:', cases);
         console.log('Current case index:', currentIndex);

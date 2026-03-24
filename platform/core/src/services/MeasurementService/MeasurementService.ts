@@ -586,8 +586,8 @@ class MeasurementService extends PubSubService {
           getCustomParams();
         const annotationData = annotation.state.getAnnotation(internalUID);
         if (annotationData) {
-          // Set colors based on userType: student = blue, faculty = green
-          const color = userType === 'student' ? 'blue' : 'rgb(0, 255, 0)';
+          // Set colors based on userType: student = light blue, faculty = light green
+          const color = userType === 'student' ? '#5cb3ff' : '#4ade80';
           annotationData.data.label =
             userType === 'student' ? 'Your Annotation' : 'Reference Annotation';
 

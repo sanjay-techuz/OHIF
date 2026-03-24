@@ -1220,44 +1220,52 @@ function commandsModule({
             const scaleY = height * spacingY;
             const newParallelScale = Math.max(scaleX, scaleY) / 2;
             const noneViewports = [0, 1, 2, 11];
-            if (!noneViewports.includes(currentStageIndex)) {
-              // Determine viewport type based on display set
-              let panX = 0;
-              try {
-                // Get the current stage and viewport configuration
-                const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
-                if (currentStage && currentStage.viewports && currentStage.viewports[index]) {
-                  const viewportConfig = currentStage.viewports[index];
-                  if (viewportConfig.displaySets && viewportConfig.displaySets[0]) {
-                    const displaySetId = viewportConfig.displaySets[0].id;
-                    // Apply pan based on display set type (both FFDM and DBT)
-                    if (
-                      displaySetId === 'LCC' ||
-                      displaySetId === 'LMLO' ||
-                      displaySetId === 'LCC3D' ||
-                      displaySetId === 'LMLO3D'
-                    ) {
-                      panX = -100; // Left side - pan left
-                    } else if (
-                      displaySetId === 'RCC' ||
-                      displaySetId === 'RMLO' ||
-                      displaySetId === 'RCC3D' ||
-                      displaySetId === 'RMLO3D'
-                    ) {
-                      panX = 100; // Right side - pan right
+            // if (!noneViewports.includes(currentStageIndex)) {
+            // Determine viewport type based on display set
+            let panX = 0;
+            try {
+              // Get the current stage and viewport configuration
+              const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
+              if (currentStage && currentStage.viewports && currentStage.viewports[index]) {
+                const viewportConfig = currentStage.viewports[index];
+                if (viewportConfig.displaySets && viewportConfig.displaySets[0]) {
+                  const displaySetId = viewportConfig.displaySets[0].id;
+                  // Apply pan based on display set type (both FFDM and DBT)
+                  if (
+                    displaySetId === 'LCC' ||
+                    displaySetId === 'LMLO' ||
+                    displaySetId === 'LCC3D' ||
+                    displaySetId === 'LMLO3D'
+                  ) {
+                    if (!noneViewports.includes(currentStageIndex)) {
+                      panX = -115; // Left side - pan left
+                    } else {
+                      panX = 42; // Left side - pan left
+                    }
+                  } else if (
+                    displaySetId === 'RCC' ||
+                    displaySetId === 'RMLO' ||
+                    displaySetId === 'RCC3D' ||
+                    displaySetId === 'RMLO3D'
+                  ) {
+                    if (!noneViewports.includes(currentStageIndex)) {
+                      panX = 115; // Right side - pan right
+                    } else {
+                      panX = -42; // Right side - pan right
                     }
                   }
                 }
-              } catch (error) {
-                // Fallback: use viewport index to determine side
-                if (index === 0 || index === 2) {
-                  panX = 100; // RCC, RMLO
-                } else if (index === 1 || index === 3) {
-                  panX = -100; // LCC, LMLO
-                }
               }
-              viewport.setPan([panX, 0]);
+            } catch (error) {
+              // Fallback: use viewport index to determine side
+              if (index === 0 || index === 2) {
+                panX = 100; // RCC, RMLO
+              } else if (index === 1 || index === 3) {
+                panX = -100; // LCC, LMLO
+              }
             }
+            viewport.setPan([panX, 0]);
+            // }
 
             viewport.setCamera({ parallelScale: newParallelScale });
             viewport.render();

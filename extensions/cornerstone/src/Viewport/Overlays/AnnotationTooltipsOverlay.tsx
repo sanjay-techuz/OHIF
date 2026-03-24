@@ -84,7 +84,7 @@ const AnnotationTooltipsOverlay = ({ element, viewportId }) => {
 
         const left = x + 40;
         const top = isStudent ? y + 10 : y - 20;
-        const textColor = isStudent ? 'blue' : isFaculty ? 'green' : color || '#fff';
+        const textColor = isStudent ? '#5cb3ff' : isFaculty ? '#4ade80' : color || '#fff';
 
         return (
           <div
