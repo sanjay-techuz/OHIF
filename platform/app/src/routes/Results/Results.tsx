@@ -17,10 +17,10 @@ const MetricRing: React.FC<{
   color: string;
 }> = ({ title, value, color }) => {
   const size = 160;
-  const strokeWidth = 30;
-  const radius = (size - strokeWidth) / 2;
+  const strokeWidth = 14;
+  const center = size / 2;
+  const radius = center - strokeWidth;
   const circumference = 2 * Math.PI * radius;
-
   const offset = circumference - (Math.min(value, 100) / 100) * circumference;
 
   return (
@@ -31,35 +31,37 @@ const MetricRing: React.FC<{
         <svg
           width={size}
           height={size}
-          className="-rotate-90"
+          viewBox={`0 0 ${size} ${size}`}
         >
-          {/* Track */}
+          {/* Background Track */}
           <circle
-            cx={size / 2}
-            cy={size / 2}
+            cx={center}
+            cy={center}
             r={radius}
+            fill="none"
+            stroke="#2d2d2d"
             strokeWidth={strokeWidth}
-            className="fill-none stroke-white/10"
           />
 
-          {/* Progress */}
+          {/* Progress Arc */}
           <circle
-            cx={size / 2}
-            cy={size / 2}
+            cx={center}
+            cy={center}
             r={radius}
-            strokeWidth="15"
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            className="fill-none transition-all duration-700 ease-out"
-            style={{ stroke: color }}
+            transform={`rotate(-90 ${center} ${center})`}
+            style={{ transition: 'stroke-dashoffset 0.7s ease-out' }}
           />
         </svg>
 
         {/* Center text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-          {/* <div className="text-sm font-medium text-white/80">{subtitle}</div> */}
-          <div className="mt-1 text-2xl font-semibold text-white">{Math.round(value)}%</div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-2xl font-semibold text-white">{Math.round(value)}%</div>
         </div>
       </div>
     </div>
@@ -418,13 +420,13 @@ const Results: React.FC<ResultsProps> = ({
                           rowSpan={2}
                           className="w-48 border-r border-white/10 px-5 py-3 text-left align-middle font-medium"
                         >
-                          True category
+                          True interpretation
                         </th>
                         <th
                           colSpan={4}
                           className="border-b border-white/10 px-5 py-3 font-medium"
                         >
-                          Your answer
+                          Your interpretation
                         </th>
                       </tr>
                       <tr>
