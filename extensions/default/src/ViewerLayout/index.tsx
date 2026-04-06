@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
@@ -18,6 +18,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  getModalityConfig,
   IconPresentationProvider,
   Icons,
   InstructionModal,
@@ -71,8 +72,16 @@ function ViewerLayout({
   const [rightPanelClosedState, setRightPanelClosed] = useState(true);
   const [showMeasurementModal, setShowMeasurementModal] = useState(false);
   const [currentMeasurementUid, setCurrentMeasurementUid] = useState<string | null>(null);
-  const [studentAcrValues, setStudentAcrValues] = useState({ acr: '', r: '', l: '' });
-  const [facultyAcrValues, setFacultyAcrValues] = useState({ acr: '', r: '', l: '' });
+  const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
+  const subSpecialitySlug = useUIStateStore(
+    state => state.uiState.subSpecialitySlug as string | null
+  );
+  const acrConfig = useMemo(
+    () => getModalityConfig(subSpecialitySlug, modalitySlug),
+    [subSpecialitySlug, modalitySlug]
+  );
+  const [studentAcrValues, setStudentAcrValues] = useState(acrConfig.defaultValues);
+  const [facultyAcrValues, setFacultyAcrValues] = useState(acrConfig.defaultValues);
   const [currentFormData, setCurrentFormData] = useState<any>(null);
   // ViewType management
   const [currentViewType, setCurrentViewType] = useState<'diagnostic' | 'screening'>('diagnostic');
@@ -498,13 +507,13 @@ function ViewerLayout({
           const { data } = result.data as any;
           if (data) {
             if (isPreview) {
-              setFacultyAcrValues(data.faculty_result_data || { acr: '', r: '', l: '' });
+              setFacultyAcrValues(data.faculty_result_data || acrConfig.defaultValues);
             }
-            setStudentAcrValues(data.result_data || { acr: '', r: '', l: '' });
+            setStudentAcrValues(data.result_data || acrConfig.defaultValues);
           }
         } else {
-          setFacultyAcrValues({ acr: '', r: '', l: '' });
-          setStudentAcrValues({ acr: '', r: '', l: '' });
+          setFacultyAcrValues(acrConfig.defaultValues);
+          setStudentAcrValues(acrConfig.defaultValues);
         }
       }
       if (userType === 'faculty' || isPreview) {
@@ -517,16 +526,16 @@ function ViewerLayout({
             const { data } = result.data as any;
             if (data) {
               if (isPreview) {
-                setFacultyAcrValues(data.result_data || { acr: '', r: '', l: '' });
+                setFacultyAcrValues(data.result_data || acrConfig.defaultValues);
               } else {
-                setStudentAcrValues(data.result_data || { acr: '', r: '', l: '' });
+                setStudentAcrValues(data.result_data || acrConfig.defaultValues);
               }
             }
           } else {
             if (isPreview) {
-              setFacultyAcrValues({ acr: '', r: '', l: '' });
+              setFacultyAcrValues(acrConfig.defaultValues);
             } else {
-              setStudentAcrValues({ acr: '', r: '', l: '' });
+              setStudentAcrValues(acrConfig.defaultValues);
             }
           }
         }
@@ -560,14 +569,21 @@ function ViewerLayout({
 
         // Find current case index
         const currentIndex = cases.findIndex(c => c.case_id === +caseId);
-        setCurrentCaseIndex(currentIndex >= 0 ? currentIndex : 0);
+        const resolvedIndex = currentIndex >= 0 ? currentIndex : 0;
+        setCurrentCaseIndex(resolvedIndex);
 
         // Store current case_title on window for viewport overlay access
-        (window as any).__currentCaseTitle =
-          cases[currentIndex >= 0 ? currentIndex : 0]?.case_title || '';
+        (window as any).__currentCaseTitle = cases[resolvedIndex]?.case_title || '';
+
+        // Store current case's subspeciality and modality slugs in global state
+        const currentCase = cases[resolvedIndex];
+        if (currentCase) {
+          setUIState('subSpecialitySlug', currentCase.sub_speciality_slug || null);
+          setUIState('modalitySlug', currentCase.modality_slug || null);
+        }
 
         console.log('Case list loaded:', cases);
-        console.log('Current case index:', currentIndex);
+        console.log('Current case index:', resolvedIndex);
       } else {
         setCaseListError('Failed to load case list');
       }
@@ -625,9 +641,10 @@ function ViewerLayout({
     }
   };
 
-  // Add validation function
-  const validateACRForm = (acrValues: { acr: string; r: string; l: string }) => {
-    if (!acrValues.acr || !acrValues.r || !acrValues.l) {
+  // Add validation function — config-driven per modality
+  const validateACRForm = (acrValues: Record<string, string>) => {
+    const missing = acrConfig.requiredFields.filter(key => !acrValues[key]);
+    if (missing.length > 0) {
       setValidationMessage(
         `There are still some unfinished cases.\n Finish training and see the results?`
       );
@@ -676,12 +693,34 @@ function ViewerLayout({
     });
   }
 
-  // Fetch case list on mount
+  // Fetch case details for faculty (admin sees a single case, not the full module case list)
+  const fetchFacultyCaseDetails = async () => {
+    if (!caseId) {
+      return;
+    }
+    try {
+      const result = await apiCall(() => apiService.get(`/admin/cases/${caseId}`));
+      if (result.success) {
+        const caseData = result.data?.data;
+        if (caseData) {
+          (window as any).__currentCaseTitle = caseData.case_id || '';
+          setUIState('subSpecialitySlug', caseData.sub_speciality_slug || null);
+          setUIState('modalitySlug', caseData.modality_slug || null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching faculty case details:', error);
+    }
+  };
+
+  // Fetch case list/details on mount
   useEffect(() => {
     if (userType === 'student') {
       fetchCaseList();
+    } else if (userType === 'faculty') {
+      fetchFacultyCaseDetails();
     }
-  }, [courseId, moduleId, userType]);
+  }, [courseId, moduleId, caseId, userType]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
 

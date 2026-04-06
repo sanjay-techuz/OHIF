@@ -1,9 +1,11 @@
 // ACRDisplay component
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { apiCall, apiService } from '@ohif/core';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
-import ACRSelectorModal, { ACRValues } from '../ACRSelectorModal';
+import ACRSelectorModal from '../ACRSelectorModal';
+import type { ACRValues } from '../ACRSelectorModal';
+import { getModalityConfig } from '../ACRSelectorModal/modalityConfigs';
 
 interface ACRDisplayProps {
   studentValues?: ACRValues;
@@ -13,8 +15,8 @@ interface ACRDisplayProps {
 }
 
 const ACRDisplay: React.FC<ACRDisplayProps> = ({
-  studentValues = { acr: '', r: '', l: '' },
-  facultyValues = { acr: '', r: '', l: '' },
+  studentValues,
+  facultyValues,
   onValuesChange,
   className = '',
 }) => {
@@ -31,6 +33,19 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     isPreview,
   } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
+  const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
+  const subSpecialitySlug = useUIStateStore(
+    state => state.uiState.subSpecialitySlug as string | null
+  );
+
+  const config = useMemo(
+    () => getModalityConfig(subSpecialitySlug, modalitySlug),
+    [subSpecialitySlug, modalitySlug]
+  );
+
+  const safeStudentValues = studentValues ?? config.defaultValues;
+  const safeFacultyValues = facultyValues ?? config.defaultValues;
+
   const handleSave = async (newValues: ACRValues) => {
     console.log('ACR values saved:', newValues);
     const body = {
@@ -54,7 +69,6 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
         onValuesChange?.(newValues);
       } else {
         console.error('Failed to save ACR values:', (result as any).error);
-        // Handle error - could show notification or set error state
       }
     } else {
       body.faculty_id = facultyId;
@@ -66,7 +80,6 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           onValuesChange?.(newValues);
         } else {
           console.error('Failed to save ACR values:', (result as any).error);
-          // Handle error - could show notification or set error state
         }
       }
     }
@@ -85,10 +98,11 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     setShowModal(false);
   };
 
-  console.log('ACRDisplay render - showModal:', showModal, 'values:', studentValues);
+  console.log('ACRDisplay render - showModal:', showModal, 'values:', safeStudentValues);
 
   return (
     <>
+      {/* Student / Active interpretation bar */}
       <div
         className={`rounded-lg border ${className}`}
         style={{
@@ -99,249 +113,42 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
         }}
       >
         <div className="flex items-center gap-4">
-          {/* ACR Section */}
-          <div className="flex-raw relative flex items-center gap-3">
-            <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
-              Your Interpretation
-            </span>
-            <span className="text-base text-white/80">Breast Density</span>
-            <button
-              onClick={handleButtonClick}
-              className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
-              style={{
-                backgroundColor: '#232323',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
-              onFocus={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onBlur={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
+          {config.displaySegments.map((segment, idx) => (
+            <div
+              key={segment.valueKey}
+              className={`flex items-center gap-3 ${idx === 0 ? 'relative' : ''}`}
             >
-              {studentValues.acr || '-'}
-            </button>
-          </div>
-
-          {/* R Section */}
-          <div className="flex-raw flex items-center gap-3">
-            <span className="text-base text-gray-300">R</span>
-            <button
-              onClick={handleButtonClick}
-              className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
-              style={{
-                backgroundColor: '#232323',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
-              onFocus={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onBlur={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
-            >
-              {studentValues.r || '-'}
-            </button>
-          </div>
-
-          {/* L Section */}
-          <div className="flex-raw flex items-center gap-3">
-            <span className="text-base text-gray-300">L</span>
-            <button
-              onClick={handleButtonClick}
-              className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
-              style={{
-                backgroundColor: '#232323',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
-              onFocus={e => {
-                e.currentTarget.style.backgroundColor = '#2E2E2E';
-              }}
-              onBlur={e => {
-                e.currentTarget.style.backgroundColor = '#232323';
-              }}
-            >
-              {studentValues.l || '-'}
-            </button>
-          </div>
-
-          {/* Hamburger Menu Icon */}
-          {/* <button
-            onClick={handleButtonClick}
-            className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line
-                x1="3"
-                y1="6"
-                x2="21"
-                y2="6"
-              />
-              <line
-                x1="3"
-                y1="12"
-                x2="21"
-                y2="12"
-              />
-              <line
-                x1="3"
-                y1="18"
-                x2="21"
-                y2="18"
-              />
-            </svg>
-          </button> */}
+              {idx === 0 && (
+                <span className="absolute top-[-1rem] whitespace-nowrap bg-[#0B0A0A] px-2 text-xs text-white/80">
+                  Your Interpretation
+                </span>
+              )}
+              <span className="text-base text-white/80">{segment.label}</span>
+              <button
+                onClick={handleButtonClick}
+                className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
+                style={{ backgroundColor: '#232323' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.backgroundColor = '#2E2E2E';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.backgroundColor = '#232323';
+                }}
+              >
+                {safeStudentValues[segment.valueKey] || '-'}
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* {isPreview && (
-        <div
-          className={`rounded-lg border ${className}`}
-          style={{
-            padding: '0.75rem 1rem',
-            backgroundColor: 'rgba(4, 74, 28, 0.95)',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-            position: 'relative',
-            marginTop: '0.5rem',
-          }}
-        >
-          <div className="flex items-center gap-6">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-base text-white/80">Breast Density</span>
-              <button
-                onClick={handleButtonClick}
-                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-              >
-                {facultyValues.acr || '-'}
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-gray-300">R</span>
-              <button
-                onClick={handleButtonClick}
-                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-              >
-                {facultyValues.r || '-'}
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-gray-300">L</span>
-              <button
-                onClick={handleButtonClick}
-                className="min-w-[60px] rounded-md px-3 py-1.5 text-center text-sm font-medium text-white transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-              >
-                {facultyValues.l || '-'}
-              </button>
-            </div>
-
-            <button
-              onClick={handleButtonClick}
-              className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line
-                  x1="3"
-                  y1="6"
-                  x2="21"
-                  y2="6"
-                />
-                <line
-                  x1="3"
-                  y1="12"
-                  x2="21"
-                  y2="12"
-                />
-                <line
-                  x1="3"
-                  y1="18"
-                  x2="21"
-                  y2="18"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )} */}
+      {/* Expert / Preview interpretation bar */}
       {isPreview && (
         <div
           className={`rounded-lg border ${className}`}
@@ -353,122 +160,38 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
           }}
         >
           <div className="flex items-center gap-4">
-            {/* ACR Section */}
-            <div className="flex-raw relative flex items-center gap-3">
-              <span className="absolute top-[-1rem] bg-[#0B0A0A] px-2 text-xs text-white/80">
-                Expert Interpretation
-              </span>
-              <span className="text-base text-white/80">Breast Density</span>
-              <button
-                onClick={handleButtonClick}
-                className="h-auto rounded-[8px] px-4 py-1 text-center text-base text-white/80 transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
+            {config.displaySegments.map((segment, idx) => (
+              <div
+                key={segment.valueKey}
+                className={`flex items-center gap-3 ${idx === 0 ? 'relative' : ''}`}
               >
-                {facultyValues.acr || '-'}
-              </button>
-            </div>
-
-            {/* R Section */}
-            <div className="flex-raw flex items-center gap-3">
-              <span className="text-base text-gray-300">R</span>
-              <button
-                onClick={handleButtonClick}
-                className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-              >
-                {facultyValues.r || '-'}
-              </button>
-            </div>
-
-            {/* L Section */}
-            <div className="flex-raw flex items-center gap-3">
-              <span className="text-base text-gray-300">L</span>
-              <button
-                onClick={handleButtonClick}
-                className="rounded-md px-4 py-0.5 text-center text-base text-white transition-colors"
-                style={{
-                  backgroundColor: '#232323',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-                onFocus={e => {
-                  e.currentTarget.style.backgroundColor = '#2E2E2E';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.backgroundColor = '#232323';
-                }}
-              >
-                {facultyValues.l || '-'}
-              </button>
-            </div>
-
-            {/* Hamburger Menu Icon */}
-            {/* <button
-            onClick={handleButtonClick}
-            className="ml-auto p-1 text-gray-300 transition-colors hover:text-white"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line
-                x1="3"
-                y1="6"
-                x2="21"
-                y2="6"
-              />
-              <line
-                x1="3"
-                y1="12"
-                x2="21"
-                y2="12"
-              />
-              <line
-                x1="3"
-                y1="18"
-                x2="21"
-                y2="18"
-              />
-            </svg>
-          </button> */}
+                {idx === 0 && (
+                  <span className="absolute top-[-1rem] whitespace-nowrap bg-[#0B0A0A] px-2 text-xs text-white/80">
+                    Expert Interpretation
+                  </span>
+                )}
+                <span className="text-base text-white/80">{segment.label}</span>
+                <button
+                  onClick={handleButtonClick}
+                  className="rounded-md px-4 py-1 text-center text-base text-white/80 transition-colors"
+                  style={{ backgroundColor: '#232323' }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                  onFocus={e => {
+                    e.currentTarget.style.backgroundColor = '#2E2E2E';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.backgroundColor = '#232323';
+                  }}
+                >
+                  {safeFacultyValues[segment.valueKey] || '-'}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -477,7 +200,9 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
         open={showModal}
         onClose={handleClose}
         onSave={handleSave}
-        initialValues={studentValues}
+        initialValues={safeStudentValues}
+        modalitySlug={modalitySlug}
+        subSpecialitySlug={subSpecialitySlug}
       />
     </>
   );
