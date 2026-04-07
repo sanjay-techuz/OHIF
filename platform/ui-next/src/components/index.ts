@@ -121,6 +121,7 @@ import {
 import ViewportDialog from './ViewportDialog';
 export { default as ACRDisplay } from './ACRDisplay';
 export { default as ACRSelectorModal } from './ACRSelectorModal';
+export { getModalityConfig, MODALITY_ACR_CONFIGS } from './ACRSelectorModal';
 export * from './AllInOneMenu';
 export { default as AllInOneMenu } from './AllInOneMenu';
 export * from './ColorCircle';
