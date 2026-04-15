@@ -14,6 +14,7 @@ import {
 import {
   ACRDisplay,
   Button,
+  CaseHistoryModal,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -83,6 +84,7 @@ function ViewerLayout({
   const [studentAcrValues, setStudentAcrValues] = useState(acrConfig.defaultValues);
   const [facultyAcrValues, setFacultyAcrValues] = useState(acrConfig.defaultValues);
   const [currentFormData, setCurrentFormData] = useState<any>(null);
+  const [currentAnnotationIndex, setCurrentAnnotationIndex] = useState<number>(1);
   // ViewType management
   const [currentViewType, setCurrentViewType] = useState<'diagnostic' | 'screening'>('diagnostic');
   const [showRecallModal, setShowRecallModal] = useState(false);
@@ -98,6 +100,8 @@ function ViewerLayout({
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
+  const [caseHistoryText, setCaseHistoryText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
 
   const {
@@ -250,6 +254,15 @@ function ViewerLayout({
       measurementService.EVENTS.SHOW_MEASUREMENT_MODAL,
       async (data: { measurementUid: string }) => {
         setCurrentMeasurementUid(data.measurementUid);
+
+        // Compute 1-based annotation index for the modal title (ROI-1, Lesion-2, etc.)
+        try {
+          const allMeasurements = measurementService.getMeasurements();
+          const idx = allMeasurements.findIndex((m: any) => m.uid === data.measurementUid);
+          setCurrentAnnotationIndex(idx >= 0 ? idx + 1 : allMeasurements.length + 1);
+        } catch {
+          setCurrentAnnotationIndex(1);
+        }
 
         if (userType === 'student') {
           const result = await apiCall(() =>
@@ -580,6 +593,7 @@ function ViewerLayout({
         if (currentCase) {
           setUIState('subSpecialitySlug', currentCase.sub_speciality_slug || null);
           setUIState('modalitySlug', currentCase.modality_slug || null);
+          setCaseHistoryText(currentCase.case_history || '');
         }
 
         console.log('Case list loaded:', cases);
@@ -706,6 +720,7 @@ function ViewerLayout({
           (window as any).__currentCaseTitle = caseData.case_id || '';
           setUIState('subSpecialitySlug', caseData.sub_speciality_slug || null);
           setUIState('modalitySlug', caseData.modality_slug || null);
+          setCaseHistoryText(caseData.case_history || '');
         }
       }
     } catch (error) {
@@ -934,6 +949,7 @@ function ViewerLayout({
               variant="ghost"
               onClick={() => setShowInstructionsModal(true)}
               className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+              title="Instructions"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -950,8 +966,52 @@ function ViewerLayout({
                   strokeLinejoin="round"
                 />
               </svg>
-              <span>Instructions</span>
             </Button>
+
+            {/* Case History Button - Faculty (edit mode) or Student (read-only) */}
+            {((userType === 'faculty' && isAddAnswerClicked) || userType === 'student') && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowCaseHistoryModal(true)}
+                className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+                title="Case History"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="25"
+                  height="25"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <path
+                    d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5C15 6.10457 14.1046 7 13 7H11C9.89543 7 9 6.10457 9 5Z"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M9 12H15"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M9 16H13"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </Button>
+            )}
           </div>
 
           {/* //Center Section - Main Toolbar
@@ -1206,6 +1266,7 @@ function ViewerLayout({
               acr: value,
             }))
           }
+          annotationIndex={currentAnnotationIndex}
         />
       )}
 
@@ -1254,6 +1315,23 @@ function ViewerLayout({
       <InstructionModal
         open={showInstructionsModal}
         onClose={() => setShowInstructionsModal(false)}
+      />
+
+      <CaseHistoryModal
+        open={showCaseHistoryModal}
+        onClose={() => setShowCaseHistoryModal(false)}
+        initialValue={caseHistoryText}
+        onSave={userType === 'student' ? undefined : async (value: string) => {
+          setCaseHistoryText(value);
+          if (caseId) {
+            try {
+              await apiCall(() => apiService.patch(`/admin/cases/${caseId}/case-history`, { case_history: value }));
+            } catch (error) {
+              console.error('Error saving case history:', error);
+            }
+          }
+        }}
+        readOnly={userType === 'student'}
       />
     </div>
   );

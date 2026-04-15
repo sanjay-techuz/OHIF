@@ -133,6 +133,7 @@ export { MeasurementTable } from './MeasurementTable';
 export { default as QuestionAnswerModal } from './QuestionModal';
 export { default as RecallModal } from './RecallModal';
 export { default as InstructionModal } from './InstructionModal';
+export { default as CaseHistoryModal } from './CaseHistoryModal';
 export { default as ViewTypeSelectionModal } from './ViewTypeSelectionModal';
 
 // Segmentation Context Exports
