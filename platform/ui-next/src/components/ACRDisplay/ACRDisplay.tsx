@@ -1,6 +1,6 @@
 // ACRDisplay component
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
-import { apiCall, apiService } from '@ohif/core';
+import { apiCall, apiService, buildFellowshipBody } from '@ohif/core';
 import React, { useMemo, useState } from 'react';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import ACRSelectorModal from '../ACRSelectorModal';
@@ -31,6 +31,9 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     userType,
     facultyId,
     isPreview,
+    isFellowship,
+    programId,
+    phaseId,
   } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
@@ -48,9 +51,10 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
 
   const handleSave = async (newValues: ACRValues) => {
     console.log('ACR values saved:', newValues);
-    const body = {
-      course_id: courseId,
-      module_id: moduleId,
+    const body: Record<string, unknown> = {
+      ...(isFellowship
+        ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+        : { course_id: courseId, module_id: moduleId }),
       case_id: caseId,
       student_id: '',
       result_data: newValues,

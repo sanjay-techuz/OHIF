@@ -3,6 +3,8 @@
 import {
   apiCall,
   apiService,
+  buildFellowshipBody,
+  buildFellowshipQuery,
   decryptObject,
   encrypt,
   encryptObject,
@@ -88,11 +90,18 @@ const Results: React.FC<ResultsProps> = ({
   const [accuracy, setAccuracy] = useState(0);
   const [evaluationType, setEvaluationType] = useState<'rl_based' | 'overall_based'>('rl_based');
 
-  const { courseId, studentId, moduleId, caseId } = getCustomParams();
+  const { courseId, studentId, moduleId, caseId, isFellowship, programId, phaseId } =
+    getCustomParams();
+  // Fellowship cases arrive without `courseId`; substitute `programId` so
+  // the URL path slot doesn't render as literal "undefined". Backend routes
+  // by the `is_fellowship` query flag regardless.
+  const urlCourseId = isFellowship ? programId : courseId;
   useEffect(() => {
     const fetchResults = async () => {
       const result = await apiCall(() =>
-        apiService.get(`/user/cases/evaluation/measurement/${courseId}/${moduleId}/${studentId}`)
+        apiService.get(
+          `/user/cases/evaluation/measurement/${urlCourseId}/${moduleId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+        )
       );
 
       if (result.success) {
@@ -126,7 +135,7 @@ const Results: React.FC<ResultsProps> = ({
                   'screening': 'Screening',
                 };
                 const viewType = viewTypeMap[detail.view_type?.toString().toLowerCase()] || 'Diagnostic';
-                const caseType = detail.case_type === 1 || detail.case_type === '1' ? 'Normal' : 'Abnormal';
+                const caseType = detail.case_type === 2 || detail.case_type === '2' ? 'Abnormal' : 'Normal';
 
                 return {
                   id: detail.case_id,
@@ -170,7 +179,7 @@ const Results: React.FC<ResultsProps> = ({
                   'screening': 'Screening',
                 };
                 const viewType = viewTypeMap[detail.view_type?.toString().toLowerCase()] || 'Screening';
-                const caseType = detail.case_type === 1 || detail.case_type === '1' ? 'Normal' : 'Abnormal';
+                const caseType = detail.case_type === 2 || detail.case_type === '2' ? 'Abnormal' : 'Normal';
 
                 return {
                   id: detail.case_id,
@@ -200,10 +209,11 @@ const Results: React.FC<ResultsProps> = ({
     const fetchMeasurementResults = async () => {
       const body = {
         caseIds: [caseId],
+        ...buildFellowshipBody({ isFellowship, programId, phaseId, moduleId }),
       };
       const result = await apiCall(() =>
         apiService.post(
-          `/user/cases/evaluation/evaluate-multi-series/${courseId}/${moduleId}/${studentId}`,
+          `/user/cases/evaluation/evaluate-multi-series/${urlCourseId}/${moduleId}/${studentId}`,
           body
         )
       );
@@ -217,6 +227,22 @@ const Results: React.FC<ResultsProps> = ({
 
   const handleBackToWorklist = () => {
     navigate('/');
+  };
+
+  /**
+   * Re-Attempt — send the student back into /viewer carrying the EXACT
+   * same encrypted URL params that brought them to /results. No preview
+   * flag, no payload mutation. The viewer already re-hydrates the
+   * student's saved annotations and answers on mount, and the existing
+   * save endpoints upsert on (course|fellowship, module, case, student)
+   * so a fresh Final Submit just overwrites the previous answers.
+   */
+  const handleReAttempt = () => {
+    const currentParams = new URLSearchParams(window.location.search);
+    navigate({
+      pathname: '/viewer',
+      search: currentParams.toString(),
+    });
   };
 
   const themeBg = '#0B0A0A';
@@ -312,22 +338,38 @@ const Results: React.FC<ResultsProps> = ({
           <h2 className="text-center text-[20px] font-medium">Case Results</h2>
           <p className="border-l border-[#6B6C6E] pl-4 text-center text-base font-medium"></p>
         </div>
-        <Button
-          variant="secondary"
-          onClick={handleBackToWorklist}
-          className="h-8 px-3 text-sm font-medium text-white"
-          style={{
-            backgroundColor: 'hsl(var(--highlight))',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
-          }}
-        >
-          Close
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleReAttempt}
+            className="h-8 px-3 text-sm font-medium text-white"
+            style={{ backgroundColor: 'hsl(var(--highlight))' }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+            }}
+          >
+            Re-Attempt
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleBackToWorklist}
+            className="h-8 px-3 text-sm font-medium text-white"
+            style={{
+              backgroundColor: 'hsl(var(--highlight))',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight) / 0.9)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = 'hsl(var(--highlight))';
+            }}
+          >
+            Close
+          </Button>
+        </div>
       </div>
 
       {/* Content */}

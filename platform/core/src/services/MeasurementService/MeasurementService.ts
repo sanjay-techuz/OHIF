@@ -2,7 +2,7 @@ import { annotation } from '@cornerstonejs/tools';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import log from '../../log';
 import guid from '../../utils/guid';
-import { getCustomParams } from '../../utils/urlUtils';
+import { buildFellowshipBody, getCustomParams } from '../../utils/urlUtils';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
 import { apiService } from '../ApiService/ApiService';
 import DisplaySetService from '../DisplaySetService';
@@ -582,8 +582,19 @@ class MeasurementService extends PubSubService {
           source,
           measurement: newMeasurement,
         });
-        const { courseId, caseId, studentId, viewType, moduleId, userType, facultyId, isPreview } =
-          getCustomParams();
+        const {
+          courseId,
+          caseId,
+          studentId,
+          viewType,
+          moduleId,
+          userType,
+          facultyId,
+          isPreview,
+          isFellowship,
+          programId,
+          phaseId,
+        } = getCustomParams();
         const annotationData = annotation.state.getAnnotation(internalUID);
         if (annotationData) {
           // Set colors based on userType: student = light blue, faculty = light green
@@ -606,9 +617,10 @@ class MeasurementService extends PubSubService {
             measurement: newMeasurement,
           });
 
-          const body = {
-            course_id: courseId,
-            module_id: moduleId,
+          const body: Record<string, unknown> = {
+            ...(isFellowship
+              ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+              : { course_id: courseId, module_id: moduleId }),
             case_id: caseId,
             view_type: viewType,
             study_instance_uid: newMeasurement.referenceStudyUID,

@@ -182,12 +182,12 @@ const DefaultFallback = ({
       onOpenChange={setShowDetails}
     >
       <DialogContent
-        className="bg-muted max-w-3xl overflow-hidden border-0 p-0"
+        className="bg-muted max-w-3xl overflow-hidden rounded-xl border-0 p-0 shadow-2xl"
         onInteractOutside={e => e.preventDefault()}
       >
-        <div className="p-5 pb-4">
+        <div className="px-6 pt-5 pb-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-highlight text-xl font-normal">
+            <h2 className="text-highlight pr-8 text-lg font-medium leading-snug">
               {errorTitle || error.message || title}
             </h2>
           </div>
@@ -196,20 +196,20 @@ const DefaultFallback = ({
         {/* Code block */}
         {code && (
           <>
-            <ScrollArea className="bg-background text-foreground mx-6 h-[321px] rounded-b-md">
+            <ScrollArea className="bg-background text-foreground mx-6 h-[321px] overflow-hidden rounded-md">
               <div className="bg-background border-input flex items-center justify-between rounded-t-md border-b px-4 py-2">
-                <div className="text-muted-foreground text-base">
+                <div className="text-muted-foreground text-sm">
                   {firstFilename || 'Error Stack'}
                 </div>
                 <Button
-                  className="w-20"
+                  className="h-8 w-20"
                   onClick={copyErrorToClipboard}
                   title={t('Copy error')}
                 >
                   Copy
                 </Button>
               </div>
-              <div className="p-4 font-mono text-sm">
+              <div className="p-4 font-mono text-xs leading-relaxed">
                 {code.split('\n').map((line, index) => (
                   <div
                     key={index}
@@ -224,7 +224,7 @@ const DefaultFallback = ({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-end p-6 pt-2">
+        <div className="flex items-center justify-end px-6 pt-2 pb-5">
           <Button
             variant="link"
             className="text-primary p-0"
