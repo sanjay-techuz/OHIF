@@ -4,6 +4,8 @@ import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
   apiCall,
   apiService,
+  buildFellowshipBody,
+  buildFellowshipQuery,
   decryptObject,
   encrypt,
   encryptObject,
@@ -114,7 +116,16 @@ function ViewerLayout({
     facultyId,
     StudyInstanceUIDs,
     isPreview,
+    isFellowship,
+    programId,
+    phaseId,
   } = useCustomParams();
+  // Fellowship cases come to OHIF with `programId` instead of `courseId`.
+  // Existing backend endpoints expect a value in the `:courseId` URL slot;
+  // when fellowship, the backend routes by the `is_fellowship` query flag
+  // so this positional value is a pass-through but must NOT be `undefined`
+  // (which would render literally in the URL path).
+  const urlCourseId = isFellowship ? programId : courseId;
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const { setUIState } = useUIStateStore();
   const navigate = useNavigate();
@@ -324,7 +335,7 @@ function ViewerLayout({
       if (isPreview) {
         const result = await apiCall(() =>
           apiService.get(
-            `/user/cases/evaluation/preview-measurements/${courseId}/${moduleId}/${caseId}/${studentId}`
+            `/user/cases/evaluation/preview-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
           )
         );
         if (result.success) {
@@ -385,7 +396,7 @@ function ViewerLayout({
         if (userType === 'student') {
           const result = await apiCall(() =>
             apiService.get(
-              `/user/cases/annotation-measurements/${courseId}/${moduleId}/${caseId}/${studentId}`
+              `/user/cases/annotation-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
             )
           );
           if (result.success) {
@@ -511,7 +522,9 @@ function ViewerLayout({
     const getAcrValues = async () => {
       if (userType === 'student' || isPreview) {
         const result = await apiCall(() =>
-          apiService.get(`/user/cases/acr-values/${courseId}/${moduleId}/${caseId}/${studentId}`)
+          apiService.get(
+            `/user/cases/acr-values/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+          )
         );
         if (
           result.success &&
@@ -563,7 +576,12 @@ function ViewerLayout({
 
   // Fetch case list for navigation
   const fetchCaseList = async () => {
-    if (!courseId || !moduleId) {
+    // Fellowship cases arrive without a `courseId` (they carry `programId`
+    // instead), so gating on `courseId` alone would skip the fetch and
+    // suppress the case-navigation panel. `moduleId` is all we need —
+    // /user/cases/cases/:moduleId serves both course types (backend branches
+    // on the `is_fellowship` query flag).
+    if (!moduleId || (!courseId && !isFellowship)) {
       return;
     }
 
@@ -571,7 +589,11 @@ function ViewerLayout({
     setCaseListError(null);
 
     try {
-      const result = await apiCall(() => apiService.get(`/user/cases/cases/${moduleId}`));
+      const result = await apiCall(() =>
+        apiService.get(
+          `/user/cases/cases/${moduleId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+        )
+      );
       console.log('result--------------', result);
       if (result.success) {
         const cases = result.data.data.cases || [];
@@ -735,7 +757,7 @@ function ViewerLayout({
     } else if (userType === 'faculty') {
       fetchFacultyCaseDetails();
     }
-  }, [courseId, moduleId, caseId, userType]);
+  }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
 
@@ -765,10 +787,15 @@ function ViewerLayout({
 
   const handleFinalSubmit = async () => {
     try {
-      // Call the API first
-      const body = {
-        module_id: moduleId,
+      // Call the API first. For fellowship cases we add program/phase
+      // context and fellowship_curriculum_module_id so the backend writes
+      // to the fellowship-scoped row in case_result_module_attempt instead
+      // of the flat-course shape.
+      const body: Record<string, unknown> = {
         student_id: studentId,
+        ...(isFellowship
+          ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+          : { module_id: moduleId }),
       };
 
       const result = await apiCall(() =>
@@ -1138,26 +1165,17 @@ function ViewerLayout({
                 }}
                 onClick={() => {
                   if (isPreview) {
-                    // Get current URL parameters
                     const currentParams = new URLSearchParams(window.location.search).toString();
-
-                    // Navigate to results page with same query params
                     navigate({
                       pathname: '/results',
                       search: currentParams,
                     });
-                  } else {
-                    // Validate ACR form before submitting
-                    if (validateACRForm(studentAcrValues)) {
-                      // Get current URL parameters
-                      const currentParams = new URLSearchParams(window.location.search).toString();
-
-                      // Navigate to results page with same query params
-                      navigate({
-                        pathname: '/results',
-                        search: currentParams,
-                      });
-                    }
+                  } else if (validateACRForm(studentAcrValues)) {
+                    // Happy path: all required ACR fields filled → hit
+                    // /user/cases/final-submit/case-type so the backend
+                    // aggregator persists case_result_module_attempt
+                    // before we navigate to /results.
+                    handleFinalSubmit();
                   }
                 }}
               >

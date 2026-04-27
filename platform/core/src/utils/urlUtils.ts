@@ -12,6 +12,60 @@ export interface CustomParams {
   viewType?: 'diagnostic' | 'screening';
   StudyInstanceUIDs?: string;
   token?: string;
+  // Fellowship context — populated when the encrypted URL has
+  // `isFellowship: true`. Sent to backend to route reads/writes to the
+  // fellowship tables instead of the flat-course ones.
+  isFellowship?: boolean;
+  programId?: string;
+  phaseId?: string;
+}
+
+/**
+ * Build the fellowship context payload to add to a POST body for the
+ * student-side cases endpoints. Returns an empty object for flat courses
+ * so that existing call sites that spread the result stay backwards
+ * compatible. Use `moduleId` from `useCustomParams()` as the fellowship
+ * curriculum module identifier (biedx-react puts that in `moduleId`
+ * when isFellowship=true).
+ */
+export function buildFellowshipBody(
+  params: Pick<CustomParams, 'isFellowship' | 'programId' | 'phaseId' | 'moduleId'>
+): Record<string, unknown> {
+  if (!params.isFellowship) {
+    return {};
+  }
+  return {
+    is_fellowship: true,
+    fellowship_program_id: params.programId,
+    phase_id: params.phaseId,
+    fellowship_curriculum_module_id: params.moduleId,
+  };
+}
+
+/**
+ * Build the fellowship query-string suffix (including the leading `?` if
+ * the URL has no query yet, `&` otherwise) for a GET endpoint. Returns
+ * an empty string for flat courses.
+ */
+export function buildFellowshipQuery(
+  params: Pick<CustomParams, 'isFellowship' | 'programId' | 'phaseId' | 'moduleId'>,
+  urlAlreadyHasQuery = false
+): string {
+  if (!params.isFellowship) {
+    return '';
+  }
+  const qs = new URLSearchParams();
+  qs.set('is_fellowship', 'true');
+  if (params.programId) {
+    qs.set('fellowship_program_id', params.programId);
+  }
+  if (params.phaseId) {
+    qs.set('phase_id', params.phaseId);
+  }
+  if (params.moduleId) {
+    qs.set('fellowship_curriculum_module_id', params.moduleId);
+  }
+  return (urlAlreadyHasQuery ? '&' : '?') + qs.toString();
 }
 
 /**
@@ -53,6 +107,10 @@ export function getCustomParams(): CustomParams {
         isPreview: isPreviewParam === 'true',
         viewType: (decryptedData?.viewType as 'diagnostic' | 'screening') || 'diagnostic',
         token: decryptedData?.token ? `${decryptedData.token}` : undefined,
+        isFellowship:
+          decryptedData?.isFellowship === true || decryptedData?.isFellowship === 'true',
+        programId: decryptedData?.programId ? `${decryptedData.programId}` : undefined,
+        phaseId: decryptedData?.phaseId ? `${decryptedData.phaseId}` : undefined,
       };
     }
   }
@@ -70,6 +128,9 @@ export function getCustomParams(): CustomParams {
     isPreview: isPreviewParam === 'true',
     viewType: 'diagnostic',
     token: undefined,
+    isFellowship: false,
+    programId: undefined,
+    phaseId: undefined,
   };
 }
 
@@ -106,6 +167,10 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
           isPreview: isPreviewParam === 'true',
           viewType: (decryptedData.viewType as 'diagnostic' | 'screening') || 'diagnostic',
           token: decryptedData?.token ? `${decryptedData.token}` : undefined,
+          isFellowship:
+            decryptedData?.isFellowship === true || decryptedData?.isFellowship === 'true',
+          programId: decryptedData?.programId ? `${decryptedData.programId}` : undefined,
+          phaseId: decryptedData?.phaseId ? `${decryptedData.phaseId}` : undefined,
         };
       }
     }
@@ -123,6 +188,9 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
       isPreview: isPreviewParam === 'true',
       viewType: 'diagnostic',
       token: undefined,
+      isFellowship: false,
+      programId: undefined,
+      phaseId: undefined,
     };
   } catch (error) {
     // Invalid URL, return defaults
@@ -138,6 +206,9 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
       isPreview: false,
       viewType: 'diagnostic',
       token: undefined,
+      isFellowship: false,
+      programId: undefined,
+      phaseId: undefined,
     };
   }
 }

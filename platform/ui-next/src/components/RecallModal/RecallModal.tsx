@@ -1,5 +1,5 @@
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
-import { apiService } from '@ohif/core';
+import { apiService, buildFellowshipBody } from '@ohif/core';
 import { Button, Modal } from '@ohif/ui-next';
 import React from 'react';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
@@ -20,8 +20,19 @@ const RecallModal: React.FC<RecallModalProps> = ({
   annotationData,
 }) => {
   const { displaySetService, measurementService } = servicesManager.services;
-  const { courseId, caseId, studentId, viewType, moduleId, userType, facultyId, isPreview } =
-    useCustomParams();
+  const {
+    courseId,
+    caseId,
+    studentId,
+    viewType,
+    moduleId,
+    userType,
+    facultyId,
+    isPreview,
+    isFellowship,
+    programId,
+    phaseId,
+  } = useCustomParams();
 
   const handleRecall = async () => {
     console.log('Recall button clicked - action needed');
@@ -32,9 +43,10 @@ const RecallModal: React.FC<RecallModalProps> = ({
       const displaySetInstanceUID = measurement.displaySetInstanceUID;
       const displaySet = displaySetService.getDisplaySetByUID(displaySetInstanceUID);
 
-      const body = {
-        course_id: courseId,
-        module_id: moduleId,
+      const body: Record<string, unknown> = {
+        ...(isFellowship
+          ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+          : { course_id: courseId, module_id: moduleId }),
         case_id: caseId,
         view_type: viewType,
         study_instance_uid: measurement.referenceStudyUID,

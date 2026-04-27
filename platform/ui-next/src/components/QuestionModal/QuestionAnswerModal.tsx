@@ -6,7 +6,7 @@
  */
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
-import { apiCall, apiService } from '@ohif/core';
+import { apiCall, apiService, buildFellowshipBody } from '@ohif/core';
 import {
   Button,
   Modal,
@@ -293,8 +293,18 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
   annotationIndex,
 }) => {
   const { measurementService } = servicesManager.services;
-  const { courseId, moduleId, caseId, studentId, userType, facultyId, isPreview } =
-    useCustomParams();
+  const {
+    courseId,
+    moduleId,
+    caseId,
+    studentId,
+    userType,
+    facultyId,
+    isPreview,
+    isFellowship,
+    programId,
+    phaseId,
+  } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
   const subSpecialitySlug = useUIStateStore(
@@ -370,8 +380,9 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
     const studyInstanceUID = measurement?.referenceStudyUID;
 
     const body: Record<string, unknown> = {
-      course_id: courseId,
-      module_id: moduleId,
+      ...(isFellowship
+        ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+        : { course_id: courseId, module_id: moduleId }),
       case_id: caseId,
       study_instance_uid: studyInstanceUID,
       form_data: form,
