@@ -5,9 +5,7 @@ import {
   apiService,
   buildFellowshipBody,
   buildFellowshipQuery,
-  decryptObject,
   encrypt,
-  encryptObject,
   getCustomParams,
 } from '@ohif/core';
 import { Button } from '@ohif/ui-next';
@@ -230,15 +228,19 @@ const Results: React.FC<ResultsProps> = ({
   };
 
   /**
-   * Re-Attempt — send the student back into /viewer carrying the EXACT
-   * same encrypted URL params that brought them to /results. No preview
-   * flag, no payload mutation. The viewer already re-hydrates the
-   * student's saved annotations and answers on mount, and the existing
-   * save endpoints upsert on (course|fellowship, module, case, student)
-   * so a fresh Final Submit just overwrites the previous answers.
+   * Re-Attempt — send the student back into /viewer for a fresh attempt.
+   *
+   * Strip per-navigation overrides that may have leaked into the URL from a
+   * preview detour (Results → preview a case → Close): `isPreview`, `caseId`,
+   * `viewType`. Without this strip, Re-Attempt would inherit `isPreview=true`
+   * and reopen the viewer in read-only preview mode (the bug). Auth
+   * (`t=vt_xxx`) and the original `StudyInstanceUIDs` stay intact.
    */
   const handleReAttempt = () => {
     const currentParams = new URLSearchParams(window.location.search);
+    currentParams.delete('isPreview');
+    currentParams.delete('caseId');
+    currentParams.delete('viewType');
     navigate({
       pathname: '/viewer',
       search: currentParams.toString(),
@@ -308,17 +310,16 @@ const Results: React.FC<ResultsProps> = ({
 
   /** Navigate to case viewer in preview mode */
   const navigateToCase = (row: any) => {
+    // Auth (JWT, courseId, moduleId, studentId, ...) is already in the
+    // cached token payload from when /results was opened. Only the per-case
+    // identifiers change, so we just update plain URL params and let
+    // getCustomParams() merge them over the cached payload.
     const currentParams = new URLSearchParams(window.location.search);
-    const encryptedData = currentParams.get('data');
-    const decryptedData = decryptObject(encryptedData);
-    const data = {
-      ...decryptedData,
-      caseId: row.id,
-    };
-    currentParams.set('data', encryptObject(data));
     const encryptedUid = encrypt(row.study_instance_uid || '');
     currentParams.set('StudyInstanceUIDs', encryptedUid);
+    currentParams.set('caseId', String(row.id));
     currentParams.set('isPreview', 'true');
+    currentParams.delete('data');
     navigate({
       pathname: '/viewer',
       search: currentParams.toString(),

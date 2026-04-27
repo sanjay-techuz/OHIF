@@ -6,9 +6,7 @@ import {
   apiService,
   buildFellowshipBody,
   buildFellowshipQuery,
-  decryptObject,
   encrypt,
-  encryptObject,
   HangingProtocolService,
   HTTP_STATUS,
   Types,
@@ -641,24 +639,18 @@ function ViewerLayout({
     if (!targetCase) {
       return;
     }
-    console.log('targetCase--------------', targetCase);
 
-    // Update URL parameters to trigger OHIF reload
-    const currentParams = new URLSearchParams(window.location.search);
+    // Per-case fields move via plain URL params; auth + course/module/student
+    // context stays in the cached token payload (re-redeemed on the reload
+    // because PrivateRoute sees ?t= in the URL).
     const currentUrl = new URL(window.location.href);
-    const encryptedData = currentParams.get('data');
-    const decryptedData = decryptObject(encryptedData);
-    const data = {
-      ...decryptedData,
-      caseId: targetCase.case_id,
-      viewType: targetCase.view_type === '1' ? 'diagnostic' : 'screening',
-    };
     const encryptedUid = encrypt(targetCase.study_instance_uid || '');
-    currentUrl.searchParams.set('data', encryptObject(data));
     currentUrl.searchParams.set('StudyInstanceUIDs', encryptedUid);
+    currentUrl.searchParams.set('caseId', String(targetCase.case_id));
+    currentUrl.searchParams.set('viewType', targetCase.view_type === '1' ? 'diagnostic' : 'screening');
+    currentUrl.searchParams.delete('data');
 
-    console.log('currentUrl--------------', currentUrl.toString());
-    // Navigate to new URL (this will trigger OHIF to reload all data)
+    // Full reload re-initialises OHIF state for the next case.
     window.location.replace(currentUrl.toString());
   };
 
@@ -1165,11 +1157,22 @@ function ViewerLayout({
                 }}
                 onClick={() => {
                   if (isPreview) {
-                    const currentParams = new URLSearchParams(window.location.search).toString();
-                    navigate({
-                      pathname: '/results',
-                      search: currentParams,
-                    });
+                    // Close preview → restore the original /results URL the
+                    // user came from (browser-history pop). This avoids
+                    // leaking preview-only params (isPreview, caseId,
+                    // viewType, preview StudyInstanceUIDs) onto /results.
+                    // Fallback for the rare deep-link case where there's no
+                    // history entry: go to /results with preview overrides
+                    // explicitly stripped.
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      const stripped = new URLSearchParams(window.location.search);
+                      stripped.delete('isPreview');
+                      stripped.delete('caseId');
+                      stripped.delete('viewType');
+                      navigate({ pathname: '/results', search: stripped.toString() });
+                    }
                   } else if (validateACRForm(studentAcrValues)) {
                     // Happy path: all required ACR fields filled → hit
                     // /user/cases/final-submit/case-type so the backend
