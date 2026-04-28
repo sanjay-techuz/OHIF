@@ -3,7 +3,7 @@ import {
   getViewerTokenFromSearch,
   resolveViewerTokenIfPresent,
 } from '@ohif/core';
-import { useUserAuthentication } from '@ohif/ui-next';
+import { LoadingIndicatorProgress, useUserAuthentication } from '@ohif/ui-next';
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 
@@ -60,17 +60,8 @@ export const PrivateRoute = ({ children, handleUnauthenticated }) => {
     if (tokenInUrl && !hasDataParam) {
       if (tokenStatus === 'resolving' || tokenStatus === 'idle') {
         return (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '100vh',
-              color: '#fff',
-              background: '#000',
-            }}
-          >
-            Loading viewer…
+          <div className="relative h-screen w-screen bg-black">
+            <LoadingIndicatorProgress className="h-full w-full" />
           </div>
         );
       }
