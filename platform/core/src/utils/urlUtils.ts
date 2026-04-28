@@ -1,5 +1,43 @@
 import { apiService } from '../services/ApiService';
 import { decryptObject, decryptUrlParam } from './cryptoUtils';
+import { getTokenPayloadCache } from './viewerTokenResolver';
+
+function buildParamsFromPayload(
+  payload: Record<string, unknown>,
+  StudyInstanceUIDs: string | null,
+  isPreviewParam: string | null,
+  searchParams?: URLSearchParams
+): CustomParams {
+  // Allow per-navigation URL overrides for fields that change as the user
+  // moves between cases inside OHIF (Results → preview, viewer prev/next).
+  // Auth (token, IDs, courseId, ...) stays in the cached token payload; only
+  // the differing identifiers come through plain URL params — no need to
+  // re-encrypt anything during in-app navigation.
+  const urlCaseId = searchParams?.get('caseId') || undefined;
+  const urlViewTypeRaw = searchParams?.get('viewType') || undefined;
+  const urlViewType =
+    urlViewTypeRaw === 'diagnostic' || urlViewTypeRaw === 'screening'
+      ? (urlViewTypeRaw as 'diagnostic' | 'screening')
+      : undefined;
+
+  apiService.setAuthToken(payload?.token as string);
+  return {
+    courseId: payload?.courseId ? `${payload.courseId}` : undefined,
+    moduleId: payload?.moduleId ? `${payload.moduleId}` : undefined,
+    facultyId: payload?.facultyId ? `${payload.facultyId}` : undefined,
+    studentId: payload?.studentId ? `${payload.studentId}` : undefined,
+    caseId: urlCaseId || (payload?.caseId ? `${payload.caseId}` : undefined),
+    StudyInstanceUIDs: StudyInstanceUIDs || undefined,
+    userType: (payload?.userType as string) || 'student',
+    isPreview:
+      isPreviewParam === 'true' || payload?.isPreview === true || payload?.isPreview === 'true',
+    viewType: urlViewType || (payload?.viewType as 'diagnostic' | 'screening') || 'diagnostic',
+    token: payload?.token ? `${payload.token}` : undefined,
+    isFellowship: payload?.isFellowship === true || payload?.isFellowship === 'true',
+    programId: payload?.programId ? `${payload.programId}` : undefined,
+    phaseId: payload?.phaseId ? `${payload.phaseId}` : undefined,
+  };
+}
 
 export interface CustomParams {
   courseId?: string;
@@ -87,31 +125,24 @@ export function getCustomParams(): CustomParams {
   const isPreviewParam = decryptUrlParam(searchParams.get('isPreview'));
   const StudyInstanceUIDs = decryptUrlParam(searchParams.get('StudyInstanceUIDs'));
 
-  // First, try to get encrypted 'data' parameter
+  // Preferred path: token-resolver populated the cache from `?t=...`
+  const tokenPayload = getTokenPayloadCache();
+  if (tokenPayload) {
+    return buildParamsFromPayload(tokenPayload, StudyInstanceUIDs, isPreviewParam, searchParams);
+  }
+
+  // Backward-compat path: encrypted 'data' parameter
   const encryptedData = searchParams.get('data');
   if (encryptedData) {
     const decryptedData = decryptObject(encryptedData);
 
     if (decryptedData && typeof decryptedData === 'object') {
-      apiService.setAuthToken(decryptedData?.token as string);
-
-      // Extract values from decrypted object
-      return {
-        courseId: decryptedData?.courseId ? `${decryptedData.courseId}` : undefined,
-        moduleId: decryptedData?.moduleId ? `${decryptedData.moduleId}` : undefined,
-        facultyId: decryptedData?.facultyId ? `${decryptedData.facultyId}` : undefined,
-        studentId: decryptedData?.studentId ? `${decryptedData.studentId}` : undefined,
-        caseId: decryptedData?.caseId ? `${decryptedData.caseId}` : undefined,
-        StudyInstanceUIDs: StudyInstanceUIDs || undefined,
-        userType: (decryptedData?.userType as string) || 'student',
-        isPreview: isPreviewParam === 'true',
-        viewType: (decryptedData?.viewType as 'diagnostic' | 'screening') || 'diagnostic',
-        token: decryptedData?.token ? `${decryptedData.token}` : undefined,
-        isFellowship:
-          decryptedData?.isFellowship === true || decryptedData?.isFellowship === 'true',
-        programId: decryptedData?.programId ? `${decryptedData.programId}` : undefined,
-        phaseId: decryptedData?.phaseId ? `${decryptedData.phaseId}` : undefined,
-      };
+      return buildParamsFromPayload(
+        decryptedData as Record<string, unknown>,
+        StudyInstanceUIDs,
+        isPreviewParam,
+        searchParams
+      );
     }
   }
 
@@ -147,31 +178,24 @@ export function getCustomParamsFromUrl(url: string): CustomParams {
     const isPreviewParam = decryptUrlParam(searchParams.get('isPreview'));
     const StudyInstanceUIDs = decryptUrlParam(searchParams.get('StudyInstanceUIDs'));
 
-    // First, try to get encrypted 'data' parameter
+    // Preferred path: token-resolver cache (populated when ?t=... was redeemed)
+    const tokenPayload = getTokenPayloadCache();
+    if (tokenPayload) {
+      return buildParamsFromPayload(tokenPayload, StudyInstanceUIDs, isPreviewParam, searchParams);
+    }
+
+    // Backward-compat path: encrypted 'data' parameter
     const encryptedData = searchParams.get('data');
     if (encryptedData) {
       const decryptedData = decryptObject(encryptedData);
 
       if (decryptedData && typeof decryptedData === 'object') {
-        apiService.setAuthToken(decryptedData?.token as string);
-
-        // Extract values from decrypted object
-        return {
-          courseId: decryptedData?.courseId ? `${decryptedData.courseId}` : undefined,
-          moduleId: decryptedData?.moduleId ? `${decryptedData.moduleId}` : undefined,
-          facultyId: decryptedData?.facultyId ? `${decryptedData.facultyId}` : undefined,
-          studentId: decryptedData?.studentId ? `${decryptedData.studentId}` : undefined,
-          caseId: decryptedData?.caseId ? `${decryptedData.caseId}` : undefined,
-          StudyInstanceUIDs: StudyInstanceUIDs || undefined,
-          userType: (decryptedData.userType as string) || 'student',
-          isPreview: isPreviewParam === 'true',
-          viewType: (decryptedData.viewType as 'diagnostic' | 'screening') || 'diagnostic',
-          token: decryptedData?.token ? `${decryptedData.token}` : undefined,
-          isFellowship:
-            decryptedData?.isFellowship === true || decryptedData?.isFellowship === 'true',
-          programId: decryptedData?.programId ? `${decryptedData.programId}` : undefined,
-          phaseId: decryptedData?.phaseId ? `${decryptedData.phaseId}` : undefined,
-        };
+        return buildParamsFromPayload(
+          decryptedData as Record<string, unknown>,
+          StudyInstanceUIDs,
+          isPreviewParam,
+          searchParams
+        );
       }
     }
 

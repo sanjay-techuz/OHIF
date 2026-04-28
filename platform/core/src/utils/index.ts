@@ -129,5 +129,6 @@ export {
 export * from './apiUtils';
 export * from './cryptoUtils';
 export * from './urlUtils';
+export * from './viewerTokenResolver';
 
 export default utils;
