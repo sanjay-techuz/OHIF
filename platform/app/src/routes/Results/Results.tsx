@@ -3,7 +3,6 @@
 import {
   apiCall,
   apiService,
-  buildFellowshipBody,
   buildFellowshipQuery,
   encrypt,
   getCustomParams,
@@ -88,7 +87,7 @@ const Results: React.FC<ResultsProps> = ({
   const [accuracy, setAccuracy] = useState(0);
   const [evaluationType, setEvaluationType] = useState<'rl_based' | 'overall_based'>('rl_based');
 
-  const { courseId, studentId, moduleId, caseId, isFellowship, programId, phaseId } =
+  const { courseId, studentId, moduleId, isFellowship, programId, phaseId } =
     getCustomParams();
   // Fellowship cases arrive without `courseId`; substitute `programId` so
   // the URL path slot doesn't render as literal "undefined". Backend routes
@@ -204,23 +203,7 @@ const Results: React.FC<ResultsProps> = ({
       }
     };
 
-    const fetchMeasurementResults = async () => {
-      const body = {
-        caseIds: [caseId],
-        ...buildFellowshipBody({ isFellowship, programId, phaseId, moduleId }),
-      };
-      const result = await apiCall(() =>
-        apiService.post(
-          `/user/cases/evaluation/evaluate-multi-series/${urlCourseId}/${moduleId}/${studentId}`,
-          body
-        )
-      );
-      if (!result.success) {
-        console.error('Failed to fetch measurement results:', (result as any).error);
-      }
-    };
     fetchResults();
-    fetchMeasurementResults();
   }, [servicesManager, extensionManager, commandsManager]);
 
   const handleBackToWorklist = () => {
