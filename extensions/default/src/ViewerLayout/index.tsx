@@ -20,9 +20,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   getModalityConfig,
+  getQuestionModalConfig,
   IconPresentationProvider,
   Icons,
   InstructionModal,
+  LexaReportingPanel,
   Onboarding,
   QuestionAnswerModal,
   RecallModal,
@@ -58,7 +60,7 @@ function ViewerLayout({
 }: withAppTypes): React.FunctionComponent {
   const [appConfig] = useAppConfig();
 
-  const { panelService, hangingProtocolService, customizationService } = servicesManager.services;
+  const { panelService, hangingProtocolService, customizationService, displaySetService } = servicesManager.services;
   // Use the app config flag as originally intended; do not force a loader on.
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(appConfig.showLoadingIndicator);
 
@@ -103,6 +105,18 @@ function ViewerLayout({
   const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
   const [caseHistoryText, setCaseHistoryText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
+
+  // Lexa AI reporting panel — single panel, two modes ('generate' | 'correct').
+  const [lexaPanelMode, setLexaPanelMode] = useState<'generate' | 'correct' | null>(null);
+  // ROI form data (one entry per annotation) for the current student/case —
+  // captured from the same /annotation-measurements GET we already make on
+  // mount, so the Lexa panel can compose Key Findings from real ROI answers.
+  const [roiFormDataList, setRoiFormDataList] = useState<Array<Record<string, unknown> | null>>([]);
+  // Patient demographics from DICOM metadata for Lexa "patient" payload.
+  const [patientInfo, setPatientInfo] = useState<{ age: string; sex: string }>({
+    age: '',
+    sex: '',
+  });
 
   const {
     courseId,
@@ -237,6 +251,36 @@ function ViewerLayout({
     };
   };
 
+  // Capture PatientAge / PatientSex from the first display-set as soon as
+  // it loads. Used by the Lexa panel to pre-fill the patient block.
+  // PatientAge comes through DICOM as e.g. "045Y"; we strip non-digits so
+  // the number lands cleanly in the Age input.
+  useEffect(() => {
+    const computePatientInfo = () => {
+      const displaySets = displaySetService?.getActiveDisplaySets?.();
+      if (!displaySets || displaySets.length === 0) return;
+      const instance = displaySets[0]?.instances?.[0] || (displaySets[0] as any)?.instance;
+      if (!instance) return;
+      const rawAge = instance.PatientAge as string | undefined;
+      const ageDigits = rawAge ? String(rawAge).replace(/[^0-9]/g, '') : '';
+      let sex = '';
+      if (instance.PatientSex === 'M') sex = 'Male';
+      else if (instance.PatientSex === 'F') sex = 'Female';
+      else if (instance.PatientSex === 'O') sex = 'Other';
+      else sex = instance.PatientSex || '';
+      setPatientInfo({ age: ageDigits, sex });
+    };
+
+    // Run once in case display sets are already loaded by the time we mount.
+    computePatientInfo();
+
+    const subscription = displaySetService?.subscribe?.(
+      displaySetService.EVENTS.DISPLAY_SETS_ADDED,
+      computePatientInfo
+    );
+    return () => subscription?.unsubscribe?.();
+  }, [displaySetService]);
+
   useEffect(() => {
     const { unsubscribe } = panelService.subscribe(
       panelService.EVENTS.PANELS_CHANGED,
@@ -339,6 +383,9 @@ function ViewerLayout({
         if (result.success) {
           const { data } = result.data as any;
           console.log('data--------------', data);
+          if (Array.isArray(data)) {
+            setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+          }
           if (data && data.length > 0) {
             data.forEach(item => {
               const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -400,6 +447,13 @@ function ViewerLayout({
           if (result.success) {
             const { data } = result.data as any;
             console.log('data--------------', data);
+            // Capture per-ROI form_data for the Lexa panel's Key Findings.
+            // Order here is the order the backend returned (= submission
+            // order), which matches OHIF's measurement list, so ROI-1 / ROI-2
+            // labels stay consistent with the rest of the UI.
+            if (Array.isArray(data)) {
+              setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+            }
             if (data && data.length > 0) {
               data.forEach(item => {
                 const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -460,6 +514,9 @@ function ViewerLayout({
             if (result.success) {
               const { data } = result.data as any;
               console.log('data--------------', data);
+              if (Array.isArray(data)) {
+                setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+              }
               if (data && data.length > 0) {
                 data.forEach(item => {
                   const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -752,6 +809,142 @@ function ViewerLayout({
   }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
+
+  // Auto-compose key findings for the Lexa form from current OHIF state.
+  // Goal: feed Gemini natural-language prose (not key=value debug dumps) that
+  // a radiologist would actually write, including each ROI's full BI-RADS
+  // form. The user can still edit before submitting.
+  const lexaKeyFindings = useMemo(() => {
+    const humanizeKey = (k: string): string =>
+      k
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/^./, c => c.toUpperCase())
+        .trim();
+    const acrLabelMap: Record<string, string> = {
+      acr: 'Breast density',
+      bpe: 'BPE',
+      r: 'Right BI-RADS',
+      l: 'Left BI-RADS',
+      overall_birads: 'Overall BI-RADS',
+    };
+
+    const lines: string[] = [];
+
+    // Opening sentence — view type + modality.
+    const isScreening = currentViewType === 'screening';
+    const study = `${isScreening ? 'Screening' : 'Diagnostic'} study${
+      modalitySlug ? ` performed on ${modalitySlug}` : ''
+    }.`;
+    lines.push(study);
+
+    // ACR / BI-RADS summary as a single sentence with friendly labels.
+    const acrParts: string[] = [];
+    Object.entries(studentAcrValues || {}).forEach(([k, v]) => {
+      if (v === undefined || v === null || String(v).trim() === '') return;
+      const label = acrLabelMap[k] || humanizeKey(k);
+      acrParts.push(`${label}: ${v}`);
+    });
+    if (acrParts.length) {
+      lines.push(`Overall assessment — ${acrParts.join('; ')}.`);
+    }
+
+    if (caseHistoryText && caseHistoryText.trim()) {
+      lines.push('');
+      lines.push(`Clinical history: ${caseHistoryText.trim()}`);
+    }
+
+    // Per-marker findings — one labeled paragraph each. The marker label
+    // (e.g. "ROI" vs "Lesion") is sourced from the SAME question-modal
+    // config the student saw when filling the form, so terminology stays
+    // consistent end-to-end and any future modality just needs its own
+    // titlePrefix in questionModalConfigs.ts — no changes here. Empty
+    // form_data entries (annotation drawn but no BI-RADS form filled yet)
+    // are shown as "no findings recorded" rather than skipped, so Gemini
+    // knows a marker exists at that position.
+    const markerSingular = (() => {
+      try {
+        const cfg = getQuestionModalConfig(subSpecialitySlug, modalitySlug);
+        return cfg?.titlePrefix || 'ROI';
+      } catch {
+        return 'ROI';
+      }
+    })();
+    const markerHeadingNoun = markerSingular === 'ROI' ? 'Region of interest' : markerSingular;
+    const markerHeading = `${markerHeadingNoun} findings`;
+
+    const validRois = (roiFormDataList || []).filter(Boolean);
+    if (validRois.length > 0) {
+      lines.push('');
+      lines.push(`${markerHeading} (${validRois.length} ${markerSingular.toLowerCase()}${validRois.length > 1 ? 's' : ''}):`);
+      validRois.forEach((form, idx) => {
+        const markerLabel = `${markerSingular}-${idx + 1}`;
+        if (!form || Object.keys(form).length === 0) {
+          lines.push(`${markerLabel}: no findings recorded.`);
+          return;
+        }
+        const parts = Object.entries(form)
+          .filter(
+            ([k, v]) =>
+              v !== '' && v !== null && v !== undefined && k !== 'id' && k !== 'remarks',
+          )
+          .map(([k, v]) => `${humanizeKey(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
+        const remarks = (form as any).remarks;
+        if (parts.length === 0 && !remarks) {
+          lines.push(`${markerLabel}: no findings recorded.`);
+        } else {
+          lines.push(`${markerLabel} — ${parts.join('; ')}.${remarks ? ` Remarks: ${remarks}.` : ''}`);
+        }
+      });
+    }
+
+    return lines.join('\n');
+  }, [currentViewType, modalitySlug, subSpecialitySlug, studentAcrValues, caseHistoryText, roiFormDataList]);
+
+  // The initial /annotation-measurements GET runs once at mount, so any
+  // annotation drawn + form filled in THIS session never lands in
+  // roiFormDataList — Lexa's Key Findings would then look empty. Refetch
+  // on every Lexa-panel open so the form data list reflects everything
+  // the student has saved up to "now". One small GET; cheap.
+  useEffect(() => {
+    if (lexaPanelMode === null) return;
+    if (!caseId || !moduleId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = isPreview
+          ? `/user/cases/evaluation/preview-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+          : userType === 'student'
+            ? `/user/cases/annotation-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+            : `/admin/cases/annotation-measurements/${caseId}/${facultyId}`;
+        const result = await apiCall(() => apiService.get(url));
+        if (cancelled || !result.success) return;
+        const { data } = result.data as any;
+        if (Array.isArray(data)) {
+          setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+        }
+      } catch (err) {
+        console.error('Lexa: failed to refresh ROI form data list', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lexaPanelMode, caseId, moduleId, urlCourseId, studentId, facultyId, userType, isPreview, isFellowship, programId, phaseId]);
+
+  const lexaDefaultScenario = currentViewType === 'screening' ? 'Routine Screening' : 'Diagnostic Evaluation';
+
+  // Resolve the human-friendly case label. Student path uses caseList from
+  // the module fetch (case_title); faculty path uses the window-stashed
+  // value set in fetchFacultyCaseDetails. Falls back to caseId so the field
+  // is never empty.
+  const lexaCaseName = useMemo(() => {
+    const fromList = caseList[currentCaseIndex]?.case_title;
+    if (fromList) return String(fromList);
+    const fromWindow = (window as any).__currentCaseTitle;
+    if (fromWindow) return String(fromWindow);
+    return caseId ? `Case ${caseId}` : '';
+  }, [caseList, currentCaseIndex, caseId]);
 
   const handleSubmitAnswer = async () => {
     const body = {
@@ -1060,6 +1253,58 @@ function ViewerLayout({
 
           {/* Right Section */}
           <div className="flex items-center gap-4">
+            {/* Lexa AI compound pill — Generate + Correct in one bordered
+                container, separated by a vertical divider. Icon-only (no
+                labels) to match the compact controls grouped on this side
+                of the toolbar. */}
+            <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
+              <button
+                type="button"
+                onClick={() => setLexaPanelMode('generate')}
+                className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                title="Generate Report (Lexa AI)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="25"
+                  height="25"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <path
+                    d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 13h6M9 17h6M9 9h2"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <span className="h-6 w-px bg-[#4F4F4F]" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => setLexaPanelMode('correct')}
+                className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                title="Correct Report (Lexa AI)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="25"
+                  height="25"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <path
+                    d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 14l2 2 4-4"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+
             {/* Case Navigation Buttons */}
             {caseList.length > 1 && (
               <div className="flex items-center gap-2">
@@ -1353,6 +1598,19 @@ function ViewerLayout({
           }
         }}
         readOnly={userType === 'student'}
+      />
+
+      <LexaReportingPanel
+        open={lexaPanelMode !== null}
+        mode={lexaPanelMode || 'generate'}
+        onClose={() => setLexaPanelMode(null)}
+        userType={userType as string}
+        modalitySlug={modalitySlug}
+        defaultKeyFindings={lexaKeyFindings}
+        defaultScenario={lexaDefaultScenario}
+        defaultCaseName={lexaCaseName}
+        defaultPatientAge={patientInfo.age}
+        defaultPatientSex={patientInfo.sex}
       />
     </div>
   );

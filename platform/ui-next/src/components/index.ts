@@ -130,10 +130,21 @@ export { default as InvestigationalUseDialog } from './InvestigationalUseDialog'
 export { default as LabellingFlow } from './Labelling';
 export { default as LineChart } from './LineChart';
 export { MeasurementTable } from './MeasurementTable';
-export { default as QuestionAnswerModal } from './QuestionModal';
+export {
+  default as QuestionAnswerModal,
+  getQuestionModalConfig,
+  getBiradsChipColor,
+  normalizeFormData,
+} from './QuestionModal';
+export type {
+  QuestionFieldConfig,
+  QuestionFieldType,
+  QuestionModalityConfig,
+} from './QuestionModal';
 export { default as RecallModal } from './RecallModal';
 export { default as InstructionModal } from './InstructionModal';
 export { default as CaseHistoryModal } from './CaseHistoryModal';
+export { default as LexaReportingPanel } from './LexaReportingPanel';
 export { default as ViewTypeSelectionModal } from './ViewTypeSelectionModal';
 
 // Segmentation Context Exports
