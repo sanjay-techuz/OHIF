@@ -1,4 +1,4 @@
-import { eventTarget, EVENTS } from '@cornerstonejs/core';
+import { EVENTS, eventTarget } from '@cornerstonejs/core';
 import { Enums } from '@cornerstonejs/tools';
 import { CommandsManager, CustomizationService } from '@ohif/core';
 import { findNearbyToolData } from './utils/findNearbyToolData';
@@ -34,9 +34,31 @@ export type initDoubleClickArgs = {
 
 function initDoubleClick({ customizationService, commandsManager }: initDoubleClickArgs): void {
   const cornerstoneViewportHandleDoubleClick = (evt: CustomEvent) => {
-    // Do not allow double click on a tool.
     const nearbyToolData = findNearbyToolData(commandsManager, evt);
     if (nearbyToolData) {
+      // BIEDX: a double-click on an existing CircleROI re-opens the same
+      // question modal that auto-opens right after drawing. Mirrors the
+      // right-click "Show Question Modal" menu item in
+      // `defaultContextMenuCustomization.ts` (diagnostic mode only — the
+      // recall flow doesn't have a right-click reopener today, so we keep
+      // double-click symmetric with that).
+      try {
+        const toolName = nearbyToolData?.metadata?.toolName;
+        if (toolName === 'CircleROI') {
+          const viewType =
+            (localStorage.getItem('ohif-viewType') as 'diagnostic' | 'screening') || 'diagnostic';
+          if (viewType === 'diagnostic') {
+            const uid = nearbyToolData?.annotationUID;
+            if (uid) {
+              commandsManager.runCommand('showCircleROIQuestionModal', { uid }, 'CORNERSTONE');
+            }
+          }
+        }
+      } catch {
+        /* fall through — never let a UI hook break the viewport */
+      }
+      // Either way, do not run the viewport-level double-click commands
+      // (1-up zoom etc.) when the cursor was on an annotation.
       return;
     }
 

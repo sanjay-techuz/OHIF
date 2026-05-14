@@ -35,6 +35,13 @@ export interface QuestionAnswerModalProps {
   servicesManager: any;
   measurementUid?: string;
   onBreastDensityChange?: (value: string) => void;
+  /**
+   * Fires after a successful save with the full form. Used by the parent
+   * to propagate BI-RADS to the ACR display (per-side R/L for MG/DBT/CEM,
+   * overall_birads for MR/US). Kept separate from onBreastDensityChange
+   * so the existing density-only propagation path stays untouched.
+   */
+  onBiRadsChange?: (form: Record<string, unknown>) => void;
   /** 1-based annotation index for the title (ROI - 1, Lesion - 2, etc.) */
   annotationIndex?: number;
 }
@@ -290,6 +297,7 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
   open,
   onClose,
   onBreastDensityChange,
+  onBiRadsChange,
   annotationIndex,
 }) => {
   const { measurementService } = servicesManager.services;
@@ -412,6 +420,13 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
     if (success) {
       if (config.propagatesBreastDensity && onBreastDensityChange && form.breastDensity) {
         onBreastDensityChange(form.breastDensity as string);
+      }
+      // Always fire — parent decides based on modality whether to push
+      // biRads to R/L (MG/DBT/CEM) or overall_birads (MR/US). Guarded by
+      // the truthy-biRads check so legacy/empty submissions don't poke
+      // the ACR display.
+      if (onBiRadsChange && form.biRads) {
+        onBiRadsChange({ ...form });
       }
       onClose();
     }

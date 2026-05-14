@@ -134,12 +134,12 @@ function modeFactory({ modeConfiguration }) {
       ]);
 
       toolbarService.updateSection('MeasurementTools', [
+        'CircleROI',
         'Length',
         'Bidirectional',
         'ArrowAnnotate',
         'EllipticalROI',
         'RectangleROI',
-        'CircleROI',
         'PlanarFreehandROI',
         'SplineROI',
         // 'SplineROI',

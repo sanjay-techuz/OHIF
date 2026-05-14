@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
@@ -6,6 +6,7 @@ import {
   apiService,
   buildFellowshipBody,
   buildFellowshipQuery,
+  DicomMetadataStore,
   encrypt,
   HangingProtocolService,
   HTTP_STATUS,
@@ -26,6 +27,7 @@ import {
   InstructionModal,
   LexaReportingPanel,
   Onboarding,
+  OverlayFieldsModal,
   QuestionAnswerModal,
   RecallModal,
   ResizableHandle,
@@ -85,6 +87,14 @@ function ViewerLayout({
   );
   const [studentAcrValues, setStudentAcrValues] = useState(acrConfig.defaultValues);
   const [facultyAcrValues, setFacultyAcrValues] = useState(acrConfig.defaultValues);
+  // Auto-save plumbing for studentAcrValues. The two refs together gate
+  // the auto-save useEffect below so we never (a) save the initial
+  // backend fetch right back to the backend, and (b) re-save values that
+  // were just persisted by the ACR modal's manual Save (avoids double
+  // round-trips). Both refs are updated *before* a setStudentAcrValues
+  // call whenever the new value is already in-sync with the backend.
+  const initialAcrLoadedRef = useRef(false);
+  const lastSavedAcrRef = useRef<string | null>(null);
   const [currentFormData, setCurrentFormData] = useState<any>(null);
   const [currentAnnotationIndex, setCurrentAnnotationIndex] = useState<number>(1);
   // ViewType management
@@ -103,6 +113,7 @@ function ViewerLayout({
   const [validationMessage, setValidationMessage] = useState('');
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
+  const [showOverlayFieldsModal, setShowOverlayFieldsModal] = useState(false);
   const [caseHistoryText, setCaseHistoryText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
 
@@ -574,6 +585,15 @@ function ViewerLayout({
       }
     };
 
+    // Wrapper for the initial-fetch path: primes the auto-save refs so
+    // the loaded value isn't echoed back as a save. Use this anywhere we
+    // set studentAcrValues from the backend's response.
+    const seedStudentAcr = (values: typeof studentAcrValues) => {
+      lastSavedAcrRef.current = JSON.stringify(values);
+      initialAcrLoadedRef.current = true;
+      setStudentAcrValues(values);
+    };
+
     const getAcrValues = async () => {
       if (userType === 'student' || isPreview) {
         const result = await apiCall(() =>
@@ -590,11 +610,11 @@ function ViewerLayout({
             if (isPreview) {
               setFacultyAcrValues(data.faculty_result_data || acrConfig.defaultValues);
             }
-            setStudentAcrValues(data.result_data || acrConfig.defaultValues);
+            seedStudentAcr(data.result_data || acrConfig.defaultValues);
           }
         } else {
           setFacultyAcrValues(acrConfig.defaultValues);
-          setStudentAcrValues(acrConfig.defaultValues);
+          seedStudentAcr(acrConfig.defaultValues);
         }
       }
       if (userType === 'faculty' || isPreview) {
@@ -609,14 +629,14 @@ function ViewerLayout({
               if (isPreview) {
                 setFacultyAcrValues(data.result_data || acrConfig.defaultValues);
               } else {
-                setStudentAcrValues(data.result_data || acrConfig.defaultValues);
+                seedStudentAcr(data.result_data || acrConfig.defaultValues);
               }
             }
           } else {
             if (isPreview) {
               setFacultyAcrValues(acrConfig.defaultValues);
             } else {
-              setStudentAcrValues(acrConfig.defaultValues);
+              seedStudentAcr(acrConfig.defaultValues);
             }
           }
         }
@@ -628,6 +648,70 @@ function ViewerLayout({
       getAcrValues();
     }, 1000);
   }, [isAddAnswerClicked]);
+
+  /**
+   * Persist `studentAcrValues` to the backend. Mirrors the body shape that
+   * `ACRDisplay`'s manual Save uses, but driven from here so ROI-form-saves
+   * (which mutate ACR via `onBreastDensityChange` / `onBiRadsChange` above)
+   * are kept in sync with MySQL. Diagnostic-only — screening mode doesn't
+   * own ACR state.
+   */
+  const saveStudentAcrToBackend = useCallback(
+    async (values: typeof studentAcrValues) => {
+      if (currentViewType !== 'diagnostic') return;
+      if (userType === 'faculty' && !isAddAnswerClicked) return;
+      try {
+        const body: Record<string, unknown> = {
+          ...(isFellowship
+            ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+            : { course_id: courseId, module_id: moduleId }),
+          case_id: caseId,
+          student_id: userType === 'student' ? studentId : '',
+          result_data: values,
+          view_type: viewType,
+          user_type: userType,
+          faculty_id: userType === 'student' ? '' : facultyId,
+          study_instance_uid: StudyInstanceUIDs,
+        };
+        const endpoint =
+          userType === 'student' ? '/user/cases/case-answer' : '/admin/cases/case-answer';
+        await apiCall(() => apiService.post(endpoint, body));
+      } catch (e) {
+        console.error('Auto-save ACR failed:', e);
+      }
+    },
+    [
+      currentViewType,
+      userType,
+      isAddAnswerClicked,
+      isFellowship,
+      programId,
+      phaseId,
+      moduleId,
+      courseId,
+      caseId,
+      studentId,
+      facultyId,
+      viewType,
+      StudyInstanceUIDs,
+    ],
+  );
+
+  /**
+   * Auto-save `studentAcrValues` whenever it changes. Skipped until the
+   * first backend fetch resolves (`initialAcrLoadedRef`) so we don't echo
+   * the initial fetch right back, and skipped when the serialized value
+   * matches the last one we wrote (`lastSavedAcrRef`) so the ACR modal's
+   * manual Save — which updates the ref pre-emptively — doesn't trigger a
+   * second round-trip for the same values.
+   */
+  useEffect(() => {
+    if (!initialAcrLoadedRef.current) return;
+    const serialized = JSON.stringify(studentAcrValues);
+    if (serialized === lastSavedAcrRef.current) return;
+    lastSavedAcrRef.current = serialized;
+    saveStudentAcrToBackend(studentAcrValues);
+  }, [studentAcrValues, saveStudentAcrToBackend]);
 
   // Fetch case list for navigation
   const fetchCaseList = async () => {
@@ -766,6 +850,11 @@ function ViewerLayout({
             'flex max-w-4xl p-6 flex-col max-h-[80vh] overflow-auto',
         }),
     },
+    {
+      title: 'Customize Viewport Overlay',
+      icon: 'settings',
+      onClick: () => setShowOverlayFieldsModal(true),
+    },
   ];
 
   if (appConfig.oidc) {
@@ -849,10 +938,12 @@ function ViewerLayout({
       lines.push(`Overall assessment — ${acrParts.join('; ')}.`);
     }
 
-    if (caseHistoryText && caseHistoryText.trim()) {
-      lines.push('');
-      lines.push(`Clinical history: ${caseHistoryText.trim()}`);
-    }
+    // NOTE: case_history used to be appended here as "Clinical history: …".
+    // It now flows to the Lexa panel via the dedicated
+    // `defaultAdditionalDetails` prop and is sent to Gemini as
+    // `additionalClinicalDetails` instead — same information, correct field,
+    // and visible to the user in the "Additional clinical details" textarea
+    // where they can edit it before generating.
 
     // Per-marker findings — one labeled paragraph each. The marker label
     // (e.g. "ROI" vs "Lesion") is sourced from the SAME question-modal
@@ -862,16 +953,27 @@ function ViewerLayout({
     // form_data entries (annotation drawn but no BI-RADS form filled yet)
     // are shown as "no findings recorded" rather than skipped, so Gemini
     // knows a marker exists at that position.
-    const markerSingular = (() => {
+    // Pull the same config the student saw; the field list is the source
+    // of truth for which keys belong on the report. Walking the config
+    // (instead of `Object.entries(form)`) lets us emit "N/A" for any
+    // expected field the user left blank — required by the Lexa flow
+    // since 2026-05-13, when all non-BI-RADS fields became optional. The
+    // "N/A" only lives inside this Lexa prompt; the saved form_data row
+    // in MySQL still stores the empty string (no DB writes happen here).
+    const modalityCfg = (() => {
       try {
-        const cfg = getQuestionModalConfig(subSpecialitySlug, modalitySlug);
-        return cfg?.titlePrefix || 'ROI';
+        return getQuestionModalConfig(subSpecialitySlug, modalitySlug);
       } catch {
-        return 'ROI';
+        return undefined;
       }
     })();
+    const markerSingular = modalityCfg?.titlePrefix || 'ROI';
     const markerHeadingNoun = markerSingular === 'ROI' ? 'Region of interest' : markerSingular;
     const markerHeading = `${markerHeadingNoun} findings`;
+
+    const isEmptyValue = (v: unknown): boolean =>
+      v === '' || v === null || v === undefined ||
+      (Array.isArray(v) && v.length === 0);
 
     const validRois = (roiFormDataList || []).filter(Boolean);
     if (validRois.length > 0) {
@@ -879,17 +981,50 @@ function ViewerLayout({
       lines.push(`${markerHeading} (${validRois.length} ${markerSingular.toLowerCase()}${validRois.length > 1 ? 's' : ''}):`);
       validRois.forEach((form, idx) => {
         const markerLabel = `${markerSingular}-${idx + 1}`;
+
+        // Form never submitted (still null or stripped to {}): keep the
+        // legacy short-form line — Gemini can tell this annotation has no
+        // form attached at all (different signal than "submitted but
+        // every field blank").
         if (!form || Object.keys(form).length === 0) {
           lines.push(`${markerLabel}: no findings recorded.`);
           return;
         }
-        const parts = Object.entries(form)
-          .filter(
-            ([k, v]) =>
-              v !== '' && v !== null && v !== undefined && k !== 'id' && k !== 'remarks',
-          )
-          .map(([k, v]) => `${humanizeKey(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
-        const remarks = (form as any).remarks;
+
+        // Build parts off the config's field list, falling back to the
+        // form's own keys if the config is missing (very defensive — every
+        // modality we ship has a config, but a future stray slug must not
+        // throw here).
+        const fieldKeys: string[] = modalityCfg?.fields?.map(f => f.key) ?? [];
+        const remarks = (form as Record<string, unknown>).remarks;
+        const parts: string[] = [];
+        const seen = new Set<string>();
+
+        const pushPart = (k: string) => {
+          if (k === 'id' || k === 'remarks' || seen.has(k)) return;
+          seen.add(k);
+          const raw = (form as Record<string, unknown>)[k];
+          const value = isEmptyValue(raw)
+            ? 'N/A'
+            : Array.isArray(raw)
+              ? raw.join(', ')
+              : String(raw);
+          parts.push(`${humanizeKey(k)}: ${value}`);
+        };
+
+        // Config order first (so output reads in the same order the user
+        // saw on screen).
+        fieldKeys.forEach(pushPart);
+        // Then any form-only keys we didn't already cover (legacy data /
+        // newer keys not yet in the config) — extracted values only, no
+        // N/A spam since we don't know if these fields are expected.
+        Object.entries(form as Record<string, unknown>).forEach(([k, v]) => {
+          if (seen.has(k) || k === 'id' || k === 'remarks') return;
+          if (isEmptyValue(v)) return;
+          seen.add(k);
+          parts.push(`${humanizeKey(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
+        });
+
         if (parts.length === 0 && !remarks) {
           lines.push(`${markerLabel}: no findings recorded.`);
         } else {
@@ -899,7 +1034,7 @@ function ViewerLayout({
     }
 
     return lines.join('\n');
-  }, [currentViewType, modalitySlug, subSpecialitySlug, studentAcrValues, caseHistoryText, roiFormDataList]);
+  }, [currentViewType, modalitySlug, subSpecialitySlug, studentAcrValues, roiFormDataList]);
 
   // The initial /annotation-measurements GET runs once at mount, so any
   // annotation drawn + form filled in THIS session never lands in
@@ -1239,14 +1374,26 @@ function ViewerLayout({
               <ACRDisplay
                 studentValues={studentAcrValues}
                 facultyValues={facultyAcrValues}
-                onValuesChange={setStudentAcrValues}
+                onValuesChange={values => {
+                  // Manual ACR modal "Save" already POSTed these values to
+                  // /case-answer. Mark them as the last-saved snapshot so
+                  // the auto-save useEffect skips and we don't double-write.
+                  lastSavedAcrRef.current = JSON.stringify(values);
+                  setStudentAcrValues(values);
+                }}
               />
             )}
             {currentViewType === 'diagnostic' && userType === 'student' && (
               <ACRDisplay
                 studentValues={studentAcrValues}
                 facultyValues={facultyAcrValues}
-                onValuesChange={setStudentAcrValues}
+                onValuesChange={values => {
+                  // Manual ACR modal "Save" already POSTed these values to
+                  // /case-answer. Mark them as the last-saved snapshot so
+                  // the auto-save useEffect skips and we don't double-write.
+                  lastSavedAcrRef.current = JSON.stringify(values);
+                  setStudentAcrValues(values);
+                }}
               />
             )}
           </div>
@@ -1256,7 +1403,14 @@ function ViewerLayout({
             {/* Lexa AI compound pill — Generate + Correct in one bordered
                 container, separated by a vertical divider. Icon-only (no
                 labels) to match the compact controls grouped on this side
-                of the toolbar. */}
+                of the toolbar.
+
+                Faculty view: hide until the user enters edit mode by
+                clicking "Add Answer". Authoring assistance has no purpose
+                before the faculty has committed to writing an answer, and
+                showing it pre-edit clutters the read-only review state.
+                Students always see it. */}
+            {(userType !== 'faculty' || isAddAnswerClicked) && (
             <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
               <button
                 type="button"
@@ -1304,6 +1458,7 @@ function ViewerLayout({
                 </svg>
               </button>
             </div>
+            )}
 
             {/* Case Navigation Buttons */}
             {caseList.length > 1 && (
@@ -1526,12 +1681,121 @@ function ViewerLayout({
           servicesManager={servicesManager}
           open={showMeasurementModal}
           onClose={() => setShowMeasurementModal(false)}
-          onBreastDensityChange={value =>
+          onBreastDensityChange={value => {
+            // ACR breast density = highest BI-RADS density across ALL ROIs.
+            // Example: ROI-1=B, ROI-2=C, ROI-3=A → ACR shows C.
+            //
+            // `roiFormDataList` is captured by closure at render time; it
+            // may not yet contain the value the user is currently saving
+            // (no optimistic list update in the modal-save path), so we
+            // include `value` explicitly as an extra candidate. Anything
+            // outside A–D is ignored.
+            const DENSITY_RANK: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
+            const candidates = [
+              ...(roiFormDataList || []).map(
+                f => (f as Record<string, unknown> | null)?.breastDensity as string | undefined,
+              ),
+              value,
+            ].filter((d): d is string => typeof d === 'string' && d in DENSITY_RANK);
+            if (candidates.length === 0) return;
+            const highest = candidates.reduce(
+              (max, cur) => (DENSITY_RANK[cur] > DENSITY_RANK[max] ? cur : max),
+              candidates[0],
+            );
             setStudentAcrValues(prev => ({
               ...prev,
-              acr: value,
-            }))
-          }
+              acr: highest,
+            }));
+          }}
+          onBiRadsChange={savedForm => {
+            // BI-RADS propagation rules (driven by the ACR modality config
+            // — `r/l/overall_birads` field keys are the source of truth):
+            //
+            //   MG / DBT / CEM (config has `r` + `l`):
+            //     R = max BI-RADS across ROIs on RIGHT-laterality viewports
+            //     L = max BI-RADS across ROIs on LEFT-laterality viewports
+            //     Laterality = ImageLaterality of the series each ROI was
+            //     drawn on (from DicomMetadataStore).
+            //
+            //   MR / US (config has `overall_birads`):
+            //     overall_birads = max BI-RADS across ALL ROIs
+            //     (no laterality split — these forms don't carry a side).
+            //
+            // BI-RADS rank: 1 < 2 < 4 < 5 (3 is intentionally absent per
+            // BIEDX policy).
+            const acrFieldKeys = (acrConfig?.fields || []).map(f => f.key);
+            const hasR = acrFieldKeys.includes('r');
+            const hasL = acrFieldKeys.includes('l');
+            const hasOverall = acrFieldKeys.includes('overall_birads');
+            if (!hasR && !hasL && !hasOverall) return;
+
+            const BIRADS_RANK: Record<string, number> = { '1': 1, '2': 2, '4': 3, '5': 4 };
+            const measurements =
+              servicesManager.services.measurementService.getMeasurements?.() || [];
+
+            const getLat = (m: any): 'L' | 'R' | null => {
+              if (!m) return null;
+              try {
+                const instance = DicomMetadataStore.getInstance(
+                  m.referenceStudyUID,
+                  m.referenceSeriesUID,
+                  m.SOPInstanceUID,
+                );
+                const lat = String((instance as any)?.ImageLaterality || '').toUpperCase();
+                if (lat === 'L' || lat === 'R') return lat;
+              } catch {
+                /* fall through */
+              }
+              return null;
+            };
+
+            // Collect existing ROIs (skipping the one currently being
+            // edited, so we don't double-count its stale value alongside
+            // the fresh `savedForm`).
+            const editedUid = currentMeasurementUid;
+            const collected: Array<{ biRads: string; lat: 'L' | 'R' | null }> = [];
+            (roiFormDataList || []).forEach((f, idx) => {
+              if (!f) return;
+              const m = measurements[idx];
+              if (m && m.uid === editedUid) return;
+              const biRads = (f as Record<string, unknown>).biRads;
+              if (typeof biRads !== 'string' || !(biRads in BIRADS_RANK)) return;
+              collected.push({ biRads, lat: getLat(m) });
+            });
+
+            // Add the fresh submission. For RL modalities we need its
+            // laterality, looked up from currentMeasurementUid's series.
+            const freshBiRads = savedForm.biRads;
+            if (typeof freshBiRads === 'string' && freshBiRads in BIRADS_RANK) {
+              const editedMeas = editedUid
+                ? servicesManager.services.measurementService.getMeasurement?.(editedUid)
+                : null;
+              collected.push({ biRads: freshBiRads, lat: getLat(editedMeas) });
+            }
+
+            if (collected.length === 0) return;
+
+            const maxRank = (vals: string[]) =>
+              vals.reduce(
+                (max, cur) => (BIRADS_RANK[cur] > BIRADS_RANK[max] ? cur : max),
+                vals[0],
+              );
+
+            setStudentAcrValues(prev => {
+              const next = { ...prev };
+              if (hasR || hasL) {
+                const rs = collected.filter(c => c.lat === 'R').map(c => c.biRads);
+                const ls = collected.filter(c => c.lat === 'L').map(c => c.biRads);
+                if (hasR && rs.length > 0) next.r = maxRank(rs);
+                if (hasL && ls.length > 0) next.l = maxRank(ls);
+              }
+              if (hasOverall) {
+                const all = collected.map(c => c.biRads);
+                if (all.length > 0) next.overall_birads = maxRank(all);
+              }
+              return next;
+            });
+          }}
           annotationIndex={currentAnnotationIndex}
         />
       )}
@@ -1583,6 +1847,11 @@ function ViewerLayout({
         onClose={() => setShowInstructionsModal(false)}
       />
 
+      <OverlayFieldsModal
+        open={showOverlayFieldsModal}
+        onClose={() => setShowOverlayFieldsModal(false)}
+      />
+
       <CaseHistoryModal
         open={showCaseHistoryModal}
         onClose={() => setShowCaseHistoryModal(false)}
@@ -1607,10 +1876,17 @@ function ViewerLayout({
         userType={userType as string}
         modalitySlug={modalitySlug}
         defaultKeyFindings={lexaKeyFindings}
+        defaultAdditionalDetails={caseHistoryText}
         defaultScenario={lexaDefaultScenario}
         defaultCaseName={lexaCaseName}
         defaultPatientAge={patientInfo.age}
         defaultPatientSex={patientInfo.sex}
+        courseId={courseId}
+        moduleId={moduleId}
+        caseId={caseId}
+        isFellowship={isFellowship}
+        programId={programId}
+        phaseId={phaseId}
       />
     </div>
   );

@@ -145,6 +145,7 @@ export { default as RecallModal } from './RecallModal';
 export { default as InstructionModal } from './InstructionModal';
 export { default as CaseHistoryModal } from './CaseHistoryModal';
 export { default as LexaReportingPanel } from './LexaReportingPanel';
+export { default as OverlayFieldsModal } from './OverlayFieldsModal';
 export { default as ViewTypeSelectionModal } from './ViewTypeSelectionModal';
 
 // Segmentation Context Exports

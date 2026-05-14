@@ -22,6 +22,13 @@ import { cleanDenaturalizedDataset } from './DicomWebDataSource/utils';
 import { useViewportsByPositionStore } from './stores/useViewportsByPositionStore';
 import { useViewportGridStore } from './stores/useViewportGridStore';
 import { useUIStateStore } from './stores/useUIStateStore';
+import {
+  useOverlayFieldsStore,
+  OVERLAY_FIELD_CATALOG,
+  OVERLAY_FIELD_GROUPS,
+  MAX_OVERLAY_FIELDS,
+  DEFAULT_OVERLAY_FIELDS,
+} from './stores/useOverlayFieldsStore';
 import { useDisplaySetSelectorStore } from './stores/useDisplaySetSelectorStore';
 import { useHangingProtocolStageIndexStore } from './stores/useHangingProtocolStageIndexStore';
 import { useToggleHangingProtocolStore } from './stores/useToggleHangingProtocolStore';
@@ -89,6 +96,11 @@ export {
   useToggleHangingProtocolStore,
   useToggleOneUpViewportGridStore,
   useUIStateStore,
+  useOverlayFieldsStore,
+  OVERLAY_FIELD_CATALOG,
+  OVERLAY_FIELD_GROUPS,
+  MAX_OVERLAY_FIELDS,
+  DEFAULT_OVERLAY_FIELDS,
   useViewportGridStore,
   useViewportsByPositionStore,
   callInputDialogAutoComplete,
@@ -104,3 +116,8 @@ export {
   callInputDialog,
   createReportDialogPrompt,
 };
+export type {
+  OverlayFieldId,
+  OverlayCatalogEntry,
+  OverlayFieldGroup,
+} from './stores/useOverlayFieldsStore';
