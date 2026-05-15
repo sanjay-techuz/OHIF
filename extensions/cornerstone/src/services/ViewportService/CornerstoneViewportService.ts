@@ -1,26 +1,18 @@
-import { PubSubService } from '@ohif/core';
-import { Types as OhifTypes } from '@ohif/core';
 import {
+  BaseVolumeViewport,
   RenderingEngine,
   StackViewport,
   Types,
-  getRenderingEngine,
-  utilities as csUtils,
   VolumeViewport,
   VolumeViewport3D,
   cache,
   Enums as csEnums,
-  BaseVolumeViewport,
+  utilities as csUtils,
+  getRenderingEngine,
 } from '@cornerstonejs/core';
+import { Types as OhifTypes, PubSubService } from '@ohif/core';
 
-import { utilities as csToolsUtils, Enums as csToolsEnums } from '@cornerstonejs/tools';
-import { IViewportService } from './IViewportService';
-import { RENDERING_ENGINE_ID } from './constants';
-import ViewportInfo, {
-  DisplaySetOptions,
-  PublicViewportOptions,
-  ViewportOptions,
-} from './Viewport';
+import { Enums as csToolsEnums, utilities as csToolsUtils } from '@cornerstonejs/tools';
 import { StackViewportData, VolumeViewportData } from '../../types/CornerstoneCacheService';
 import {
   LutPresentation,
@@ -29,14 +21,21 @@ import {
   SegmentationPresentation,
   SegmentationPresentationItem,
 } from '../../types/Presentation';
+import { RENDERING_ENGINE_ID } from './constants';
+import { IViewportService } from './IViewportService';
+import ViewportInfo, {
+  DisplaySetOptions,
+  PublicViewportOptions,
+  ViewportOptions,
+} from './Viewport';
 
-import JumpPresets from '../../utils/JumpPresets';
 import { ViewportProperties } from '@cornerstonejs/core/types';
+import { VOLUME_LOADER_SCHEME } from '../../constants';
 import { useLutPresentationStore } from '../../stores/useLutPresentationStore';
 import { usePositionPresentationStore } from '../../stores/usePositionPresentationStore';
-import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
 import { useSegmentationPresentationStore } from '../../stores/useSegmentationPresentationStore';
-import { VOLUME_LOADER_SCHEME } from '../../constants';
+import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
+import JumpPresets from '../../utils/JumpPresets';
 
 const EVENTS = {
   VIEWPORT_DATA_CHANGED: 'event::cornerstoneViewportService:viewportDataChanged',
@@ -664,21 +663,42 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     }
 
     return viewport.setStack(imageIdsToSet, initialImageIndexToUse).then(() => {
-      viewport.setProperties({ ...properties });
-      this.setPresentations(viewport.id, presentations, viewportInfo);
+      // Guard against the viewport being disabled/recreated while setStack was in
+      // flight — e.g. when many viewports load concurrently or the hanging
+      // protocol swaps layouts. In that case getImageData()/element is null and
+      // calls like setDisplayArea → setCamera → getCameraNoRotation crash
+      // reading `imageData.getViewUp`.
+      const isViewportAlive = () => {
+        try {
+          return !!viewport.element && !!viewport.getImageData?.();
+        } catch {
+          return false;
+        }
+      };
 
-      if (overlayProcessingResult?.addOverlayFn) {
-        overlayProcessingResult.addOverlayFn();
+      if (!isViewportAlive()) {
+        return;
       }
 
-      if (displayArea) {
-        viewport.setDisplayArea(displayArea);
-      }
-      if (rotation) {
-        viewport.setProperties({ rotation });
-      }
-      if (flipHorizontal) {
-        viewport.setCamera({ flipHorizontal: true });
+      try {
+        viewport.setProperties({ ...properties });
+        this.setPresentations(viewport.id, presentations, viewportInfo);
+
+        if (overlayProcessingResult?.addOverlayFn) {
+          overlayProcessingResult.addOverlayFn();
+        }
+
+        if (displayArea && isViewportAlive()) {
+          viewport.setDisplayArea(displayArea);
+        }
+        if (rotation && isViewportAlive()) {
+          viewport.setProperties({ rotation });
+        }
+        if (flipHorizontal && isViewportAlive()) {
+          viewport.setCamera({ flipHorizontal: true });
+        }
+      } catch (err) {
+        console.warn('[CornerstoneViewportService] post-setStack apply skipped:', err);
       }
     });
   }

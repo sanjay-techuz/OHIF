@@ -198,6 +198,13 @@ interface OverlayFieldsState {
    */
   toggleField: (id: OverlayFieldId) => void;
   resetToDefaults: () => void;
+  /**
+   * Replace the entire selection programmatically. Used when case data
+   * arrives with admin-configured `viewer_overlay_fields` for the case's
+   * (subspeciality, modality) pair — overrides any prior local pick so
+   * what the student sees matches what the admin chose for that combo.
+   */
+  setSelectedFields: (ids: OverlayFieldId[]) => void;
 }
 
 export const useOverlayFieldsStore = create<OverlayFieldsState>()(
@@ -226,6 +233,15 @@ export const useOverlayFieldsStore = create<OverlayFieldsState>()(
           selectedFields: [...DEFAULT_OVERLAY_FIELDS],
           version: state.version + 1,
         })),
+      setSelectedFields: ids =>
+        set(state => {
+          // Sanitize: keep only strings, drop dups, cap at MAX, fall back
+          // to defaults on empty so the overlay never blanks completely.
+          const cleaned = Array.from(new Set((ids || []).filter((x): x is string => typeof x === 'string')));
+          const capped = cleaned.length > MAX_OVERLAY_FIELDS ? cleaned.slice(0, MAX_OVERLAY_FIELDS) : cleaned;
+          const next = capped.length > 0 ? capped : [...DEFAULT_OVERLAY_FIELDS];
+          return { selectedFields: next, version: state.version + 1 };
+        }),
     }),
     {
       name: 'biedx-overlay-fields',

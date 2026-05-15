@@ -59,7 +59,7 @@ const gridHorizontalPadding = 10;
 const tabSpacerWidth = 2;
 
 const baseClasses =
-  'bg-[#0B0A0A] border-black justify-start box-content flex flex-col pl-10 pr-6 !max-w-[calc(100%-64px)] !w-[calc(100%-64px)] !max-h-[calc(100vh-130.5px)] !h-[calc(100vh-130.5px)]';
+  'bg-[#0B0A0A] border-black justify-start box-content flex flex-col pl-4 pr-3 !max-w-[calc(100%-28px)] !w-[calc(100%-28px)] !max-h-[calc(100vh-130.5px)] !h-[calc(100vh-130.5px)]';
 
 const openStateIconName = {
   left: 'SidePanelCloseLeft',

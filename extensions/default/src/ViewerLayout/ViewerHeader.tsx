@@ -117,17 +117,22 @@ function ViewerHeader({
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              {/* <Icons.ByName
-                name="MenuHamburger"
-                className="h-5 w-8"
-              /> */}
-              {leftPanelClosedState ? (
+              {/* Crossfade + slight rotate between the hamburger and close
+                  icons so the toggle feels smooth alongside the sidebar slide.
+                  Both SVGs live in a relative wrapper and only opacity /
+                  transform animate (no layout shift). */}
+              <span className="relative inline-flex h-[25px] w-[25px] items-center justify-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="25"
                   height="17"
                   viewBox="0 0 25 17"
                   fill="none"
+                  className="absolute inset-0 m-auto transition-all duration-300 ease-out"
+                  style={{
+                    opacity: leftPanelClosedState ? 1 : 0,
+                    transform: leftPanelClosedState ? 'rotate(0deg)' : 'rotate(-90deg)',
+                  }}
                 >
                   <path
                     d="M1 8.5H23.5M1 1H23.5M1 16H23.5"
@@ -137,13 +142,17 @@ function ViewerHeader({
                     strokeLinejoin="round"
                   />
                 </svg>
-              ) : (
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="40"
                   height="40"
                   viewBox="0 0 40 40"
                   fill="none"
+                  className="absolute inset-0 m-auto transition-all duration-300 ease-out"
+                  style={{
+                    opacity: leftPanelClosedState ? 0 : 1,
+                    transform: leftPanelClosedState ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
                 >
                   <path
                     d="M30 10L10 30M10 10L30 30"
@@ -153,7 +162,7 @@ function ViewerHeader({
                     strokeLinejoin="round"
                   />
                 </svg>
-              )}
+              </span>
             </Button>
           ) : null
         }

@@ -41,6 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import SidePanelWithServices from '../Components/SidePanelWithServices';
 import { useUIStateStore } from '../stores/useUIStateStore';
+import { useOverlayFieldsStore } from '../stores/useOverlayFieldsStore';
 import useResizablePanels from './ResizablePanelsHook';
 import ViewerHeader from './ViewerHeader';
 
@@ -62,7 +63,8 @@ function ViewerLayout({
 }: withAppTypes): React.FunctionComponent {
   const [appConfig] = useAppConfig();
 
-  const { panelService, hangingProtocolService, customizationService, displaySetService } = servicesManager.services;
+  const { panelService, hangingProtocolService, customizationService, displaySetService } =
+    servicesManager.services;
   // Use the app config flag as originally intended; do not force a loader on.
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(appConfig.showLoadingIndicator);
 
@@ -236,21 +238,52 @@ function ViewerLayout({
   };
 
   useEffect(() => {
+    // For BIEDX breast modalities the default OHIF protocol applies first
+    // (firing PROTOCOL_CHANGED), then `HangingProtocolDropdown.tsx`'s
+    // auto-apply setTimeout swaps in the BIEDX MG/MR protocol ~1s later
+    // (another PROTOCOL_CHANGED). The original code hid the loader on the
+    // FIRST event, which let the user see ~1s of wrong-ordered viewports
+    // before the BIEDX RCC/LCC/RMLO/LMLO layout took over.
+    //
+    // Fix: when the current case is one of the modalities that BIEDX maps
+    // to a custom HP, keep the loader visible until that specific protocol
+    // is reported active. For modalities without a custom HP (US, etc.)
+    // and for the early-mount case where modalitySlug hasn't arrived yet,
+    // fall back to the original "hide on first event" behavior so we
+    // never get stuck.
+    const slug = (modalitySlug || '').toUpperCase();
+    // CEM has its OWN protocol (@ohif/hpCEM) — keeping it bucketed with
+    // MG/DBT would mean the loader waits for hpMammo's PROTOCOL_CHANGED
+    // forever while HangingProtocolDropdown actually fires hpCEM. That
+    // bug manifested as "loader visible, viewports never appear" for
+    // CEM cases. MG and DBT still share hpMammo.
+    const targetProtocolId =
+      slug === 'MG' || slug === 'DBT'
+        ? '@ohif/hpMammo'
+        : slug === 'CEM'
+          ? '@ohif/hpCEM'
+          : slug === 'MR' || slug === 'MRI'
+            ? '@ohif/hpMR'
+            : null;
+
     const { unsubscribe } = hangingProtocolService.subscribe(
       HangingProtocolService.EVENTS.PROTOCOL_CHANGED,
-
-      // Todo: right now to set the loading indicator to false, we need to wait for the
-      // hangingProtocolService to finish applying the viewport matching to each viewport,
-      // however, this might not be the only approach to set the loading indicator to false. we need to explore this further.
-      () => {
-        setShowLoadingIndicator(false);
+      event => {
+        if (!targetProtocolId) {
+          setShowLoadingIndicator(false);
+          return;
+        }
+        const activeId = event?.protocol?.id ?? hangingProtocolService.protocol?.id;
+        if (activeId === targetProtocolId) {
+          setShowLoadingIndicator(false);
+        }
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [hangingProtocolService]);
+  }, [hangingProtocolService, modalitySlug]);
 
   const getViewportComponentData = viewportComponent => {
     const { entry } = getComponent(viewportComponent.namespace);
@@ -269,16 +302,25 @@ function ViewerLayout({
   useEffect(() => {
     const computePatientInfo = () => {
       const displaySets = displaySetService?.getActiveDisplaySets?.();
-      if (!displaySets || displaySets.length === 0) return;
+      if (!displaySets || displaySets.length === 0) {
+        return;
+      }
       const instance = displaySets[0]?.instances?.[0] || (displaySets[0] as any)?.instance;
-      if (!instance) return;
+      if (!instance) {
+        return;
+      }
       const rawAge = instance.PatientAge as string | undefined;
       const ageDigits = rawAge ? String(rawAge).replace(/[^0-9]/g, '') : '';
       let sex = '';
-      if (instance.PatientSex === 'M') sex = 'Male';
-      else if (instance.PatientSex === 'F') sex = 'Female';
-      else if (instance.PatientSex === 'O') sex = 'Other';
-      else sex = instance.PatientSex || '';
+      if (instance.PatientSex === 'M') {
+        sex = 'Male';
+      } else if (instance.PatientSex === 'F') {
+        sex = 'Female';
+      } else if (instance.PatientSex === 'O') {
+        sex = 'Other';
+      } else {
+        sex = instance.PatientSex || '';
+      }
       setPatientInfo({ age: ageDigits, sex });
     };
 
@@ -395,7 +437,7 @@ function ViewerLayout({
           const { data } = result.data as any;
           console.log('data--------------', data);
           if (Array.isArray(data)) {
-            setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+            setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
           }
           if (data && data.length > 0) {
             data.forEach(item => {
@@ -463,7 +505,7 @@ function ViewerLayout({
             // order), which matches OHIF's measurement list, so ROI-1 / ROI-2
             // labels stay consistent with the rest of the UI.
             if (Array.isArray(data)) {
-              setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+              setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
             }
             if (data && data.length > 0) {
               data.forEach(item => {
@@ -526,7 +568,7 @@ function ViewerLayout({
               const { data } = result.data as any;
               console.log('data--------------', data);
               if (Array.isArray(data)) {
-                setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+                setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
               }
               if (data && data.length > 0) {
                 data.forEach(item => {
@@ -658,8 +700,12 @@ function ViewerLayout({
    */
   const saveStudentAcrToBackend = useCallback(
     async (values: typeof studentAcrValues) => {
-      if (currentViewType !== 'diagnostic') return;
-      if (userType === 'faculty' && !isAddAnswerClicked) return;
+      if (currentViewType !== 'diagnostic') {
+        return;
+      }
+      if (userType === 'faculty' && !isAddAnswerClicked) {
+        return;
+      }
       try {
         const body: Record<string, unknown> = {
           ...(isFellowship
@@ -694,7 +740,7 @@ function ViewerLayout({
       facultyId,
       viewType,
       StudyInstanceUIDs,
-    ],
+    ]
   );
 
   /**
@@ -706,9 +752,13 @@ function ViewerLayout({
    * second round-trip for the same values.
    */
   useEffect(() => {
-    if (!initialAcrLoadedRef.current) return;
+    if (!initialAcrLoadedRef.current) {
+      return;
+    }
     const serialized = JSON.stringify(studentAcrValues);
-    if (serialized === lastSavedAcrRef.current) return;
+    if (serialized === lastSavedAcrRef.current) {
+      return;
+    }
     lastSavedAcrRef.current = serialized;
     saveStudentAcrToBackend(studentAcrValues);
   }, [studentAcrValues, saveStudentAcrToBackend]);
@@ -755,6 +805,18 @@ function ViewerLayout({
           setUIState('subSpecialitySlug', currentCase.sub_speciality_slug || null);
           setUIState('modalitySlug', currentCase.modality_slug || null);
           setCaseHistoryText(currentCase.case_history || '');
+          // Admin-configured per (subspeciality, modality) overlay fields,
+          // resolved server-side in /user/cases/cases/:moduleId. Stamp the
+          // result into the overlay store so the viewport shows the admin's
+          // picks (or BIEDX defaults if no row exists for this pair).
+          // Students see this and cannot change it (menu entry is gated
+          // by userType below); admin/faculty can still adjust via the
+          // Customize Viewport Overlay modal, which writes back to the
+          // same backend row on modal close.
+          const overlayFields = Array.isArray(currentCase.viewer_overlay_fields)
+            ? currentCase.viewer_overlay_fields
+            : ['patient_age', 'case_id', 'view'];
+          useOverlayFieldsStore.getState().setSelectedFields(overlayFields);
         }
 
         console.log('Case list loaded:', cases);
@@ -788,7 +850,10 @@ function ViewerLayout({
     const encryptedUid = encrypt(targetCase.study_instance_uid || '');
     currentUrl.searchParams.set('StudyInstanceUIDs', encryptedUid);
     currentUrl.searchParams.set('caseId', String(targetCase.case_id));
-    currentUrl.searchParams.set('viewType', targetCase.view_type === '1' ? 'diagnostic' : 'screening');
+    currentUrl.searchParams.set(
+      'viewType',
+      targetCase.view_type === '1' ? 'diagnostic' : 'screening'
+    );
     currentUrl.searchParams.delete('data');
 
     // Full reload re-initialises OHIF state for the next case.
@@ -850,11 +915,19 @@ function ViewerLayout({
             'flex max-w-4xl p-6 flex-col max-h-[80vh] overflow-auto',
         }),
     },
-    {
-      title: 'Customize Viewport Overlay',
-      icon: 'settings',
-      onClick: () => setShowOverlayFieldsModal(true),
-    },
+    // Customize Viewport Overlay is admin/faculty-only. Students see the
+    // admin-configured fields (delivered via case data) and cannot change
+    // them. Faculty/admin saves write back to the (subspec, modality) row
+    // in the admin overlay-config table — see the close handler below.
+    ...(userType !== 'student'
+      ? [
+          {
+            title: 'Customize Viewport Overlay',
+            icon: 'settings',
+            onClick: () => setShowOverlayFieldsModal(true),
+          },
+        ]
+      : []),
   ];
 
   if (appConfig.oidc) {
@@ -881,6 +954,10 @@ function ViewerLayout({
           setUIState('subSpecialitySlug', caseData.sub_speciality_slug || null);
           setUIState('modalitySlug', caseData.modality_slug || null);
           setCaseHistoryText(caseData.case_history || '');
+          const overlayFields = Array.isArray(caseData.viewer_overlay_fields)
+            ? caseData.viewer_overlay_fields
+            : ['patient_age', 'case_id', 'view'];
+          useOverlayFieldsStore.getState().setSelectedFields(overlayFields);
         }
       }
     } catch (error) {
@@ -930,7 +1007,9 @@ function ViewerLayout({
     // ACR / BI-RADS summary as a single sentence with friendly labels.
     const acrParts: string[] = [];
     Object.entries(studentAcrValues || {}).forEach(([k, v]) => {
-      if (v === undefined || v === null || String(v).trim() === '') return;
+      if (v === undefined || v === null || String(v).trim() === '') {
+        return;
+      }
       const label = acrLabelMap[k] || humanizeKey(k);
       acrParts.push(`${label}: ${v}`);
     });
@@ -972,13 +1051,14 @@ function ViewerLayout({
     const markerHeading = `${markerHeadingNoun} findings`;
 
     const isEmptyValue = (v: unknown): boolean =>
-      v === '' || v === null || v === undefined ||
-      (Array.isArray(v) && v.length === 0);
+      v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
 
     const validRois = (roiFormDataList || []).filter(Boolean);
     if (validRois.length > 0) {
       lines.push('');
-      lines.push(`${markerHeading} (${validRois.length} ${markerSingular.toLowerCase()}${validRois.length > 1 ? 's' : ''}):`);
+      lines.push(
+        `${markerHeading} (${validRois.length} ${markerSingular.toLowerCase()}${validRois.length > 1 ? 's' : ''}):`
+      );
       validRois.forEach((form, idx) => {
         const markerLabel = `${markerSingular}-${idx + 1}`;
 
@@ -1001,7 +1081,9 @@ function ViewerLayout({
         const seen = new Set<string>();
 
         const pushPart = (k: string) => {
-          if (k === 'id' || k === 'remarks' || seen.has(k)) return;
+          if (k === 'id' || k === 'remarks' || seen.has(k)) {
+            return;
+          }
           seen.add(k);
           const raw = (form as Record<string, unknown>)[k];
           const value = isEmptyValue(raw)
@@ -1019,8 +1101,12 @@ function ViewerLayout({
         // newer keys not yet in the config) — extracted values only, no
         // N/A spam since we don't know if these fields are expected.
         Object.entries(form as Record<string, unknown>).forEach(([k, v]) => {
-          if (seen.has(k) || k === 'id' || k === 'remarks') return;
-          if (isEmptyValue(v)) return;
+          if (seen.has(k) || k === 'id' || k === 'remarks') {
+            return;
+          }
+          if (isEmptyValue(v)) {
+            return;
+          }
           seen.add(k);
           parts.push(`${humanizeKey(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
         });
@@ -1028,7 +1114,9 @@ function ViewerLayout({
         if (parts.length === 0 && !remarks) {
           lines.push(`${markerLabel}: no findings recorded.`);
         } else {
-          lines.push(`${markerLabel} — ${parts.join('; ')}.${remarks ? ` Remarks: ${remarks}.` : ''}`);
+          lines.push(
+            `${markerLabel} — ${parts.join('; ')}.${remarks ? ` Remarks: ${remarks}.` : ''}`
+          );
         }
       });
     }
@@ -1042,8 +1130,12 @@ function ViewerLayout({
   // on every Lexa-panel open so the form data list reflects everything
   // the student has saved up to "now". One small GET; cheap.
   useEffect(() => {
-    if (lexaPanelMode === null) return;
-    if (!caseId || !moduleId) return;
+    if (lexaPanelMode === null) {
+      return;
+    }
+    if (!caseId || !moduleId) {
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -1053,10 +1145,12 @@ function ViewerLayout({
             ? `/user/cases/annotation-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
             : `/admin/cases/annotation-measurements/${caseId}/${facultyId}`;
         const result = await apiCall(() => apiService.get(url));
-        if (cancelled || !result.success) return;
+        if (cancelled || !result.success) {
+          return;
+        }
         const { data } = result.data as any;
         if (Array.isArray(data)) {
-          setRoiFormDataList(data.map((it: any) => (it?.form_data ?? null)));
+          setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
         }
       } catch (err) {
         console.error('Lexa: failed to refresh ROI form data list', err);
@@ -1065,9 +1159,22 @@ function ViewerLayout({
     return () => {
       cancelled = true;
     };
-  }, [lexaPanelMode, caseId, moduleId, urlCourseId, studentId, facultyId, userType, isPreview, isFellowship, programId, phaseId]);
+  }, [
+    lexaPanelMode,
+    caseId,
+    moduleId,
+    urlCourseId,
+    studentId,
+    facultyId,
+    userType,
+    isPreview,
+    isFellowship,
+    programId,
+    phaseId,
+  ]);
 
-  const lexaDefaultScenario = currentViewType === 'screening' ? 'Routine Screening' : 'Diagnostic Evaluation';
+  const lexaDefaultScenario =
+    currentViewType === 'screening' ? 'Routine Screening' : 'Diagnostic Evaluation';
 
   // Resolve the human-friendly case label. Student path uses caseList from
   // the module fetch (case_title); faculty path uses the window-stashed
@@ -1075,9 +1182,13 @@ function ViewerLayout({
   // is never empty.
   const lexaCaseName = useMemo(() => {
     const fromList = caseList[currentCaseIndex]?.case_title;
-    if (fromList) return String(fromList);
+    if (fromList) {
+      return String(fromList);
+    }
     const fromWindow = (window as any).__currentCaseTitle;
-    if (fromWindow) return String(fromWindow);
+    if (fromWindow) {
+      return String(fromWindow);
+    }
     return caseId ? `Case ${caseId}` : '';
   }, [caseList, currentCaseIndex, caseId]);
 
@@ -1176,27 +1287,10 @@ function ViewerLayout({
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
           <ResizablePanelGroup {...resizablePanelGroupProps}>
-            {/* LEFT SIDEPANELS */}
-            {hasLeftPanels ? (
-              <div className="bg-[#0B0A0A]">
-                <ResizablePanel {...resizableLeftPanelProps}>
-                  <SidePanelWithServices
-                    side="left"
-                    isExpanded={!leftPanelClosedState}
-                    servicesManager={servicesManager}
-                    {...leftPanelProps}
-                  />
-                </ResizablePanel>
-                {/* Hide the resize handle when left panel is closed */}
-                {!leftPanelClosedState && (
-                  <ResizableHandle
-                    onDragging={onHandleDragging}
-                    disabled={!leftPanelResizable}
-                    className={resizableHandleClassName}
-                  />
-                )}
-              </div>
-            ) : null}
+            {/* LEFT sidebar is rendered as a floating overlay below (outside
+                ResizablePanelGroup) so it slides ON TOP of the viewport instead
+                of resizing it. Resizing the viewport is what was causing the
+                cornerstone canvas re-render flicker. */}
             {/* TOOLBAR + GRID */}
             <ResizablePanel {...resizableViewportGridPanelProps}>
               <div className="flex h-full flex-1 flex-col">
@@ -1233,6 +1327,37 @@ function ViewerLayout({
               </>
             ) : null}
           </ResizablePanelGroup>
+          {/* Floating LEFT sidebar overlay. translateX is GPU-accelerated and
+              does NOT trigger layout on the viewport, so the cornerstone canvas
+              keeps its pixel buffer and there's no flicker. Width is kept
+              compact (260px) so more space stays available for the viewport;
+              when closed, the wrapper sits one full width off-screen so its
+              content can't bleed onto the viewport. */}
+          {hasLeftPanels && (
+            <div
+              className="biedx-floating-sidebar absolute left-0 top-0 bottom-0 z-30 bg-[#0B0A0A]"
+              style={{
+                width: '260px',
+                transform: leftPanelClosedState ? 'translateX(-100%)' : 'translateX(0)',
+                transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+                willChange: 'transform',
+                pointerEvents: leftPanelClosedState ? 'none' : 'auto',
+              }}
+            >
+              {/* isExpanded is hard-coded to true so the SidePanel keeps its
+                  full-content rendering throughout the slide-in AND slide-out.
+                  Visibility is driven entirely by the wrapper's transform —
+                  letting the SidePanel switch to its (empty) closed-state
+                  rendering mid-animation would make the panel appear blank
+                  while it's sliding out. */}
+              <SidePanelWithServices
+                side="left"
+                isExpanded={true}
+                servicesManager={servicesManager}
+                {...leftPanelProps}
+              />
+            </div>
+          )}
         </React.Fragment>
       </div>
       <IconPresentationProvider
@@ -1411,53 +1536,56 @@ function ViewerLayout({
                 showing it pre-edit clutters the read-only review state.
                 Students always see it. */}
             {(userType !== 'faculty' || isAddAnswerClicked) && (
-            <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
-              <button
-                type="button"
-                onClick={() => setLexaPanelMode('generate')}
-                className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
-                title="Generate Report (Lexa AI)"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="25"
-                  height="25"
-                  viewBox="0 0 24 24"
-                  fill="none"
+              <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
+                <button
+                  type="button"
+                  onClick={() => setLexaPanelMode('generate')}
+                  className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                  title="Generate Report (Lexa AI)"
                 >
-                  <path
-                    d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 13h6M9 17h6M9 9h2"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <span className="h-6 w-px bg-[#4F4F4F]" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={() => setLexaPanelMode('correct')}
-                className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
-                title="Correct Report (Lexa AI)"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="25"
-                  height="25"
-                  viewBox="0 0 24 24"
-                  fill="none"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 13h6M9 17h6M9 9h2"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <span
+                  className="h-6 w-px bg-[#4F4F4F]"
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => setLexaPanelMode('correct')}
+                  className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                  title="Correct Report (Lexa AI)"
                 >
-                  <path
-                    d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 14l2 2 4-4"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 14l2 2 4-4"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
             )}
 
             {/* Case Navigation Buttons */}
@@ -1693,14 +1821,16 @@ function ViewerLayout({
             const DENSITY_RANK: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
             const candidates = [
               ...(roiFormDataList || []).map(
-                f => (f as Record<string, unknown> | null)?.breastDensity as string | undefined,
+                f => (f as Record<string, unknown> | null)?.breastDensity as string | undefined
               ),
               value,
             ].filter((d): d is string => typeof d === 'string' && d in DENSITY_RANK);
-            if (candidates.length === 0) return;
+            if (candidates.length === 0) {
+              return;
+            }
             const highest = candidates.reduce(
               (max, cur) => (DENSITY_RANK[cur] > DENSITY_RANK[max] ? cur : max),
-              candidates[0],
+              candidates[0]
             );
             setStudentAcrValues(prev => ({
               ...prev,
@@ -1727,22 +1857,28 @@ function ViewerLayout({
             const hasR = acrFieldKeys.includes('r');
             const hasL = acrFieldKeys.includes('l');
             const hasOverall = acrFieldKeys.includes('overall_birads');
-            if (!hasR && !hasL && !hasOverall) return;
+            if (!hasR && !hasL && !hasOverall) {
+              return;
+            }
 
             const BIRADS_RANK: Record<string, number> = { '1': 1, '2': 2, '4': 3, '5': 4 };
             const measurements =
               servicesManager.services.measurementService.getMeasurements?.() || [];
 
             const getLat = (m: any): 'L' | 'R' | null => {
-              if (!m) return null;
+              if (!m) {
+                return null;
+              }
               try {
                 const instance = DicomMetadataStore.getInstance(
                   m.referenceStudyUID,
                   m.referenceSeriesUID,
-                  m.SOPInstanceUID,
+                  m.SOPInstanceUID
                 );
                 const lat = String((instance as any)?.ImageLaterality || '').toUpperCase();
-                if (lat === 'L' || lat === 'R') return lat;
+                if (lat === 'L' || lat === 'R') {
+                  return lat;
+                }
               } catch {
                 /* fall through */
               }
@@ -1755,11 +1891,17 @@ function ViewerLayout({
             const editedUid = currentMeasurementUid;
             const collected: Array<{ biRads: string; lat: 'L' | 'R' | null }> = [];
             (roiFormDataList || []).forEach((f, idx) => {
-              if (!f) return;
+              if (!f) {
+                return;
+              }
               const m = measurements[idx];
-              if (m && m.uid === editedUid) return;
+              if (m && m.uid === editedUid) {
+                return;
+              }
               const biRads = (f as Record<string, unknown>).biRads;
-              if (typeof biRads !== 'string' || !(biRads in BIRADS_RANK)) return;
+              if (typeof biRads !== 'string' || !(biRads in BIRADS_RANK)) {
+                return;
+              }
               collected.push({ biRads, lat: getLat(m) });
             });
 
@@ -1773,25 +1915,30 @@ function ViewerLayout({
               collected.push({ biRads: freshBiRads, lat: getLat(editedMeas) });
             }
 
-            if (collected.length === 0) return;
+            if (collected.length === 0) {
+              return;
+            }
 
             const maxRank = (vals: string[]) =>
-              vals.reduce(
-                (max, cur) => (BIRADS_RANK[cur] > BIRADS_RANK[max] ? cur : max),
-                vals[0],
-              );
+              vals.reduce((max, cur) => (BIRADS_RANK[cur] > BIRADS_RANK[max] ? cur : max), vals[0]);
 
             setStudentAcrValues(prev => {
               const next = { ...prev };
               if (hasR || hasL) {
                 const rs = collected.filter(c => c.lat === 'R').map(c => c.biRads);
                 const ls = collected.filter(c => c.lat === 'L').map(c => c.biRads);
-                if (hasR && rs.length > 0) next.r = maxRank(rs);
-                if (hasL && ls.length > 0) next.l = maxRank(ls);
+                if (hasR && rs.length > 0) {
+                  next.r = maxRank(rs);
+                }
+                if (hasL && ls.length > 0) {
+                  next.l = maxRank(ls);
+                }
               }
               if (hasOverall) {
                 const all = collected.map(c => c.biRads);
-                if (all.length > 0) next.overall_birads = maxRank(all);
+                if (all.length > 0) {
+                  next.overall_birads = maxRank(all);
+                }
               }
               return next;
             });
@@ -1847,25 +1994,59 @@ function ViewerLayout({
         onClose={() => setShowInstructionsModal(false)}
       />
 
+      {/*
+        OverlayFieldsModal is gated by `userType !== 'student'` via the
+        menu entry above, so students can't open it. On close (admin/faculty
+        only), we upsert the latest selection to
+        /admin/viewport-overlay-config for the case's (subspec, modality)
+        so it persists for every future student/admin who opens a case in
+        that combination — same data the admin panel's Configure Overlay
+        modal writes to.
+       */}
       <OverlayFieldsModal
         open={showOverlayFieldsModal}
-        onClose={() => setShowOverlayFieldsModal(false)}
+        onClose={() => {
+          setShowOverlayFieldsModal(false);
+          if (userType === 'student') return;
+          if (!subSpecialitySlug || !modalitySlug) return;
+          const fields = useOverlayFieldsStore.getState().selectedFields;
+          apiCall(() =>
+            apiService.post('/admin/viewport-overlay-config', {
+              sub_speciality_slug: subSpecialitySlug,
+              modality_slug: modalitySlug,
+              fields,
+            })
+          ).catch(err => {
+            // Non-fatal — the user's local picks still apply for this
+            // session (Zustand state). They'll just need to re-toggle to
+            // persist again. Logging suffices; no toast spam.
+            console.warn('Overlay config save failed:', err);
+          });
+        }}
       />
 
       <CaseHistoryModal
         open={showCaseHistoryModal}
         onClose={() => setShowCaseHistoryModal(false)}
         initialValue={caseHistoryText}
-        onSave={userType === 'student' ? undefined : async (value: string) => {
-          setCaseHistoryText(value);
-          if (caseId) {
-            try {
-              await apiCall(() => apiService.patch(`/admin/cases/${caseId}/case-history`, { case_history: value }));
-            } catch (error) {
-              console.error('Error saving case history:', error);
-            }
-          }
-        }}
+        onSave={
+          userType === 'student'
+            ? undefined
+            : async (value: string) => {
+                setCaseHistoryText(value);
+                if (caseId) {
+                  try {
+                    await apiCall(() =>
+                      apiService.patch(`/admin/cases/${caseId}/case-history`, {
+                        case_history: value,
+                      })
+                    );
+                  } catch (error) {
+                    console.error('Error saving case history:', error);
+                  }
+                }
+              }
+        }
         readOnly={userType === 'student'}
       />
 

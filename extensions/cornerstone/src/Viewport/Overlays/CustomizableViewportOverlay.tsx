@@ -11,6 +11,7 @@ import AnnotationTooltipsOverlay from './AnnotationTooltipsOverlay';
 import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
 
 import { useViewportRendering } from '../../hooks';
+import { useOverlayFieldsStore } from '@ohif/extension-default';
 import './CustomizableViewportOverlay.css';
 
 const EPSILON = 1e-4;
@@ -71,6 +72,15 @@ function CustomizableViewportOverlay({
   const [scale, setScale] = useState(1);
   const { isViewportBackgroundLight: isLight } = useViewportRendering(viewportId);
   const { imageIndex } = imageSliceData;
+
+  // Subscribe to the field-selection store's version counter so the overlay
+  // re-renders whenever the user toggles a field in OverlayFieldsModal.
+  // The actual gating happens inside each item's `condition` (in
+  // viewportOverlayCustomization.tsx) which reads selectedFields fresh via
+  // getState() — but without this subscription nothing forces React to
+  // re-run those conditions when the store changes. Without this line,
+  // "Done" updates the store but the viewport keeps showing the old picks.
+  useOverlayFieldsStore(s => s.version);
 
   // Historical usage defined the overlays as separate items due to lack of
   // append functionality.  This code enables the historical usage, but

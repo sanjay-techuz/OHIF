@@ -194,34 +194,18 @@ const useResizablePanels = (
     [leftPanelExpandedWidth, rightPanelExpandedWidth]
   );
 
+  // Left panel is rendered as a floating overlay (see ViewerLayout/index.tsx),
+  // NOT as a ResizablePanel inside ResizablePanelGroup. Toggling open/close is
+  // just a state flip — the CSS transform on the overlay wrapper drives the
+  // slide animation. No API.expand/collapse calls because there's no panel API
+  // attached on the left side anymore.
   const onLeftPanelClose = useCallback(() => {
     setLeftPanelClosed(true);
-    setMinMaxWidth(resizableLeftPanelElemRef.current);
-    // Set collapsed size to 0 before collapsing to completely hide the panel
-    setLeftResizePanelCollapsedSize(0);
-    resizableLeftPanelAPIRef?.current?.collapse();
   }, [setLeftPanelClosed]);
 
   const onLeftPanelOpen = useCallback(() => {
-    if (!resizablePanelGroupElemRef.current || !resizableLeftPanelAPIRef.current) {
-      return;
-    }
-    // Ensure collapsed size is calculated before expanding (if it's still 0)
-    if (leftResizablePanelCollapsedSize === 0) {
-      const collapsedSize = getPercentageSize(panelGroupDefinition.left.collapsedOffsetWidth);
-      setLeftResizePanelCollapsedSize(collapsedSize);
-    }
-    // Use requestAnimationFrame to ensure state updates before expanding
-    requestAnimationFrame(() => {
-      if (resizableLeftPanelAPIRef.current && resizablePanelGroupElemRef.current) {
-        const expandedSize = getPercentageSize(
-          panelGroupDefinition.left.initialExpandedOffsetWidth
-        );
-        resizableLeftPanelAPIRef.current.expand(expandedSize);
-        setLeftPanelClosed(false);
-      }
-    });
-  }, [setLeftPanelClosed, leftResizablePanelCollapsedSize]);
+    setLeftPanelClosed(false);
+  }, [setLeftPanelClosed]);
 
   const onLeftPanelResize = useCallback(size => {
     if (!resizablePanelGroupElemRef?.current || resizableLeftPanelAPIRef.current?.isCollapsed()) {
