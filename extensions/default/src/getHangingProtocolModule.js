@@ -1,3 +1,4 @@
+import hpCEM from './hangingprotocols/hpCEM';
 import hpMNCompare from './hangingprotocols/hpCompare';
 import hpMammography from './hangingprotocols/hpMammo';
 import { hpMN, hpMN8 } from './hangingprotocols/hpMNGrid';
@@ -140,6 +141,10 @@ function getHangingProtocolModule() {
     {
       name: hpMR.id,
       protocol: hpMR,
+    },
+    {
+      name: hpCEM.id,
+      protocol: hpCEM,
     },
     {
       name: hpScale.id,

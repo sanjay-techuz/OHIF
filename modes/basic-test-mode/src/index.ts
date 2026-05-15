@@ -148,11 +148,11 @@ function modeFactory() {
       ]);
 
       toolbarService.updateSection('MeasurementTools', [
+        'CircleROI',
         'Length',
         'Bidirectional',
         'ArrowAnnotate',
         'EllipticalROI',
-        'CircleROI',
         'PlanarFreehandROI',
         'SplineROI',
         'LivewireContour',

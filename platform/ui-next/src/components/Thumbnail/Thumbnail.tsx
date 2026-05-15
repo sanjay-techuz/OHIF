@@ -69,17 +69,17 @@ const Thumbnail = ({
           backgroundColor: isActive ? '#232323' : '#2E2E2E',
         }}
       >
-        <div className="h-[114px] w-full">
+        <div className="h-[88px] w-full">
           <div className="relative bg-black">
             {imageSrc ? (
               <img
                 src={imageSrc}
                 alt={imageAltText}
-                className="h-[114px] w-full rounded object-contain"
+                className="h-[88px] w-full rounded object-contain"
                 crossOrigin="anonymous"
               />
             ) : (
-              <div className="h-[114px] w-full rounded bg-black"></div>
+              <div className="h-[88px] w-full rounded bg-black"></div>
             )}
 
             {/* bottom left */}

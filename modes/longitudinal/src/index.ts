@@ -97,11 +97,10 @@ function modeFactory({ modeConfiguration }) {
         'MeasurementTools',
         'Zoom',
         'Pan',
-        'TrackballRotate',
+        'invert',
         'WindowLevel',
         'Capture',
         'Layout',
-        'Crosshairs',
         'MoreTools',
         'HangingProtocol',
       ]);
@@ -134,12 +133,12 @@ function modeFactory({ modeConfiguration }) {
       ]);
 
       toolbarService.updateSection('MeasurementTools', [
+        'CircleROI',
         'Length',
         'Bidirectional',
         'ArrowAnnotate',
         'EllipticalROI',
         'RectangleROI',
-        'CircleROI',
         'PlanarFreehandROI',
         'SplineROI',
         // 'SplineROI',
@@ -154,7 +153,8 @@ function modeFactory({ modeConfiguration }) {
         'ReferenceLines',
         'ImageOverlayViewer',
         'StackScroll',
-        'invert',
+        'TrackballRotate',
+        'Crosshairs',
         'Probe',
         'Cine',
         'Angle',

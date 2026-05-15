@@ -287,3 +287,98 @@ input[type='number'] {
 .w-5\/24 {
   width: 20.83333333%;
 }
+
+/* ---- BIEDX toast (sonner) overrides ----
+ * Disables sonner's default richColors palette and applies the dark
+ * BIEDX surface + brand-pink accent so the toast looks like a first-
+ * class viewer element rather than a generic third-party toast.
+ *
+ * Typography: Inter (BIEDX app font, loaded via fonts.css). Sizes
+ * mirror QuestionAnswerModal / Lexa panel scale —
+ *   title:       14px / 600
+ *   description: 13px / 400
+ *   action btn:  13px / 600 */
+
+/* Force the toaster container itself to sit 48px away from the right
+ * viewport edge. The Sonner `offset` prop SHOULD set this, but some
+ * versions ignore non-numeric values or apply the offset asymmetrically.
+ * Pinning it here in CSS is a guaranteed override so the inline action
+ * button (e.g. "Show Details" in ErrorBoundary toasts) can never get
+ * clipped against the viewport edge. */
+[data-sonner-toaster][data-x-position='right'] {
+  right: 48px !important;
+}
+[data-sonner-toaster][data-x-position='right'][data-y-position='top'] {
+  top: 20px !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast,
+[data-sonner-toaster][data-theme='dark'] .biedx-toast * {
+  font-family: 'Inter', sans-serif !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast {
+  background: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 1px solid #2D2728 !important;
+  /* Reserve enough right-edge padding so the inline action button never
+   * clips against the toast's right border. */
+  padding-right: 16px !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__title {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__description {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1.45;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__icon {
+  color: hsl(var(--highlight));
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__action {
+  background: hsl(var(--highlight)) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  /* Compact padding so the button fits within the toast width. */
+  padding: 5px 10px !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  height: auto !important;
+  /* Let sonner's own flex layout decide spacing — no forced margin-left
+   * that could push the button past the toast's right edge. */
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__action:hover {
+  filter: brightness(1.05);
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__cancel {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid #2D2728 !important;
+  border-radius: 8px !important;
+  padding: 5px 10px !important;
+  font-size: 13px !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast__close {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border: 0 !important;
+}
+/* Variant accents — left-border colored stripe by toast type */
+[data-sonner-toaster][data-theme='dark'] .biedx-toast--error {
+  border-left: 3px solid hsl(var(--highlight)) !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast--success {
+  border-left: 3px solid #22C55E !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast--warning {
+  border-left: 3px solid #F59E0B !important;
+}
+[data-sonner-toaster][data-theme='dark'] .biedx-toast--info {
+  border-left: 3px solid hsl(var(--highlight)) !important;
+}

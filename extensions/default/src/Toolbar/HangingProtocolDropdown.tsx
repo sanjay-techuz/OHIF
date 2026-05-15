@@ -1,6 +1,7 @@
 import { CommandsManager, ServicesManager } from '@ohif/core';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@ohif/ui-next';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useUIStateStore } from '../stores/useUIStateStore';
 import HPALL from '../../assets/images/HP-ALL.png';
 import LCCLMLO from '../../assets/images/LCC-LMLO.png';
 import RCCRMLO from '../../assets/images/RCC-RMLO.png';
@@ -36,6 +37,22 @@ interface HangingProtocolDropdownProps {
   commandsManager: CommandsManager;
   servicesManager: ServicesManager;
 }
+
+// CEM (Contrast-Enhanced Mammography) hanging protocol stages — mirrors
+// the stages defined in `hangingprotocols/hpCEM.ts`. The CEM dropdown
+// uses the same MG icons (LE views are visually identical to standard
+// MG) until dedicated CEM thumbnails are added. Custom icons are a
+// pure-cosmetic upgrade and can be swapped in without touching this
+// stage mapping.
+const CEM_HANGING_PROTOCOLS = [
+  { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HPALL },
+  { label: 'All Low-Energy', stageIndex: 1, icon: HPALL },
+  { label: 'All Recombined', stageIndex: 2, icon: HPALL },
+  { label: 'R CC: LE vs Recombined', stageIndex: 3, icon: RLCC },
+  { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: RLCC },
+  { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: RLMLO },
+  { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: RLMLO },
+];
 
 // Unified array with ALL hanging protocols (used for both dropdown and navigation)
 // Includes all stages: prior, current, DBT, and hidden partial views
@@ -78,6 +95,33 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const isMammo = activeDisplaySets.some(ds => ds.Modality === 'MG');
   // Check if any active display set is MRI (MR)
   const isMR = activeDisplaySets.some(ds => ds.Modality === 'MR');
+
+  // CEM detection. Two signals (per user spec):
+  //   1) Admin-tagged via case data: `modalitySlug === 'CEM'`. Trusted first
+  //      because slugs arrive from the API alongside case metadata and
+  //      don't depend on display sets being loaded yet.
+  //   2) Fallback: any active display set has `ImageType` containing
+  //      'RECOMBINED' (the load-bearing tag — see cemDisplaySetSelector.ts).
+  //      Covers the case where admin forgot to tag but the DICOM is CEM.
+  //
+  // CEM cases ALSO report `Modality: 'MG'` on their images, so without
+  // this guard `isMammo` would be true and the MG protocol would
+  // hijack the auto-apply below. The MG auto-apply is gated by
+  // `!isCEM` for that reason.
+  const modalitySlug = useUIStateStore(s => s.uiState.modalitySlug as string | null | undefined);
+  const isCEM = useMemo(() => {
+    if ((modalitySlug || '').toUpperCase() === 'CEM') return true;
+    return activeDisplaySets.some(ds => {
+      const imageType = (ds as { ImageType?: unknown }).ImageType;
+      if (Array.isArray(imageType)) {
+        return imageType.some(v => typeof v === 'string' && v.toUpperCase() === 'RECOMBINED');
+      }
+      if (typeof imageType === 'string') {
+        return imageType.toUpperCase().includes('RECOMBINED');
+      }
+      return false;
+    });
+  }, [modalitySlug, activeDisplaySets]);
 
   // Check if it's DBT case by looking for DBT-specific series descriptions or SOP Class UID
   const isDBT = activeDisplaySets.some(ds => {
@@ -161,8 +205,19 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     };
   }, [hangingProtocolService, isMammo, checkForPrior, activeDisplaySets]);
 
+  // For CEM, the dropdown and nav use a different protocol id and a
+  // different stage map. Centralising both here keeps every callback /
+  // effect below from having to branch on `isCEM` for the protocolId
+  // and the stage array — they just consume `activeProtocolId` and
+  // `allHangingProtocols`.
+  const activeProtocolId = isCEM ? '@ohif/hpCEM' : '@ohif/hpMammo';
+
   // Unified array for both dropdown and navigation - filter based on prior/DBT availability
   const allHangingProtocols = useMemo(() => {
+    if (isCEM) {
+      // CEM has no prior or DBT stages — return its fixed 7-stage list.
+      return CEM_HANGING_PROTOCOLS;
+    }
     return ALL_HANGING_PROTOCOLS.filter(protocol => {
       // Filter out prior-only stages if no prior exists
       if (protocol.requiresPrior && !hasPrior) {
@@ -174,13 +229,15 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       }
       return true;
     });
-  }, [hasPrior, isDBT]);
+  }, [hasPrior, isDBT, isCEM]);
   const [selected, setSelected] = useState(allHangingProtocols[0]?.stageIndex ?? 2);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
-  // Auto-apply mammography hanging protocol
+  // Auto-apply mammography hanging protocol — guarded by !isCEM because
+  // CEM display sets ALSO have Modality === 'MG' but need their own
+  // protocol (see CEM auto-apply below).
   useEffect(() => {
-    if (isMammo) {
+    if (isMammo && !isCEM) {
       setTimeout(() => {
         commandsManager.run({
           commandName: 'setHangingProtocol',
@@ -198,7 +255,39 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         }, 100);
       }, 1000);
     }
-  }, [isMammo, allHangingProtocols, commandsManager]);
+  }, [isMammo, isCEM, allHangingProtocols, commandsManager]);
+
+  // Auto-apply CEM hanging protocol when the study is CEM (slug-tagged
+  // or contains a RECOMBINED display set). Same 1s delay precedent as
+  // the MG auto-apply so display sets have time to land before the HP
+  // service does its matching pass.
+  useEffect(() => {
+    if (!isCEM) {
+      return;
+    }
+    const currentProtocol = hangingProtocolService?.protocol;
+    if (currentProtocol?.id === '@ohif/hpCEM') {
+      return;
+    }
+    const timeoutId = setTimeout(() => {
+      commandsManager.run({
+        commandName: 'setHangingProtocol',
+        commandOptions: {
+          protocolId: '@ohif/hpCEM',
+          stageIndex: 0,
+        },
+      });
+      // Reuse the MG zoom callback — CEM LE images are dimensionally
+      // identical to MG so the same anchor math works.
+      setTimeout(() => {
+        commandsManager.run({
+          commandName: 'setMammographyZoomConditional',
+          commandOptions: {},
+        });
+      }, 100);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [isCEM, commandsManager, hangingProtocolService]);
 
   // Auto-apply MRI hanging protocol (no dropdown, just apply automatically)
   useEffect(() => {
@@ -246,7 +335,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
-          protocolId: '@ohif/hpMammo',
+          protocolId: activeProtocolId,
           stageIndex,
         },
       });
@@ -259,7 +348,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     },
-    [commandsManager, allHangingProtocols]
+    [commandsManager, allHangingProtocols, activeProtocolId]
   );
 
   // Keyboard navigation handlers
@@ -273,7 +362,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
-          protocolId: '@ohif/hpMammo',
+          protocolId: activeProtocolId,
           stageIndex: protocol.stageIndex,
         },
       });
@@ -293,7 +382,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
-          protocolId: '@ohif/hpMammo',
+          protocolId: activeProtocolId,
           stageIndex: protocol.stageIndex,
         },
       });
@@ -306,7 +395,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     }
-  }, [currentStageIndex, commandsManager, allHangingProtocols]);
+  }, [currentStageIndex, commandsManager, allHangingProtocols, activeProtocolId]);
 
   const handlePreviousStage = useCallback(() => {
     const prevIndex = currentStageIndex - 1;
@@ -318,7 +407,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
-          protocolId: '@ohif/hpMammo',
+          protocolId: activeProtocolId,
           stageIndex: protocol.stageIndex,
         },
       });
@@ -339,7 +428,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       commandsManager.run({
         commandName: 'setHangingProtocol',
         commandOptions: {
-          protocolId: '@ohif/hpMammo',
+          protocolId: activeProtocolId,
           stageIndex: protocol.stageIndex,
         },
       });
@@ -352,7 +441,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     }
-  }, [currentStageIndex, commandsManager, allHangingProtocols]);
+  }, [currentStageIndex, commandsManager, allHangingProtocols, activeProtocolId]);
 
   // Re-apply current hanging protocol when sidebar opens/closes to fix viewport blank space
   useEffect(() => {

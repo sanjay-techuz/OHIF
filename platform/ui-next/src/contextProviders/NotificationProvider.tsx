@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useCallback, useEffect, ReactNode, useRef } from 'react';
 import PropTypes from 'prop-types';
+import React, { ReactNode, createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import { Toaster, toast } from '../components';
 
 const NotificationContext = createContext(null);
@@ -27,8 +27,11 @@ const NotificationProvider = ({
     title: '',
     message: '',
     duration: 5000,
-    position: 'bottom-right', // Aligning to Sonner's positioning system
-    type: 'info', // info, success, error
+    // BIEDX prefers top-right so toasts don't collide with the bottom
+    // toolbar (Submit / case-nav / ACR pill) or the Lexa panel that
+    // anchors to the bottom of the viewer.
+    position: 'top-right',
+    type: 'info',
   };
 
   // Cache for recent notifications to prevent duplicates
@@ -198,7 +201,7 @@ const NotificationProvider = ({
 
   return (
     <NotificationContext.Provider value={{ show, hide, hideAll, getNotificationCache }}>
-      <Toaster position="bottom-right" />
+      <Toaster position="top-right" />
       {children}
     </NotificationContext.Provider>
   );

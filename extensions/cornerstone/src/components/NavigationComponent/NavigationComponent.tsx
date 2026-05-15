@@ -54,9 +54,15 @@ function NavigationComponent({ viewportId }: { viewportId: string }) {
         setMeasurementSelected(newIndex);
 
         const measurement = measurements[newIndex];
-        cornerstoneViewport.setViewReference({
-          referencedImageId: measurement.imageId,
-        });
+        try {
+          if (cornerstoneViewport?.element && cornerstoneViewport?.getImageData?.()) {
+            cornerstoneViewport.setViewReference({
+              referencedImageId: measurement.imageId,
+            });
+          }
+        } catch (err) {
+          console.warn('[NavigationComponent] setViewReference skipped:', err);
+        }
         return;
       }
 

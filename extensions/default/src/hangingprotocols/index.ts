@@ -1,3 +1,4 @@
+import hpCEM from './hpCEM';
 import hpCompare from './hpCompare';
 import hpMammography from './hpMammo';
 import hpMNGrid from './hpMNGrid';
@@ -8,6 +9,7 @@ import viewCodeAttribute from './utils/viewCode';
 export * from './hpMNGrid';
 
 export {
+  hpCEM,
   hpCompare,
   hpMNGrid,
   hpMR,

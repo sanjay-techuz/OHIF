@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
@@ -6,6 +6,7 @@ import {
   apiService,
   buildFellowshipBody,
   buildFellowshipQuery,
+  DicomMetadataStore,
   encrypt,
   HangingProtocolService,
   HTTP_STATUS,
@@ -20,10 +21,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   getModalityConfig,
+  getQuestionModalConfig,
   IconPresentationProvider,
   Icons,
   InstructionModal,
+  LexaReportingPanel,
   Onboarding,
+  OverlayFieldsModal,
   QuestionAnswerModal,
   RecallModal,
   ResizableHandle,
@@ -37,6 +41,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import SidePanelWithServices from '../Components/SidePanelWithServices';
 import { useUIStateStore } from '../stores/useUIStateStore';
+import { useOverlayFieldsStore } from '../stores/useOverlayFieldsStore';
 import useResizablePanels from './ResizablePanelsHook';
 import ViewerHeader from './ViewerHeader';
 
@@ -58,7 +63,8 @@ function ViewerLayout({
 }: withAppTypes): React.FunctionComponent {
   const [appConfig] = useAppConfig();
 
-  const { panelService, hangingProtocolService, customizationService } = servicesManager.services;
+  const { panelService, hangingProtocolService, customizationService, displaySetService } =
+    servicesManager.services;
   // Use the app config flag as originally intended; do not force a loader on.
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(appConfig.showLoadingIndicator);
 
@@ -83,6 +89,14 @@ function ViewerLayout({
   );
   const [studentAcrValues, setStudentAcrValues] = useState(acrConfig.defaultValues);
   const [facultyAcrValues, setFacultyAcrValues] = useState(acrConfig.defaultValues);
+  // Auto-save plumbing for studentAcrValues. The two refs together gate
+  // the auto-save useEffect below so we never (a) save the initial
+  // backend fetch right back to the backend, and (b) re-save values that
+  // were just persisted by the ACR modal's manual Save (avoids double
+  // round-trips). Both refs are updated *before* a setStudentAcrValues
+  // call whenever the new value is already in-sync with the backend.
+  const initialAcrLoadedRef = useRef(false);
+  const lastSavedAcrRef = useRef<string | null>(null);
   const [currentFormData, setCurrentFormData] = useState<any>(null);
   const [currentAnnotationIndex, setCurrentAnnotationIndex] = useState<number>(1);
   // ViewType management
@@ -101,8 +115,21 @@ function ViewerLayout({
   const [validationMessage, setValidationMessage] = useState('');
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
+  const [showOverlayFieldsModal, setShowOverlayFieldsModal] = useState(false);
   const [caseHistoryText, setCaseHistoryText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
+
+  // Lexa AI reporting panel — single panel, two modes ('generate' | 'correct').
+  const [lexaPanelMode, setLexaPanelMode] = useState<'generate' | 'correct' | null>(null);
+  // ROI form data (one entry per annotation) for the current student/case —
+  // captured from the same /annotation-measurements GET we already make on
+  // mount, so the Lexa panel can compose Key Findings from real ROI answers.
+  const [roiFormDataList, setRoiFormDataList] = useState<Array<Record<string, unknown> | null>>([]);
+  // Patient demographics from DICOM metadata for Lexa "patient" payload.
+  const [patientInfo, setPatientInfo] = useState<{ age: string; sex: string }>({
+    age: '',
+    sex: '',
+  });
 
   const {
     courseId,
@@ -211,21 +238,52 @@ function ViewerLayout({
   };
 
   useEffect(() => {
+    // For BIEDX breast modalities the default OHIF protocol applies first
+    // (firing PROTOCOL_CHANGED), then `HangingProtocolDropdown.tsx`'s
+    // auto-apply setTimeout swaps in the BIEDX MG/MR protocol ~1s later
+    // (another PROTOCOL_CHANGED). The original code hid the loader on the
+    // FIRST event, which let the user see ~1s of wrong-ordered viewports
+    // before the BIEDX RCC/LCC/RMLO/LMLO layout took over.
+    //
+    // Fix: when the current case is one of the modalities that BIEDX maps
+    // to a custom HP, keep the loader visible until that specific protocol
+    // is reported active. For modalities without a custom HP (US, etc.)
+    // and for the early-mount case where modalitySlug hasn't arrived yet,
+    // fall back to the original "hide on first event" behavior so we
+    // never get stuck.
+    const slug = (modalitySlug || '').toUpperCase();
+    // CEM has its OWN protocol (@ohif/hpCEM) — keeping it bucketed with
+    // MG/DBT would mean the loader waits for hpMammo's PROTOCOL_CHANGED
+    // forever while HangingProtocolDropdown actually fires hpCEM. That
+    // bug manifested as "loader visible, viewports never appear" for
+    // CEM cases. MG and DBT still share hpMammo.
+    const targetProtocolId =
+      slug === 'MG' || slug === 'DBT'
+        ? '@ohif/hpMammo'
+        : slug === 'CEM'
+          ? '@ohif/hpCEM'
+          : slug === 'MR' || slug === 'MRI'
+            ? '@ohif/hpMR'
+            : null;
+
     const { unsubscribe } = hangingProtocolService.subscribe(
       HangingProtocolService.EVENTS.PROTOCOL_CHANGED,
-
-      // Todo: right now to set the loading indicator to false, we need to wait for the
-      // hangingProtocolService to finish applying the viewport matching to each viewport,
-      // however, this might not be the only approach to set the loading indicator to false. we need to explore this further.
-      () => {
-        setShowLoadingIndicator(false);
+      event => {
+        if (!targetProtocolId) {
+          setShowLoadingIndicator(false);
+          return;
+        }
+        const activeId = event?.protocol?.id ?? hangingProtocolService.protocol?.id;
+        if (activeId === targetProtocolId) {
+          setShowLoadingIndicator(false);
+        }
       }
     );
 
     return () => {
       unsubscribe();
     };
-  }, [hangingProtocolService]);
+  }, [hangingProtocolService, modalitySlug]);
 
   const getViewportComponentData = viewportComponent => {
     const { entry } = getComponent(viewportComponent.namespace);
@@ -236,6 +294,45 @@ function ViewerLayout({
       displaySetsToDisplay: viewportComponent.displaySetsToDisplay,
     };
   };
+
+  // Capture PatientAge / PatientSex from the first display-set as soon as
+  // it loads. Used by the Lexa panel to pre-fill the patient block.
+  // PatientAge comes through DICOM as e.g. "045Y"; we strip non-digits so
+  // the number lands cleanly in the Age input.
+  useEffect(() => {
+    const computePatientInfo = () => {
+      const displaySets = displaySetService?.getActiveDisplaySets?.();
+      if (!displaySets || displaySets.length === 0) {
+        return;
+      }
+      const instance = displaySets[0]?.instances?.[0] || (displaySets[0] as any)?.instance;
+      if (!instance) {
+        return;
+      }
+      const rawAge = instance.PatientAge as string | undefined;
+      const ageDigits = rawAge ? String(rawAge).replace(/[^0-9]/g, '') : '';
+      let sex = '';
+      if (instance.PatientSex === 'M') {
+        sex = 'Male';
+      } else if (instance.PatientSex === 'F') {
+        sex = 'Female';
+      } else if (instance.PatientSex === 'O') {
+        sex = 'Other';
+      } else {
+        sex = instance.PatientSex || '';
+      }
+      setPatientInfo({ age: ageDigits, sex });
+    };
+
+    // Run once in case display sets are already loaded by the time we mount.
+    computePatientInfo();
+
+    const subscription = displaySetService?.subscribe?.(
+      displaySetService.EVENTS.DISPLAY_SETS_ADDED,
+      computePatientInfo
+    );
+    return () => subscription?.unsubscribe?.();
+  }, [displaySetService]);
 
   useEffect(() => {
     const { unsubscribe } = panelService.subscribe(
@@ -339,6 +436,9 @@ function ViewerLayout({
         if (result.success) {
           const { data } = result.data as any;
           console.log('data--------------', data);
+          if (Array.isArray(data)) {
+            setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
+          }
           if (data && data.length > 0) {
             data.forEach(item => {
               const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -400,6 +500,13 @@ function ViewerLayout({
           if (result.success) {
             const { data } = result.data as any;
             console.log('data--------------', data);
+            // Capture per-ROI form_data for the Lexa panel's Key Findings.
+            // Order here is the order the backend returned (= submission
+            // order), which matches OHIF's measurement list, so ROI-1 / ROI-2
+            // labels stay consistent with the rest of the UI.
+            if (Array.isArray(data)) {
+              setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
+            }
             if (data && data.length > 0) {
               data.forEach(item => {
                 const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -460,6 +567,9 @@ function ViewerLayout({
             if (result.success) {
               const { data } = result.data as any;
               console.log('data--------------', data);
+              if (Array.isArray(data)) {
+                setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
+              }
               if (data && data.length > 0) {
                 data.forEach(item => {
                   const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
@@ -517,6 +627,15 @@ function ViewerLayout({
       }
     };
 
+    // Wrapper for the initial-fetch path: primes the auto-save refs so
+    // the loaded value isn't echoed back as a save. Use this anywhere we
+    // set studentAcrValues from the backend's response.
+    const seedStudentAcr = (values: typeof studentAcrValues) => {
+      lastSavedAcrRef.current = JSON.stringify(values);
+      initialAcrLoadedRef.current = true;
+      setStudentAcrValues(values);
+    };
+
     const getAcrValues = async () => {
       if (userType === 'student' || isPreview) {
         const result = await apiCall(() =>
@@ -533,11 +652,11 @@ function ViewerLayout({
             if (isPreview) {
               setFacultyAcrValues(data.faculty_result_data || acrConfig.defaultValues);
             }
-            setStudentAcrValues(data.result_data || acrConfig.defaultValues);
+            seedStudentAcr(data.result_data || acrConfig.defaultValues);
           }
         } else {
           setFacultyAcrValues(acrConfig.defaultValues);
-          setStudentAcrValues(acrConfig.defaultValues);
+          seedStudentAcr(acrConfig.defaultValues);
         }
       }
       if (userType === 'faculty' || isPreview) {
@@ -552,14 +671,14 @@ function ViewerLayout({
               if (isPreview) {
                 setFacultyAcrValues(data.result_data || acrConfig.defaultValues);
               } else {
-                setStudentAcrValues(data.result_data || acrConfig.defaultValues);
+                seedStudentAcr(data.result_data || acrConfig.defaultValues);
               }
             }
           } else {
             if (isPreview) {
               setFacultyAcrValues(acrConfig.defaultValues);
             } else {
-              setStudentAcrValues(acrConfig.defaultValues);
+              seedStudentAcr(acrConfig.defaultValues);
             }
           }
         }
@@ -571,6 +690,78 @@ function ViewerLayout({
       getAcrValues();
     }, 1000);
   }, [isAddAnswerClicked]);
+
+  /**
+   * Persist `studentAcrValues` to the backend. Mirrors the body shape that
+   * `ACRDisplay`'s manual Save uses, but driven from here so ROI-form-saves
+   * (which mutate ACR via `onBreastDensityChange` / `onBiRadsChange` above)
+   * are kept in sync with MySQL. Diagnostic-only — screening mode doesn't
+   * own ACR state.
+   */
+  const saveStudentAcrToBackend = useCallback(
+    async (values: typeof studentAcrValues) => {
+      if (currentViewType !== 'diagnostic') {
+        return;
+      }
+      if (userType === 'faculty' && !isAddAnswerClicked) {
+        return;
+      }
+      try {
+        const body: Record<string, unknown> = {
+          ...(isFellowship
+            ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+            : { course_id: courseId, module_id: moduleId }),
+          case_id: caseId,
+          student_id: userType === 'student' ? studentId : '',
+          result_data: values,
+          view_type: viewType,
+          user_type: userType,
+          faculty_id: userType === 'student' ? '' : facultyId,
+          study_instance_uid: StudyInstanceUIDs,
+        };
+        const endpoint =
+          userType === 'student' ? '/user/cases/case-answer' : '/admin/cases/case-answer';
+        await apiCall(() => apiService.post(endpoint, body));
+      } catch (e) {
+        console.error('Auto-save ACR failed:', e);
+      }
+    },
+    [
+      currentViewType,
+      userType,
+      isAddAnswerClicked,
+      isFellowship,
+      programId,
+      phaseId,
+      moduleId,
+      courseId,
+      caseId,
+      studentId,
+      facultyId,
+      viewType,
+      StudyInstanceUIDs,
+    ]
+  );
+
+  /**
+   * Auto-save `studentAcrValues` whenever it changes. Skipped until the
+   * first backend fetch resolves (`initialAcrLoadedRef`) so we don't echo
+   * the initial fetch right back, and skipped when the serialized value
+   * matches the last one we wrote (`lastSavedAcrRef`) so the ACR modal's
+   * manual Save — which updates the ref pre-emptively — doesn't trigger a
+   * second round-trip for the same values.
+   */
+  useEffect(() => {
+    if (!initialAcrLoadedRef.current) {
+      return;
+    }
+    const serialized = JSON.stringify(studentAcrValues);
+    if (serialized === lastSavedAcrRef.current) {
+      return;
+    }
+    lastSavedAcrRef.current = serialized;
+    saveStudentAcrToBackend(studentAcrValues);
+  }, [studentAcrValues, saveStudentAcrToBackend]);
 
   // Fetch case list for navigation
   const fetchCaseList = async () => {
@@ -614,6 +805,18 @@ function ViewerLayout({
           setUIState('subSpecialitySlug', currentCase.sub_speciality_slug || null);
           setUIState('modalitySlug', currentCase.modality_slug || null);
           setCaseHistoryText(currentCase.case_history || '');
+          // Admin-configured per (subspeciality, modality) overlay fields,
+          // resolved server-side in /user/cases/cases/:moduleId. Stamp the
+          // result into the overlay store so the viewport shows the admin's
+          // picks (or BIEDX defaults if no row exists for this pair).
+          // Students see this and cannot change it (menu entry is gated
+          // by userType below); admin/faculty can still adjust via the
+          // Customize Viewport Overlay modal, which writes back to the
+          // same backend row on modal close.
+          const overlayFields = Array.isArray(currentCase.viewer_overlay_fields)
+            ? currentCase.viewer_overlay_fields
+            : ['patient_age', 'case_id', 'view'];
+          useOverlayFieldsStore.getState().setSelectedFields(overlayFields);
         }
 
         console.log('Case list loaded:', cases);
@@ -647,7 +850,10 @@ function ViewerLayout({
     const encryptedUid = encrypt(targetCase.study_instance_uid || '');
     currentUrl.searchParams.set('StudyInstanceUIDs', encryptedUid);
     currentUrl.searchParams.set('caseId', String(targetCase.case_id));
-    currentUrl.searchParams.set('viewType', targetCase.view_type === '1' ? 'diagnostic' : 'screening');
+    currentUrl.searchParams.set(
+      'viewType',
+      targetCase.view_type === '1' ? 'diagnostic' : 'screening'
+    );
     currentUrl.searchParams.delete('data');
 
     // Full reload re-initialises OHIF state for the next case.
@@ -709,6 +915,19 @@ function ViewerLayout({
             'flex max-w-4xl p-6 flex-col max-h-[80vh] overflow-auto',
         }),
     },
+    // Customize Viewport Overlay is admin/faculty-only. Students see the
+    // admin-configured fields (delivered via case data) and cannot change
+    // them. Faculty/admin saves write back to the (subspec, modality) row
+    // in the admin overlay-config table — see the close handler below.
+    ...(userType !== 'student'
+      ? [
+          {
+            title: 'Customize Viewport Overlay',
+            icon: 'settings',
+            onClick: () => setShowOverlayFieldsModal(true),
+          },
+        ]
+      : []),
   ];
 
   if (appConfig.oidc) {
@@ -735,6 +954,10 @@ function ViewerLayout({
           setUIState('subSpecialitySlug', caseData.sub_speciality_slug || null);
           setUIState('modalitySlug', caseData.modality_slug || null);
           setCaseHistoryText(caseData.case_history || '');
+          const overlayFields = Array.isArray(caseData.viewer_overlay_fields)
+            ? caseData.viewer_overlay_fields
+            : ['patient_age', 'case_id', 'view'];
+          useOverlayFieldsStore.getState().setSelectedFields(overlayFields);
         }
       }
     } catch (error) {
@@ -752,6 +975,222 @@ function ViewerLayout({
   }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
+
+  // Auto-compose key findings for the Lexa form from current OHIF state.
+  // Goal: feed Gemini natural-language prose (not key=value debug dumps) that
+  // a radiologist would actually write, including each ROI's full BI-RADS
+  // form. The user can still edit before submitting.
+  const lexaKeyFindings = useMemo(() => {
+    const humanizeKey = (k: string): string =>
+      k
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/_/g, ' ')
+        .replace(/^./, c => c.toUpperCase())
+        .trim();
+    const acrLabelMap: Record<string, string> = {
+      acr: 'Breast density',
+      bpe: 'BPE',
+      r: 'Right BI-RADS',
+      l: 'Left BI-RADS',
+      overall_birads: 'Overall BI-RADS',
+    };
+
+    const lines: string[] = [];
+
+    // Opening sentence — view type + modality.
+    const isScreening = currentViewType === 'screening';
+    const study = `${isScreening ? 'Screening' : 'Diagnostic'} study${
+      modalitySlug ? ` performed on ${modalitySlug}` : ''
+    }.`;
+    lines.push(study);
+
+    // ACR / BI-RADS summary as a single sentence with friendly labels.
+    const acrParts: string[] = [];
+    Object.entries(studentAcrValues || {}).forEach(([k, v]) => {
+      if (v === undefined || v === null || String(v).trim() === '') {
+        return;
+      }
+      const label = acrLabelMap[k] || humanizeKey(k);
+      acrParts.push(`${label}: ${v}`);
+    });
+    if (acrParts.length) {
+      lines.push(`Overall assessment — ${acrParts.join('; ')}.`);
+    }
+
+    // NOTE: case_history used to be appended here as "Clinical history: …".
+    // It now flows to the Lexa panel via the dedicated
+    // `defaultAdditionalDetails` prop and is sent to Gemini as
+    // `additionalClinicalDetails` instead — same information, correct field,
+    // and visible to the user in the "Additional clinical details" textarea
+    // where they can edit it before generating.
+
+    // Per-marker findings — one labeled paragraph each. The marker label
+    // (e.g. "ROI" vs "Lesion") is sourced from the SAME question-modal
+    // config the student saw when filling the form, so terminology stays
+    // consistent end-to-end and any future modality just needs its own
+    // titlePrefix in questionModalConfigs.ts — no changes here. Empty
+    // form_data entries (annotation drawn but no BI-RADS form filled yet)
+    // are shown as "no findings recorded" rather than skipped, so Gemini
+    // knows a marker exists at that position.
+    // Pull the same config the student saw; the field list is the source
+    // of truth for which keys belong on the report. Walking the config
+    // (instead of `Object.entries(form)`) lets us emit "N/A" for any
+    // expected field the user left blank — required by the Lexa flow
+    // since 2026-05-13, when all non-BI-RADS fields became optional. The
+    // "N/A" only lives inside this Lexa prompt; the saved form_data row
+    // in MySQL still stores the empty string (no DB writes happen here).
+    const modalityCfg = (() => {
+      try {
+        return getQuestionModalConfig(subSpecialitySlug, modalitySlug);
+      } catch {
+        return undefined;
+      }
+    })();
+    const markerSingular = modalityCfg?.titlePrefix || 'ROI';
+    const markerHeadingNoun = markerSingular === 'ROI' ? 'Region of interest' : markerSingular;
+    const markerHeading = `${markerHeadingNoun} findings`;
+
+    const isEmptyValue = (v: unknown): boolean =>
+      v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
+
+    const validRois = (roiFormDataList || []).filter(Boolean);
+    if (validRois.length > 0) {
+      lines.push('');
+      lines.push(
+        `${markerHeading} (${validRois.length} ${markerSingular.toLowerCase()}${validRois.length > 1 ? 's' : ''}):`
+      );
+      validRois.forEach((form, idx) => {
+        const markerLabel = `${markerSingular}-${idx + 1}`;
+
+        // Form never submitted (still null or stripped to {}): keep the
+        // legacy short-form line — Gemini can tell this annotation has no
+        // form attached at all (different signal than "submitted but
+        // every field blank").
+        if (!form || Object.keys(form).length === 0) {
+          lines.push(`${markerLabel}: no findings recorded.`);
+          return;
+        }
+
+        // Build parts off the config's field list, falling back to the
+        // form's own keys if the config is missing (very defensive — every
+        // modality we ship has a config, but a future stray slug must not
+        // throw here).
+        const fieldKeys: string[] = modalityCfg?.fields?.map(f => f.key) ?? [];
+        const remarks = (form as Record<string, unknown>).remarks;
+        const parts: string[] = [];
+        const seen = new Set<string>();
+
+        const pushPart = (k: string) => {
+          if (k === 'id' || k === 'remarks' || seen.has(k)) {
+            return;
+          }
+          seen.add(k);
+          const raw = (form as Record<string, unknown>)[k];
+          const value = isEmptyValue(raw)
+            ? 'N/A'
+            : Array.isArray(raw)
+              ? raw.join(', ')
+              : String(raw);
+          parts.push(`${humanizeKey(k)}: ${value}`);
+        };
+
+        // Config order first (so output reads in the same order the user
+        // saw on screen).
+        fieldKeys.forEach(pushPart);
+        // Then any form-only keys we didn't already cover (legacy data /
+        // newer keys not yet in the config) — extracted values only, no
+        // N/A spam since we don't know if these fields are expected.
+        Object.entries(form as Record<string, unknown>).forEach(([k, v]) => {
+          if (seen.has(k) || k === 'id' || k === 'remarks') {
+            return;
+          }
+          if (isEmptyValue(v)) {
+            return;
+          }
+          seen.add(k);
+          parts.push(`${humanizeKey(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`);
+        });
+
+        if (parts.length === 0 && !remarks) {
+          lines.push(`${markerLabel}: no findings recorded.`);
+        } else {
+          lines.push(
+            `${markerLabel} — ${parts.join('; ')}.${remarks ? ` Remarks: ${remarks}.` : ''}`
+          );
+        }
+      });
+    }
+
+    return lines.join('\n');
+  }, [currentViewType, modalitySlug, subSpecialitySlug, studentAcrValues, roiFormDataList]);
+
+  // The initial /annotation-measurements GET runs once at mount, so any
+  // annotation drawn + form filled in THIS session never lands in
+  // roiFormDataList — Lexa's Key Findings would then look empty. Refetch
+  // on every Lexa-panel open so the form data list reflects everything
+  // the student has saved up to "now". One small GET; cheap.
+  useEffect(() => {
+    if (lexaPanelMode === null) {
+      return;
+    }
+    if (!caseId || !moduleId) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = isPreview
+          ? `/user/cases/evaluation/preview-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+          : userType === 'student'
+            ? `/user/cases/annotation-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+            : `/admin/cases/annotation-measurements/${caseId}/${facultyId}`;
+        const result = await apiCall(() => apiService.get(url));
+        if (cancelled || !result.success) {
+          return;
+        }
+        const { data } = result.data as any;
+        if (Array.isArray(data)) {
+          setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
+        }
+      } catch (err) {
+        console.error('Lexa: failed to refresh ROI form data list', err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    lexaPanelMode,
+    caseId,
+    moduleId,
+    urlCourseId,
+    studentId,
+    facultyId,
+    userType,
+    isPreview,
+    isFellowship,
+    programId,
+    phaseId,
+  ]);
+
+  const lexaDefaultScenario =
+    currentViewType === 'screening' ? 'Routine Screening' : 'Diagnostic Evaluation';
+
+  // Resolve the human-friendly case label. Student path uses caseList from
+  // the module fetch (case_title); faculty path uses the window-stashed
+  // value set in fetchFacultyCaseDetails. Falls back to caseId so the field
+  // is never empty.
+  const lexaCaseName = useMemo(() => {
+    const fromList = caseList[currentCaseIndex]?.case_title;
+    if (fromList) {
+      return String(fromList);
+    }
+    const fromWindow = (window as any).__currentCaseTitle;
+    if (fromWindow) {
+      return String(fromWindow);
+    }
+    return caseId ? `Case ${caseId}` : '';
+  }, [caseList, currentCaseIndex, caseId]);
 
   const handleSubmitAnswer = async () => {
     const body = {
@@ -848,27 +1287,10 @@ function ViewerLayout({
         <React.Fragment>
           {showLoadingIndicator && <LoadingIndicatorProgress className="h-full w-full bg-black" />}
           <ResizablePanelGroup {...resizablePanelGroupProps}>
-            {/* LEFT SIDEPANELS */}
-            {hasLeftPanels ? (
-              <div className="bg-[#0B0A0A]">
-                <ResizablePanel {...resizableLeftPanelProps}>
-                  <SidePanelWithServices
-                    side="left"
-                    isExpanded={!leftPanelClosedState}
-                    servicesManager={servicesManager}
-                    {...leftPanelProps}
-                  />
-                </ResizablePanel>
-                {/* Hide the resize handle when left panel is closed */}
-                {!leftPanelClosedState && (
-                  <ResizableHandle
-                    onDragging={onHandleDragging}
-                    disabled={!leftPanelResizable}
-                    className={resizableHandleClassName}
-                  />
-                )}
-              </div>
-            ) : null}
+            {/* LEFT sidebar is rendered as a floating overlay below (outside
+                ResizablePanelGroup) so it slides ON TOP of the viewport instead
+                of resizing it. Resizing the viewport is what was causing the
+                cornerstone canvas re-render flicker. */}
             {/* TOOLBAR + GRID */}
             <ResizablePanel {...resizableViewportGridPanelProps}>
               <div className="flex h-full flex-1 flex-col">
@@ -905,6 +1327,37 @@ function ViewerLayout({
               </>
             ) : null}
           </ResizablePanelGroup>
+          {/* Floating LEFT sidebar overlay. translateX is GPU-accelerated and
+              does NOT trigger layout on the viewport, so the cornerstone canvas
+              keeps its pixel buffer and there's no flicker. Width is kept
+              compact (260px) so more space stays available for the viewport;
+              when closed, the wrapper sits one full width off-screen so its
+              content can't bleed onto the viewport. */}
+          {hasLeftPanels && (
+            <div
+              className="biedx-floating-sidebar absolute left-0 top-0 bottom-0 z-30 bg-[#0B0A0A]"
+              style={{
+                width: '260px',
+                transform: leftPanelClosedState ? 'translateX(-100%)' : 'translateX(0)',
+                transition: 'transform 320ms cubic-bezier(0.32, 0.72, 0, 1)',
+                willChange: 'transform',
+                pointerEvents: leftPanelClosedState ? 'none' : 'auto',
+              }}
+            >
+              {/* isExpanded is hard-coded to true so the SidePanel keeps its
+                  full-content rendering throughout the slide-in AND slide-out.
+                  Visibility is driven entirely by the wrapper's transform —
+                  letting the SidePanel switch to its (empty) closed-state
+                  rendering mid-animation would make the panel appear blank
+                  while it's sliding out. */}
+              <SidePanelWithServices
+                side="left"
+                isExpanded={true}
+                servicesManager={servicesManager}
+                {...leftPanelProps}
+              />
+            </div>
+          )}
         </React.Fragment>
       </div>
       <IconPresentationProvider
@@ -1046,20 +1499,95 @@ function ViewerLayout({
               <ACRDisplay
                 studentValues={studentAcrValues}
                 facultyValues={facultyAcrValues}
-                onValuesChange={setStudentAcrValues}
+                onValuesChange={values => {
+                  // Manual ACR modal "Save" already POSTed these values to
+                  // /case-answer. Mark them as the last-saved snapshot so
+                  // the auto-save useEffect skips and we don't double-write.
+                  lastSavedAcrRef.current = JSON.stringify(values);
+                  setStudentAcrValues(values);
+                }}
               />
             )}
             {currentViewType === 'diagnostic' && userType === 'student' && (
               <ACRDisplay
                 studentValues={studentAcrValues}
                 facultyValues={facultyAcrValues}
-                onValuesChange={setStudentAcrValues}
+                onValuesChange={values => {
+                  // Manual ACR modal "Save" already POSTed these values to
+                  // /case-answer. Mark them as the last-saved snapshot so
+                  // the auto-save useEffect skips and we don't double-write.
+                  lastSavedAcrRef.current = JSON.stringify(values);
+                  setStudentAcrValues(values);
+                }}
               />
             )}
           </div>
 
           {/* Right Section */}
           <div className="flex items-center gap-4">
+            {/* Lexa AI compound pill — Generate + Correct in one bordered
+                container, separated by a vertical divider. Icon-only (no
+                labels) to match the compact controls grouped on this side
+                of the toolbar.
+
+                Faculty view: hide until the user enters edit mode by
+                clicking "Add Answer". Authoring assistance has no purpose
+                before the faculty has committed to writing an answer, and
+                showing it pre-edit clutters the read-only review state.
+                Students always see it. */}
+            {(userType !== 'faculty' || isAddAnswerClicked) && (
+              <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
+                <button
+                  type="button"
+                  onClick={() => setLexaPanelMode('generate')}
+                  className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                  title="Generate Report (Lexa AI)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 13h6M9 17h6M9 9h2"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                <span
+                  className="h-6 w-px bg-[#4F4F4F]"
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => setLexaPanelMode('correct')}
+                  className="flex h-auto items-center justify-center py-2 px-4 text-white hover:bg-[#2e2e2e]"
+                  title="Correct Report (Lexa AI)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="25"
+                    height="25"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M14 3v4a1 1 0 0 0 1 1h4M5 3h9l5 5v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM9 14l2 2 4-4"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
+
             {/* Case Navigation Buttons */}
             {caseList.length > 1 && (
               <div className="flex items-center gap-2">
@@ -1281,12 +1809,140 @@ function ViewerLayout({
           servicesManager={servicesManager}
           open={showMeasurementModal}
           onClose={() => setShowMeasurementModal(false)}
-          onBreastDensityChange={value =>
+          onBreastDensityChange={value => {
+            // ACR breast density = highest BI-RADS density across ALL ROIs.
+            // Example: ROI-1=B, ROI-2=C, ROI-3=A → ACR shows C.
+            //
+            // `roiFormDataList` is captured by closure at render time; it
+            // may not yet contain the value the user is currently saving
+            // (no optimistic list update in the modal-save path), so we
+            // include `value` explicitly as an extra candidate. Anything
+            // outside A–D is ignored.
+            const DENSITY_RANK: Record<string, number> = { A: 1, B: 2, C: 3, D: 4 };
+            const candidates = [
+              ...(roiFormDataList || []).map(
+                f => (f as Record<string, unknown> | null)?.breastDensity as string | undefined
+              ),
+              value,
+            ].filter((d): d is string => typeof d === 'string' && d in DENSITY_RANK);
+            if (candidates.length === 0) {
+              return;
+            }
+            const highest = candidates.reduce(
+              (max, cur) => (DENSITY_RANK[cur] > DENSITY_RANK[max] ? cur : max),
+              candidates[0]
+            );
             setStudentAcrValues(prev => ({
               ...prev,
-              acr: value,
-            }))
-          }
+              acr: highest,
+            }));
+          }}
+          onBiRadsChange={savedForm => {
+            // BI-RADS propagation rules (driven by the ACR modality config
+            // — `r/l/overall_birads` field keys are the source of truth):
+            //
+            //   MG / DBT / CEM (config has `r` + `l`):
+            //     R = max BI-RADS across ROIs on RIGHT-laterality viewports
+            //     L = max BI-RADS across ROIs on LEFT-laterality viewports
+            //     Laterality = ImageLaterality of the series each ROI was
+            //     drawn on (from DicomMetadataStore).
+            //
+            //   MR / US (config has `overall_birads`):
+            //     overall_birads = max BI-RADS across ALL ROIs
+            //     (no laterality split — these forms don't carry a side).
+            //
+            // BI-RADS rank: 1 < 2 < 4 < 5 (3 is intentionally absent per
+            // BIEDX policy).
+            const acrFieldKeys = (acrConfig?.fields || []).map(f => f.key);
+            const hasR = acrFieldKeys.includes('r');
+            const hasL = acrFieldKeys.includes('l');
+            const hasOverall = acrFieldKeys.includes('overall_birads');
+            if (!hasR && !hasL && !hasOverall) {
+              return;
+            }
+
+            const BIRADS_RANK: Record<string, number> = { '1': 1, '2': 2, '4': 3, '5': 4 };
+            const measurements =
+              servicesManager.services.measurementService.getMeasurements?.() || [];
+
+            const getLat = (m: any): 'L' | 'R' | null => {
+              if (!m) {
+                return null;
+              }
+              try {
+                const instance = DicomMetadataStore.getInstance(
+                  m.referenceStudyUID,
+                  m.referenceSeriesUID,
+                  m.SOPInstanceUID
+                );
+                const lat = String((instance as any)?.ImageLaterality || '').toUpperCase();
+                if (lat === 'L' || lat === 'R') {
+                  return lat;
+                }
+              } catch {
+                /* fall through */
+              }
+              return null;
+            };
+
+            // Collect existing ROIs (skipping the one currently being
+            // edited, so we don't double-count its stale value alongside
+            // the fresh `savedForm`).
+            const editedUid = currentMeasurementUid;
+            const collected: Array<{ biRads: string; lat: 'L' | 'R' | null }> = [];
+            (roiFormDataList || []).forEach((f, idx) => {
+              if (!f) {
+                return;
+              }
+              const m = measurements[idx];
+              if (m && m.uid === editedUid) {
+                return;
+              }
+              const biRads = (f as Record<string, unknown>).biRads;
+              if (typeof biRads !== 'string' || !(biRads in BIRADS_RANK)) {
+                return;
+              }
+              collected.push({ biRads, lat: getLat(m) });
+            });
+
+            // Add the fresh submission. For RL modalities we need its
+            // laterality, looked up from currentMeasurementUid's series.
+            const freshBiRads = savedForm.biRads;
+            if (typeof freshBiRads === 'string' && freshBiRads in BIRADS_RANK) {
+              const editedMeas = editedUid
+                ? servicesManager.services.measurementService.getMeasurement?.(editedUid)
+                : null;
+              collected.push({ biRads: freshBiRads, lat: getLat(editedMeas) });
+            }
+
+            if (collected.length === 0) {
+              return;
+            }
+
+            const maxRank = (vals: string[]) =>
+              vals.reduce((max, cur) => (BIRADS_RANK[cur] > BIRADS_RANK[max] ? cur : max), vals[0]);
+
+            setStudentAcrValues(prev => {
+              const next = { ...prev };
+              if (hasR || hasL) {
+                const rs = collected.filter(c => c.lat === 'R').map(c => c.biRads);
+                const ls = collected.filter(c => c.lat === 'L').map(c => c.biRads);
+                if (hasR && rs.length > 0) {
+                  next.r = maxRank(rs);
+                }
+                if (hasL && ls.length > 0) {
+                  next.l = maxRank(ls);
+                }
+              }
+              if (hasOverall) {
+                const all = collected.map(c => c.biRads);
+                if (all.length > 0) {
+                  next.overall_birads = maxRank(all);
+                }
+              }
+              return next;
+            });
+          }}
           annotationIndex={currentAnnotationIndex}
         />
       )}
@@ -1338,21 +1994,80 @@ function ViewerLayout({
         onClose={() => setShowInstructionsModal(false)}
       />
 
+      {/*
+        OverlayFieldsModal is gated by `userType !== 'student'` via the
+        menu entry above, so students can't open it. On close (admin/faculty
+        only), we upsert the latest selection to
+        /admin/viewport-overlay-config for the case's (subspec, modality)
+        so it persists for every future student/admin who opens a case in
+        that combination — same data the admin panel's Configure Overlay
+        modal writes to.
+       */}
+      <OverlayFieldsModal
+        open={showOverlayFieldsModal}
+        onClose={() => {
+          setShowOverlayFieldsModal(false);
+          if (userType === 'student') return;
+          if (!subSpecialitySlug || !modalitySlug) return;
+          const fields = useOverlayFieldsStore.getState().selectedFields;
+          apiCall(() =>
+            apiService.post('/admin/viewport-overlay-config', {
+              sub_speciality_slug: subSpecialitySlug,
+              modality_slug: modalitySlug,
+              fields,
+            })
+          ).catch(err => {
+            // Non-fatal — the user's local picks still apply for this
+            // session (Zustand state). They'll just need to re-toggle to
+            // persist again. Logging suffices; no toast spam.
+            console.warn('Overlay config save failed:', err);
+          });
+        }}
+      />
+
       <CaseHistoryModal
         open={showCaseHistoryModal}
         onClose={() => setShowCaseHistoryModal(false)}
         initialValue={caseHistoryText}
-        onSave={userType === 'student' ? undefined : async (value: string) => {
-          setCaseHistoryText(value);
-          if (caseId) {
-            try {
-              await apiCall(() => apiService.patch(`/admin/cases/${caseId}/case-history`, { case_history: value }));
-            } catch (error) {
-              console.error('Error saving case history:', error);
-            }
-          }
-        }}
+        onSave={
+          userType === 'student'
+            ? undefined
+            : async (value: string) => {
+                setCaseHistoryText(value);
+                if (caseId) {
+                  try {
+                    await apiCall(() =>
+                      apiService.patch(`/admin/cases/${caseId}/case-history`, {
+                        case_history: value,
+                      })
+                    );
+                  } catch (error) {
+                    console.error('Error saving case history:', error);
+                  }
+                }
+              }
+        }
         readOnly={userType === 'student'}
+      />
+
+      <LexaReportingPanel
+        open={lexaPanelMode !== null}
+        mode={lexaPanelMode || 'generate'}
+        onClose={() => setLexaPanelMode(null)}
+        userType={userType as string}
+        modalitySlug={modalitySlug}
+        defaultKeyFindings={lexaKeyFindings}
+        defaultAdditionalDetails={caseHistoryText}
+        defaultScenario={lexaDefaultScenario}
+        defaultCaseName={lexaCaseName}
+        defaultPatientAge={patientInfo.age}
+        defaultPatientSex={patientInfo.sex}
+        courseId={courseId}
+        moduleId={moduleId}
+        caseId={caseId}
+        isFellowship={isFellowship}
+        programId={programId}
+        phaseId={phaseId}
       />
     </div>
   );

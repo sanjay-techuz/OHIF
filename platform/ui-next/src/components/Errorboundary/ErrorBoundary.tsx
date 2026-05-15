@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ErrorBoundary as ReactErrorBoundary, FallbackProps } from 'react-error-boundary';
+import React, { useEffect, useState } from 'react';
+import { FallbackProps, ErrorBoundary as ReactErrorBoundary } from 'react-error-boundary';
 import { useTranslation } from 'react-i18next';
+import { useNotification } from '../../contextProviders';
+import { Button } from '../Button/Button';
 import { Dialog, DialogContent } from '../Dialog/Dialog';
 import { ScrollArea } from '../ScrollArea/ScrollArea';
-import { Button } from '../Button/Button';
-import { useNotification } from '../../contextProviders';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -137,7 +137,15 @@ const DefaultFallback = ({
   const [showDetails, setShowDetails] = useState(false);
   const { show } = useNotification();
 
-  const title = `${t('Something went wrong')}${!isProduction && ` ${t('in')} ${context}`}.`;
+  // Bug fix: the previous template used `${!isProduction && ' in CTX'}`
+  // which renders the literal string "false" when `!isProduction` is
+  // false (because `false && …` short-circuits to the boolean `false`,
+  // and template literals coerce that to "false"). That's what produced
+  // the user-visible "Something went wrongfalse." in production toasts.
+  // Use a ternary so the empty branch is the empty string.
+  const title = isProduction
+    ? `${t('Something went wrong')}.`
+    : `${t('Something went wrong')} ${t('in')} ${context}.`;
   const subtitle = t('Sorry, something went wrong there. Try again.');
 
   const { errorTitle, code, firstFilename } = parseErrorStack(error);
@@ -176,18 +184,24 @@ const DefaultFallback = ({
     return null;
   }
 
+  // BIEDX-themed error details modal. Matches the QuestionAnswerModal /
+  // ACRSelectorModal palette: dark navy surface, subtle 1px border,
+  // brand-pink title accent. The original "Report Issue" link pointed at
+  // github.com/OHIF/Viewers — removed entirely; users have no use for an
+  // upstream-OHIF bug tracker and it leaks the underlying viewer brand.
   return (
     <Dialog
       open={showDetails}
       onOpenChange={setShowDetails}
     >
       <DialogContent
-        className="bg-muted max-w-3xl overflow-hidden rounded-xl border-0 p-0 shadow-2xl"
+        className="max-w-3xl overflow-hidden rounded-2xl border border-[#2D2728] p-0 text-white shadow-2xl"
+        style={{ backgroundColor: 'rgba(11, 10, 10, 0.98)' }}
         onInteractOutside={e => e.preventDefault()}
       >
         <div className="px-6 pt-5 pb-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-highlight pr-8 text-lg font-medium leading-snug">
+            <h2 className="pr-8 text-lg font-semibold leading-snug text-[hsl(var(--highlight))]">
               {errorTitle || error.message || title}
             </h2>
           </div>
@@ -195,47 +209,39 @@ const DefaultFallback = ({
 
         {/* Code block */}
         {code && (
-          <>
-            <ScrollArea className="bg-background text-foreground mx-6 h-[321px] overflow-hidden rounded-md">
-              <div className="bg-background border-input flex items-center justify-between rounded-t-md border-b px-4 py-2">
-                <div className="text-muted-foreground text-sm">
-                  {firstFilename || 'Error Stack'}
-                </div>
-                <Button
-                  className="h-8 w-20"
-                  onClick={copyErrorToClipboard}
-                  title={t('Copy error')}
+          <ScrollArea className="mx-6 h-[321px] overflow-hidden rounded-md border border-[#2D2728] bg-[#0B0A0A] text-white">
+            <div className="flex items-center justify-between rounded-t-md border-b border-[#2D2728] bg-[#171616] px-4 py-2">
+              <div className="text-sm text-white/60">{firstFilename || 'Error Stack'}</div>
+              <Button
+                className="h-8 w-20 rounded-lg text-white"
+                style={{ backgroundColor: 'hsl(var(--highlight))' }}
+                onClick={copyErrorToClipboard}
+                title={t('Copy error')}
+              >
+                Copy
+              </Button>
+            </div>
+            <div className="text-white/85 p-4 font-mono text-xs leading-relaxed">
+              {code.split('\n').map((line, index) => (
+                <div
+                  key={index}
+                  className="flex"
                 >
-                  Copy
-                </Button>
-              </div>
-              <div className="p-4 font-mono text-xs leading-relaxed">
-                {code.split('\n').map((line, index) => (
-                  <div
-                    key={index}
-                    className="flex"
-                  >
-                    <span className="whitespace-pre">{line}</span>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </>
+                  <span className="whitespace-pre">{line}</span>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-6 pt-2 pb-5">
+        <div className="flex items-center justify-end gap-3 px-6 pt-3 pb-5">
           <Button
-            variant="link"
-            className="text-primary p-0"
-            onClick={() =>
-              window.open(
-                'https://github.com/OHIF/Viewers/issues/new?template=bug-report.yml',
-                '_blank'
-              )
-            }
+            variant="ghost"
+            className="rounded-lg border border-[#2D2728] px-4 py-2 text-sm text-white/80 hover:bg-white/5"
+            onClick={() => setShowDetails(false)}
           >
-            Report Issue
+            Close
           </Button>
         </div>
       </DialogContent>
