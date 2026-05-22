@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Enums as CoreEnums } from '@cornerstonejs/core';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
@@ -63,8 +64,13 @@ function ViewerLayout({
 }: withAppTypes): React.FunctionComponent {
   const [appConfig] = useAppConfig();
 
-  const { panelService, hangingProtocolService, customizationService, displaySetService } =
-    servicesManager.services;
+  const {
+    panelService,
+    hangingProtocolService,
+    customizationService,
+    displaySetService,
+    cornerstoneViewportService,
+  } = servicesManager.services;
   // Use the app config flag as originally intended; do not force a loader on.
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(appConfig.showLoadingIndicator);
 
@@ -266,24 +272,133 @@ function ViewerLayout({
             ? '@ohif/hpMR'
             : null;
 
+    // Two-phase loader gate:
+    //   Phase 1: PROTOCOL_CHANGED for target HP — protocol is now active, layout
+    //            is correct, but image pixels for the N viewports may still be
+    //            fetching/decoding.
+    //   Phase 2: every viewport's first IMAGE_RENDERED with non-zero dimensions —
+    //            pixels are decoded and the breast/scan is actually painted.
+    // Hiding the loader at Phase 1 alone (the previous behavior) let the user
+    // see partially-empty grids ("WW/WL: -- / --", "1/0", blank panes) until
+    // the remaining viewports caught up. We now hold the loader until Phase 2
+    // completes. For multi-frame stacks (DBT, MRI) only the FIRST frame is
+    // gated — subsequent frame prefetch keeps running in the background,
+    // preserving the existing scroll-to-next-frame behavior.
+    //
+    // Safety net: 30s hard ceiling so a stuck decode never traps the user.
+    const HARD_TIMEOUT_MS = 30000;
+    const renderedElements = new Set<HTMLElement>();
+    const attachedListeners: Array<{ el: HTMLElement; fn: EventListener }> = [];
+    let viewportDataUnsub: (() => void) | null = null;
+    let hardTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolved = false;
+    let watchStarted = false;
+
+    const detachAll = () => {
+      attachedListeners.forEach(({ el, fn }) =>
+        el.removeEventListener(CoreEnums.Events.IMAGE_RENDERED, fn)
+      );
+      attachedListeners.length = 0;
+      if (viewportDataUnsub) {
+        viewportDataUnsub();
+        viewportDataUnsub = null;
+      }
+      if (hardTimer) {
+        clearTimeout(hardTimer);
+        hardTimer = null;
+      }
+    };
+
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      setShowLoadingIndicator(false);
+      detachAll();
+    };
+
+    const hasValidDims = (vp: any): boolean => {
+      const dims = vp?.getImageData?.()?.dimensions;
+      return Array.isArray(dims) && dims[0] > 0 && dims[1] > 0;
+    };
+
+    const beginViewportWatch = () => {
+      if (watchStarted) return;
+      watchStarted = true;
+      const numPanes =
+        hangingProtocolService.protocol?.stages?.[hangingProtocolService.stageIndex]?.viewports
+          ?.length ?? 1;
+
+      const tryFinish = () => {
+        if (renderedElements.size >= numPanes) finish();
+      };
+
+      const watchViewport = (viewportId: string | undefined) => {
+        if (!viewportId || !cornerstoneViewportService) return;
+        const vp = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+        const el = (vp as any)?.element as HTMLElement | undefined;
+        if (!el || renderedElements.has(el)) return;
+
+        if (hasValidDims(vp)) {
+          renderedElements.add(el);
+          tryFinish();
+          return;
+        }
+        const onRendered = () => {
+          if (!hasValidDims(vp)) return;
+          el.removeEventListener(CoreEnums.Events.IMAGE_RENDERED, onRendered);
+          renderedElements.add(el);
+          tryFinish();
+        };
+        el.addEventListener(CoreEnums.Events.IMAGE_RENDERED, onRendered);
+        attachedListeners.push({ el, fn: onRendered });
+      };
+
+      if (cornerstoneViewportService?.subscribe && cornerstoneViewportService.EVENTS) {
+        const sub = cornerstoneViewportService.subscribe(
+          cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
+          (evt: any) => watchViewport(evt?.viewportId)
+        );
+        viewportDataUnsub = sub?.unsubscribe ?? null;
+      }
+
+      // Catch viewports that already had their data set before this subscriber
+      // ran (e.g. fast cache hits during a stage swap).
+      try {
+        const re = cornerstoneViewportService?.getRenderingEngine?.();
+        const viewports = re?.getViewports?.();
+        if (viewports) {
+          Object.values(viewports).forEach((vp: any) => watchViewport(vp?.id));
+        }
+      } catch {
+        /* non-fatal */
+      }
+
+      hardTimer = setTimeout(finish, HARD_TIMEOUT_MS);
+    };
+
     const { unsubscribe } = hangingProtocolService.subscribe(
       HangingProtocolService.EVENTS.PROTOCOL_CHANGED,
       event => {
+        if (resolved) return;
         if (!targetProtocolId) {
-          setShowLoadingIndicator(false);
+          // No custom-HP mapping (e.g. US). Original behavior: hide on first
+          // PROTOCOL_CHANGED — but still wait for the panes to render so the
+          // user doesn't see a half-empty grid.
+          beginViewportWatch();
           return;
         }
         const activeId = event?.protocol?.id ?? hangingProtocolService.protocol?.id;
         if (activeId === targetProtocolId) {
-          setShowLoadingIndicator(false);
+          beginViewportWatch();
         }
       }
     );
 
     return () => {
       unsubscribe();
+      detachAll();
     };
-  }, [hangingProtocolService, modalitySlug]);
+  }, [hangingProtocolService, modalitySlug, cornerstoneViewportService]);
 
   const getViewportComponentData = viewportComponent => {
     const { entry } = getComponent(viewportComponent.namespace);

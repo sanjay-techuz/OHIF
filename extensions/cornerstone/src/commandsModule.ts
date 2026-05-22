@@ -1089,15 +1089,24 @@ function commandsModule({
           return;
         }
 
-        // Check if viewports are ready (have image data)
+        // Check if viewports are ready (have image data AND non-zero dimensions).
+        // The previous check `imageData.dimensions || imageData.width` always passed
+        // because a `[0, 0]` array is truthy in JS — so the retry never actually
+        // retried and `parallelScale` would be computed as `Math.max(0,0)/2 = 0`,
+        // producing the "Zoom: 0.01x" microscopic-image bug on slow first-load.
         const readyViewports = targetViewports.filter(viewport => {
           if (!(viewport instanceof StackViewport)) {
             return false;
           }
           const imageData = viewport.getImageData();
-          return imageData && (imageData.dimensions || imageData.width);
+          const dims = imageData?.dimensions;
+          return Array.isArray(dims) && dims[0] > 0 && dims[1] > 0;
         });
 
+        // If no viewports have valid dimensions yet, retry. If we've exhausted
+        // retries, return without touching the camera — the hanging protocol's
+        // `imageArea: [0.8, 0.8]` default fit will hold (clean fit-to-window,
+        // never microscopic).
         if (readyViewports.length === 0) {
           if (attempt < maxAttempts) {
             setTimeout(() => applyZoomWithRetry(attempt + 1, maxAttempts), 200 * attempt);
@@ -1464,16 +1473,59 @@ function commandsModule({
       const EVENT = cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED;
       const command = protocol.callbacks.onViewportDataInitialized;
       const numPanes = protocol.stages?.[stageIndex]?.viewports.length ?? 1;
-      let numPanesWithData = 0;
-      const { unsubscribe } = cornerstoneViewportService.subscribe(EVENT, evt => {
-        numPanesWithData++;
 
-        if (numPanesWithData === numPanes) {
+      // Two-phase readiness:
+      //   Phase 1: VIEWPORT_DATA_CHANGED — stack assigned, but pixels may not be
+      //            decoded yet (image dimensions can still read as [0,0]).
+      //   Phase 2: IMAGE_RENDERED       — pixels decoded, dimensions populated;
+      //            this is when fit-to-window math is safe to run.
+      // The previous code only waited on Phase 1, which raced with the decode
+      // and caused mammography zoom to be applied against zero dimensions
+      // (Zoom: 0.01x / clipped / undersized viewports on first load).
+      const renderedElements = new Set<HTMLElement>();
+      let allPanesRendered = false;
+
+      const tryRunCommand = () => {
+        if (allPanesRendered) return;
+        if (renderedElements.size >= numPanes) {
+          allPanesRendered = true;
           commandsManager.run(...command);
-
-          // Unsubscribe from the event
-          unsubscribe(EVENT);
         }
+      };
+
+      const hasValidDimensions = (viewport: unknown): boolean => {
+        if (!(viewport instanceof StackViewport)) return false;
+        const dims = viewport.getImageData()?.dimensions;
+        return Array.isArray(dims) && dims[0] > 0 && dims[1] > 0;
+      };
+
+      const { unsubscribe } = cornerstoneViewportService.subscribe(EVENT, evt => {
+        // Event payload from CornerstoneViewportService._broadcastEvent is
+        // `{ viewportData, viewportId }` at the top level (see service line 1028).
+        const viewportId = evt?.viewportId;
+        if (!viewportId) return;
+        const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+        const element = viewport?.element as HTMLElement | undefined;
+        if (!element || renderedElements.has(element)) return;
+
+        // Fast path: if pixels already decoded by the time VIEWPORT_DATA_CHANGED
+        // arrives (cached image, or synchronous-decode codec), count immediately.
+        if (hasValidDimensions(viewport)) {
+          renderedElements.add(element);
+          tryRunCommand();
+          if (allPanesRendered) unsubscribe(EVENT);
+          return;
+        }
+
+        // Slow path: wait for IMAGE_RENDERED on this viewport's element.
+        const onRendered = () => {
+          if (!hasValidDimensions(viewport)) return;
+          element.removeEventListener(CoreEnums.Events.IMAGE_RENDERED, onRendered);
+          renderedElements.add(element);
+          tryRunCommand();
+          if (allPanesRendered) unsubscribe(EVENT);
+        };
+        element.addEventListener(CoreEnums.Events.IMAGE_RENDERED, onRendered);
       });
     },
 
