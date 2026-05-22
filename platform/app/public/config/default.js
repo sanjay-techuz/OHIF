@@ -9,8 +9,11 @@ window.config = {
   customizationService: {},
   showStudyList: true,
   showPatientInfo: 'disabled', // Hide patient info from header
-  // some windows systems have issues with more than 3 web workers
-  maxNumberOfWebWorkers: 3,
+  // Cornerstone caps this further to (navigator.hardwareConcurrency - 1)
+  // in initWADOImageLoader.js, so low-spec machines still get a sensible
+  // value. Raised from 3 to 8 to fully utilise modern multi-core clients —
+  // critical for CEM 8-viewport layouts and DBT multi-frame decode.
+  maxNumberOfWebWorkers: 8,
   // below flag is for performance reasons, but it might not work for all servers
   showWarningMessageForCrossOrigin: true,
   showCPUFallbackMessage: true,

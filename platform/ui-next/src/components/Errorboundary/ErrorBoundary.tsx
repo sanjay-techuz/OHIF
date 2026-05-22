@@ -201,7 +201,7 @@ const DefaultFallback = ({
       >
         <div className="px-6 pt-5 pb-3">
           <div className="flex items-center justify-between">
-            <h2 className="pr-8 text-lg font-semibold leading-snug text-[hsl(var(--highlight))]">
+            <h2 className="pr-8 text-lg font-semibold leading-snug text-[#F59E0B]">
               {errorTitle || error.message || title}
             </h2>
           </div>

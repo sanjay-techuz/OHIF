@@ -9,6 +9,12 @@ window.config = {
   showWarningMessageForCrossOrigin: true,
   showCPUFallbackMessage: true,
   showLoadingIndicator: true,
+  // Cornerstone caps this further to (navigator.hardwareConcurrency - 1)
+  // at runtime in initWADOImageLoader.js, so low-spec machines still get
+  // a sensible value. Raised from default (3) to 8 to fully utilise modern
+  // multi-core clients — critical for CEM 8-viewport layouts and DBT
+  // multi-frame decode.
+  maxNumberOfWebWorkers: 8,
   // Automatically track all measurements without confirmation popup
   measurementTrackingMode: 'simplified',
   experimentalStudyBrowserSort: false,

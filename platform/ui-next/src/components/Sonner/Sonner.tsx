@@ -31,9 +31,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       icons={{
         warning: <Icons.StatusWarning />,
-        info: <Icons.Info className="text-[hsl(var(--highlight))]" />,
+        info: <Icons.Info className="text-[#F59E0B]" />,
         success: <Icons.StatusSuccess />,
-        error: <Icons.StatusError className="text-[hsl(var(--highlight))]" />,
+        error: <Icons.StatusError className="text-[#F59E0B]" />,
       }}
       theme="dark"
       // Distance from viewport edges. The previous `20px` value (less

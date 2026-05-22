@@ -336,7 +336,7 @@ input[type='number'] {
   line-height: 1.45;
 }
 [data-sonner-toaster][data-theme='dark'] .biedx-toast__icon {
-  color: hsl(var(--highlight));
+  color: #F59E0B;
 }
 [data-sonner-toaster][data-theme='dark'] .biedx-toast__action {
   background: hsl(var(--highlight)) !important;
@@ -371,14 +371,14 @@ input[type='number'] {
 }
 /* Variant accents — left-border colored stripe by toast type */
 [data-sonner-toaster][data-theme='dark'] .biedx-toast--error {
-  border-left: 3px solid hsl(var(--highlight)) !important;
+  border-left: 3px solid #F59E0B !important;
 }
 [data-sonner-toaster][data-theme='dark'] .biedx-toast--success {
-  border-left: 3px solid #22C55E !important;
+  border-left: 3px solid #F59E0B !important;
 }
 [data-sonner-toaster][data-theme='dark'] .biedx-toast--warning {
   border-left: 3px solid #F59E0B !important;
 }
 [data-sonner-toaster][data-theme='dark'] .biedx-toast--info {
-  border-left: 3px solid hsl(var(--highlight)) !important;
+  border-left: 3px solid #F59E0B !important;
 }

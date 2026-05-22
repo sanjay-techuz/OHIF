@@ -186,7 +186,7 @@ const TextArea: React.FC<{
 
 // Three-dot bouncing typing indicator (ChatGPT/Gemini style). Pure CSS via
 // Tailwind `animate-bounce` utility with staggered delays.
-const TypingIndicator: React.FC = () => (
+const TypingIndicator: React.FC<{ mode: LexaMode }> = ({ mode }) => (
   <div className="flex flex-col items-center justify-center py-10">
     <div className="flex items-end gap-1.5">
       <span
@@ -202,7 +202,9 @@ const TypingIndicator: React.FC = () => (
         style={{ animationDelay: '300ms', animationDuration: '1.2s' }}
       />
     </div>
-    <p className="text-primary-light mt-4 text-sm opacity-70">Lexa is generating your report…</p>
+    <p className="text-primary-light mt-4 text-sm opacity-70">
+      {mode === 'generate' ? 'Lexa is generating your report…' : 'Lexa is reviewing your case…'}
+    </p>
   </div>
 );
 
@@ -1065,7 +1067,7 @@ const LexaReportingPanel: React.FC<LexaReportingPanelProps> = ({
                 className="rounded-lg border border-[#4F4F4F] p-4"
                 style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}
               >
-                <TypingIndicator />
+                <TypingIndicator mode={mode} />
               </div>
             )}
             {response && !isLoading && (
