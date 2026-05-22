@@ -25,6 +25,40 @@ local WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 -- process, which is exactly the lifetime we need.
 local studiesDeletedAfterAnonymize = {}
 
+-- ====================================
+--  Auto-transcode tracking
+-- ====================================
+-- Studies we've already submitted a JPEG 2000 Lossless transcode job for.
+-- The transcode runs Asynchronous:true, so the job may still be running
+-- when subsequent OnStableStudy events fire for the same study (e.g.
+-- caused by the in-place modify itself transitioning the study back to
+-- unstable then re-stable). This in-process table prevents duplicate
+-- job submissions for the same study.
+local studiesTranscodeSubmitted = {}
+
+-- Returns true if the study should be transcoded — i.e. its first instance
+-- isn't already in our target transfer syntax (JPEG 2000 Lossless).
+-- This is a cheap check: one REST call to /instances?limit=1 + one to
+-- /metadata?expand. The actual transcode is much more expensive.
+local function shouldTranscode(sid)
+    local ok, instancesJson = pcall(function()
+        return RestApiGet('/studies/' .. sid .. '/instances?limit=1')
+    end)
+    if not ok or not instancesJson then return false end
+    local instances = ParseJson(instancesJson)
+    if not instances or #instances == 0 then return false end
+    local mok, metaJson = pcall(function()
+        return RestApiGet('/instances/' .. instances[1].ID .. '/metadata?expand')
+    end)
+    if not mok or not metaJson then return false end
+    local meta = ParseJson(metaJson)
+    -- 1.2.840.10008.1.2.4.90 = JPEG 2000 Image Compression, Lossless Only
+    if meta and meta.TransferSyntax == '1.2.840.10008.1.2.4.90' then
+        return false  -- already in target format
+    end
+    return true
+end
+
 
 -- ====================================
 --  Function: Handle study auto-anonymization
@@ -256,6 +290,54 @@ function OnStableStudy(studyId, tags, metadata)
     else
         print("ERROR", "Failed to send webhook for study: " .. studyId .. " to " .. WEBHOOK_URL)
     end
+
+    -- 3️⃣ Auto-transcode to JPEG 2000 Lossless. ASYNCHRONOUS so this
+    --    callback returns immediately and other studies' OnStableStudy
+    --    events don't queue behind this one. Orthanc's job engine handles
+    --    the transcode in background (parallelism capped by ConcurrentJobs
+    --    in orthanc.json).
+    --
+    --    The modify keeps all 3 UIDs (Study/Series/SOPInstance) +
+    --    KeepSource:true. With OverwriteInstances:true (already set in
+    --    orthanc.json) this becomes a TRUE IN-PLACE transcode: the
+    --    returned Orthanc UUID is the same as the source, all OHIF URLs,
+    --    DICOMweb references, and biedx-node Cases.study_instance_uid
+    --    linkages continue to resolve.
+    --
+    --    Pixel data is bit-identical to the source (lossless verified in
+    --    Phase A standalone testing). Only the on-disk transfer-syntax
+    --    encoding changes — ~3-6× smaller files on Azure Blob.
+    --
+    --    Re-entry guards:
+    --      - studiesTranscodeSubmitted (in-process Lua) prevents duplicate
+    --        job submissions for the same study while the first is running
+    --      - shouldTranscode() also short-circuits if the first instance
+    --        already shows the target transfer syntax (handles Lua restart
+    --        case where studiesTranscodeSubmitted is reset but storage is
+    --        already transcoded)
+    --
+    --    Failure handling: pcall catches errors; on failure we clear the
+    --    in-process flag so a subsequent OnStableStudy can retry.
+    if not studiesTranscodeSubmitted[studyId] and shouldTranscode(studyId) then
+        studiesTranscodeSubmitted[studyId] = true
+        local transcodeRequest = {
+            Transcode = "1.2.840.10008.1.2.4.90",
+            KeepSource = true,
+            Force = true,
+            Asynchronous = true,
+            Keep = {"StudyInstanceUID", "SeriesInstanceUID", "SOPInstanceUID"}
+        }
+        local tcOk, tcResp = pcall(function()
+            return RestApiPost('/studies/' .. studyId .. '/modify', DumpJson(transcodeRequest))
+        end)
+        if tcOk and tcResp and tcResp ~= '' then
+            print("INFO", "Transcode job submitted for " .. studyId .. " -> JPEG 2000 Lossless (async)")
+        else
+            print("WARN", "Transcode submission failed for " .. studyId .. ": " .. tostring(tcResp))
+            -- Allow retry on the next OnStableStudy event for this study
+            studiesTranscodeSubmitted[studyId] = nil
+        end
+    end
 end
 
 
@@ -263,6 +345,11 @@ end
 --  Event: OnDeletedStudy
 -- ====================================
 function OnDeletedStudy(studyId)
+    -- Drop the transcode-tracking entry so a future re-upload of the same
+    -- StudyInstanceUID (which gets a new Orthanc UUID anyway, so unlikely
+    -- to collide here) can be processed cleanly.
+    studiesTranscodeSubmitted[studyId] = nil
+
     -- Suppress the Delete webhook for studies we deleted ourselves right
     -- after anonymizing. The backend never received a StudyModified
     -- webhook for those source IDs (we suppressed it above), so there is
