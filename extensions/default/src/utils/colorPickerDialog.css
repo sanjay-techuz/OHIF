@@ -1,3 +1,33 @@
-.chrome-picker {
-  background: #090c29 !important;
+/* Make the react-color ChromePicker blend with BIEDX dark modal theme. */
+.biedx-color-picker-dialog .chrome-picker {
+  background: transparent !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+}
+
+/* The picker renders an inner padded container; lighten its bg + drop the harsh
+   navy default so the swatch/sliders/input read against the modal grey. */
+.biedx-color-picker-dialog .chrome-picker > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 8px;
+  padding-bottom: 12px !important;
+}
+
+/* HEX input box: keep light bg for legibility but soften the border. */
+.biedx-color-picker-dialog .chrome-picker input {
+  background: #ffffff !important;
+  color: #111 !important;
+  border-radius: 4px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+}
+
+/* "HEX" label below the input. */
+.biedx-color-picker-dialog .chrome-picker label {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.biedx-color-picker-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }

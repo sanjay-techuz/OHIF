@@ -28,6 +28,28 @@ const currentStudyMatchingRules = [
   },
 ];
 
+// Standard screening views (plain CC/MLO) carry no ViewModifierCodeSequence;
+// spot-compression / magnification / rolled / cleavage views do. When a case
+// contains BOTH a standard and a modified acquisition of the same (laterality,
+// view) — e.g. a standard RMLO and a GE "RMSMLO" spot-mag MLO — every other
+// scored attribute is identical, so they tie and the modified view can win the
+// pane by chance. This optional bonus tips the tie toward the standard view.
+//
+// It is keyed on the `ViewModifier` custom attribute (returns 'NONE' for a
+// standard view). The weight is deliberately kept BELOW the laterality weight
+// (25) so it only ever breaks a same-view tie and never perturbs the cross-view
+// (CC vs MLO) ranking. Because it is optional (required: false) it never
+// excludes a modified view — a case that only has a spot/mag acquisition still
+// fills the pane with it.
+const standardViewBonusRule = {
+  weight: 15,
+  attribute: 'ViewModifier',
+  required: false,
+  constraint: {
+    equals: 'NONE',
+  },
+};
+
 const LCCSeriesMatchingRules = [
   {
     weight: 10,
@@ -60,6 +82,7 @@ const LCCSeriesMatchingRules = [
       equals: 'L',
     },
   },
+  standardViewBonusRule,
 ];
 
 const RCCSeriesMatchingRules = [
@@ -100,6 +123,7 @@ const RCCSeriesMatchingRules = [
       equals: 'R',
     },
   },
+  standardViewBonusRule,
 ];
 
 const LMLOSeriesMatchingRules = [
@@ -141,6 +165,7 @@ const LMLOSeriesMatchingRules = [
       equals: 'L',
     },
   },
+  standardViewBonusRule,
 ];
 
 const RMLOSeriesMatchingRules = [
@@ -210,6 +235,7 @@ const RMLOSeriesMatchingRules = [
       equals: 'R',
     },
   },
+  standardViewBonusRule,
 ];
 
 const RCC = {
@@ -291,6 +317,7 @@ const RCC3DSeriesMatchingRules = [
       contains: ['P', 'L'],
     },
   },
+  standardViewBonusRule,
 ];
 
 const LCC3DSeriesMatchingRules = [
@@ -331,6 +358,7 @@ const LCC3DSeriesMatchingRules = [
       contains: ['A', 'R'],
     },
   },
+  standardViewBonusRule,
 ];
 
 const RMLO3DSeriesMatchingRules = [
@@ -380,6 +408,7 @@ const RMLO3DSeriesMatchingRules = [
       contains: ['P', 'FL'],
     },
   },
+  standardViewBonusRule,
 ];
 
 const LMLO3DSeriesMatchingRules = [
@@ -429,6 +458,7 @@ const LMLO3DSeriesMatchingRules = [
       contains: ['A', 'FR'],
     },
   },
+  standardViewBonusRule,
 ];
 
 // DBT Display Set Objects

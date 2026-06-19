@@ -1,0 +1,71 @@
+/* Custom-color ChromePicker tucked under the preset color palette in the
+   multi-label dialog. Same blend with the dark modal as colorPickerDialog. */
+.biedx-mini-picker .chrome-picker {
+  background: transparent !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+}
+.biedx-mini-picker .chrome-picker > div:nth-child(2) {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 6px;
+  padding-bottom: 8px !important;
+}
+.biedx-mini-picker .chrome-picker input {
+  background: #ffffff !important;
+  color: #111 !important;
+  border-radius: 4px !important;
+}
+.biedx-mini-picker .chrome-picker label {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Dark-theme text input for the label-text field. Same visual language as
+   the rest of the modal (dark translucent fill, soft white border on focus). */
+.biedx-ml-input {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.biedx-ml-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.biedx-ml-input:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.biedx-ml-input:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark-theme select for the font-size dropdown. Custom caret because the
+   native white triangle clashes with the dark fill. */
+.biedx-ml-select {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 14px;
+  padding-right: 28px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23ffffffaa' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 10px 7px;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.biedx-ml-select:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.biedx-ml-select:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+/* The <option> elements pop out of the select using the OS native style,
+   which is light by default; force dark to match the rest of the modal. */
+.biedx-ml-select option {
+  background-color: #1f1f1f;
+  color: #fff;
+}

@@ -32,6 +32,7 @@ import nthLoader from './utils/nthLoader';
 import interleaveTopToBottom from './utils/interleaveTopToBottom';
 import initContextMenu from './initContextMenu';
 import initDoubleClick from './initDoubleClick';
+import initOneShotMeasurementTools from './initOneShotMeasurementTools';
 import initViewTiming from './utils/initViewTiming';
 import { colormaps } from './utils/colormaps';
 import { SegmentationRepresentations } from '@cornerstonejs/tools/enums';
@@ -236,6 +237,14 @@ export default async function init({
   initDoubleClick({
     customizationService,
     commandsManager,
+  });
+
+  // After a measurement tool finishes drawing one annotation, revert
+  // Mouse_Primary to the default tool (Zoom). Prevents the "just-drew-a-
+  // circle, next click accidentally drew another" UX.
+  initOneShotMeasurementTools({
+    toolGroupService: servicesManager.services.toolGroupService,
+    viewportGridService,
   });
 
   /**

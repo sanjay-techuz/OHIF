@@ -7,6 +7,11 @@ import { useNavigate } from 'react-router-dom';
 import MoreDropdownMenu from '../../Components/MoreDropdownMenu';
 import { defaultActionIcons } from './constants';
 import { PanelStudyBrowserHeader } from './PanelStudyBrowserHeader';
+import { useUIStateStore } from '../../stores/useUIStateStore';
+// Same `getViewLabel` source the viewport overlay uses (one source of truth).
+import { getViewLabel, getDisplaySetInstance } from '../../utils/getViewLabel';
+// Note: NOT imported via '@ohif/extension-default' here because we ARE
+// extension-default; importing your own package name creates a circular ref.
 
 const { sortStudyInstances, formatDate, createStudyBrowserTabs } = utils;
 
@@ -685,7 +690,16 @@ function PanelStudyBrowser({
     customMapDisplaySets,
   ]);
 
-  const tabs = createStudyBrowserTabs(StudyInstanceUIDs, studyDisplayList, displaySets);
+  // Override StudyDescription with the current case title (e.g. "Case 132")
+  // so the sidebar shows the case identifier instead of the raw DICOM
+  // StudyDescription. Reactive — ViewerLayout pushes the title to
+  // useUIStateStore for both student and faculty paths.
+  const caseTitle = useUIStateStore(state => state.uiState.caseTitle as string | undefined);
+  const displayList = caseTitle
+    ? studyDisplayList.map(s => ({ ...s, description: caseTitle }))
+    : studyDisplayList;
+
+  const tabs = createStudyBrowserTabs(StudyInstanceUIDs, displayList, displaySets);
 
   // TODO: Should not fire this on "close"
   function _handleStudyClick(StudyInstanceUID) {
@@ -818,9 +832,15 @@ function _mapDisplaySets(displaySets, displaySetLoadingState, thumbnailImageSrcM
 
       const loadingProgress = displaySetLoadingState?.[displaySetInstanceUID];
 
+      // Sidebar card label: prefer a clinical view label (RCC / LMLO / Axial T1
+      // / MIP / etc.) derived from per-instance DICOM tags, so cards match
+      // what the viewport overlay shows. Falls back to SeriesDescription when
+      // the view label can't be derived — never produces a misleading label.
+      const viewLabel = getViewLabel(getDisplaySetInstance(ds));
+
       array.push({
         displaySetInstanceUID,
-        description: ds.SeriesDescription || '',
+        description: viewLabel || ds.SeriesDescription || '',
         seriesNumber: ds.SeriesNumber,
         modality: ds.Modality,
         seriesDate: formatDate(ds.SeriesDate),

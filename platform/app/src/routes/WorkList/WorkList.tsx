@@ -497,8 +497,7 @@ function WorkList({
           </div>
         </StudyListExpandedRow>
       ),
-      onClickRow: () =>
-        setExpandedRows(s => (isExpanded ? s.filter(n => rowKey !== n) : [...s, rowKey])),
+      onClickRow: () => setExpandedRows(isExpanded ? [] : [rowKey]),
       isExpanded,
     };
   });

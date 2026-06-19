@@ -12,8 +12,19 @@ export default {
             commands: 'removeMeasurement',
           },
           {
-            label: 'Add Label',
+            label: 'Add labels',
             commands: 'setMeasurementLabel',
+          },
+          // "Change Color" — opens the existing `colorPickerDialog` and
+          // applies the chosen color to this annotation via cornerstone3D's
+          // per-annotation style API. Color rides inside annotation.data.color
+          // so it survives re-renders and round-trips through the existing
+          // annotation load/save flow (see initMeasurementService.ts:458-463
+          // for the load-side application). Same selector as Delete/Add Label
+          // — only visible when right-clicking an existing annotation.
+          {
+            label: 'Change Color',
+            commands: 'changeMeasurementColor',
           },
           // Show Question Modal
           {

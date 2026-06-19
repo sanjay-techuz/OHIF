@@ -168,6 +168,11 @@ const bindings = [
     keys: ['backspace'],
   },
   {
+    commandName: 'deleteActiveAnnotation',
+    label: 'Delete Annotation (Del)',
+    keys: ['del'],
+  },
+  {
     commandName: 'acceptPreview',
     label: 'Accept Preview',
     keys: ['enter'],

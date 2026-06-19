@@ -42,6 +42,28 @@ const defaultDisplayArea = {
   // scale: 1.5,
 };
 
+// Centered fit used for the normal (non-partial-view) MG stages.
+// `imageArea: [1.0, 1.0]` tells cornerstone to scale the image so the
+// constraining dimension (width for a tall MG image in a tall narrow
+// viewport) exactly fills the canvas — no cutoff on the sides, no
+// chest-wall pinning. The cornerstone math is
+//   absZoom = currentScale / (areaX * imgWidth/canvasWidth)
+// so `areaX = 1.0` gives absZoom = 1.0, then `setZoom(1.1 * 1.0)`
+// cancels the 10% `insetImageMultiplier` cornerstone bakes into its
+// fit-to-canvas camera. End result: image fills 100% of canvas width
+// (or height, whichever is constraining) with no cutoff. Anything smaller
+// (e.g. 0.9) OVERSHOOTS and cuts off the sides — that's the symptom we
+// saw on main OHIF after Reset until the user opened/closed the sidebar
+// (which forced a viewport-resize that recomputed the camera).
+// Partial-view stages 16-21 KEEP `defaultDisplayArea` (no imageArea) so
+// the zoom command's 2× + top/center/bottom pan math continues to work.
+// Stages with chest-wall pinning (`leftDisplayArea` / `rightDisplayArea`)
+// also stay as-is — that pinning is intentional, not a fit-to-canvas case.
+const centeredFitDisplayArea = {
+  storeAsInitialCamera: true,
+  imageArea: [1.0, 1.0],
+};
+
 const hpMammography = {
   id: '@ohif/hpMammo',
   hasUpdatedPriorsInformation: false,
@@ -111,56 +133,56 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RMLO' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LMLO' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCCPrior' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCCPrior' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RMLOPrior' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LMLOPrior' }],
         },
@@ -244,28 +266,28 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RMLO' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LMLO' }],
         },
@@ -286,14 +308,14 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCC' }],
         },
@@ -314,14 +336,14 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCCPrior' }],
         },
@@ -342,14 +364,14 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCCPrior' }],
         },
@@ -501,28 +523,28 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC3D' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LCC3D' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RMLO3D' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'LMLO3D' }],
         },
@@ -543,14 +565,14 @@ const hpMammography = {
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC' }],
         },
         {
           viewportOptions: {
             toolGroupId: 'default',
-            displayArea: defaultDisplayArea,
+            displayArea: centeredFitDisplayArea,
           },
           displaySets: [{ id: 'RCC3D' }],
         },

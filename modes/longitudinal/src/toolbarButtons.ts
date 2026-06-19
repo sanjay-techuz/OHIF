@@ -188,8 +188,19 @@ const toolbarButtons: Button[] = [
     props: {
       icon: 'tool-reset',
       label: 'Reset View',
-      tooltip: 'Reset View',
-      commands: 'resetViewport',
+      tooltip: 'Reset hanging protocol to default stage',
+      commands: 'resetView',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'Clear',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-seg-eraser',
+      label: 'Clear',
+      tooltip: 'Clear annotations + reset everything (full reset)',
+      commands: 'clearView',
       evaluate: 'evaluate.action',
     },
   },
@@ -662,32 +673,32 @@ const toolbarButtons: Button[] = [
       },
     },
   },
-  // {
-  //   id: 'Undo',
-  //   uiType: 'ohif.toolButton',
-  //   props: {
-  //     type: 'tool',
-  //     icon: 'prev-arrow',
-  //     label: 'Undo',
-  //     commands: {
-  //       commandName: 'undo',
-  //     },
-  //     evaluate: 'evaluate.action',
-  //   },
-  // },
-  // {
-  //   id: 'Redo',
-  //   uiType: 'ohif.toolButton',
-  //   props: {
-  //     type: 'tool',
-  //     icon: 'next-arrow',
-  //     label: 'Redo',
-  //     commands: {
-  //       commandName: 'redo',
-  //     },
-  //     evaluate: 'evaluate.action',
-  //   },
-  // },
+  {
+    id: 'Undo',
+    uiType: 'ohif.toolButton',
+    props: {
+      type: 'tool',
+      icon: 'Undo',
+      label: 'Undo',
+      commands: {
+        commandName: 'undo',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'Redo',
+    uiType: 'ohif.toolButton',
+    props: {
+      type: 'tool',
+      icon: 'Redo',
+      label: 'Redo',
+      commands: {
+        commandName: 'redo',
+      },
+      evaluate: 'evaluate.action',
+    },
+  },
 ];
 
 export default toolbarButtons;

@@ -95,6 +95,14 @@ function ViewerLayout({
   );
   const [studentAcrValues, setStudentAcrValues] = useState(acrConfig.defaultValues);
   const [facultyAcrValues, setFacultyAcrValues] = useState(acrConfig.defaultValues);
+  // Bump this to re-run the annotation/ACR backend fetch (see the
+  // `getToolMapping` / `getAcrValues` useEffect below). The toolbar
+  // Reset command writes to `window.__reloadSavedAnnotations` (registered
+  // in a side-effect below) so it can clear all in-memory annotations
+  // and then ask us to repopulate them from the DB. This mirrors the
+  // "ephemeral local annotations are cleared on Reset; DB-saved ones
+  // are re-fetched" behaviour the user asked for.
+  const [annotationsReloadKey, setAnnotationsReloadKey] = useState(0);
   // Auto-save plumbing for studentAcrValues. The two refs together gate
   // the auto-save useEffect below so we never (a) save the initial
   // backend fetch right back to the backend, and (b) re-save values that
@@ -243,62 +251,59 @@ function ViewerLayout({
     return { entry };
   };
 
+  // Hanging-protocol loader gate.
+  //
+  // Problem (the "flicker"): OHIF applies a DEFAULT hanging protocol the moment
+  // display sets land, then HangingProtocolDropdown swaps in the BIEDX breast
+  // protocol (hpMammo / hpCEM / hpMR) a beat later. If the loader hides after
+  // the DEFAULT layout paints, the user sees the wrong-ordered grid and then a
+  // visible jump when the real protocol applies — and the same jump on every
+  // manual stage change. To keep it smooth we hold a full-screen loader OVER
+  // the viewport until the protocol the user / auto-apply actually asked for
+  // has settled and painted.
+  //
+  // Coordination: HangingProtocolDropdown dispatches a `viewer-hp-transition`
+  // window event immediately before it runs ANY setHangingProtocol command
+  // (initial auto-apply AND manual stage changes). That event tells this gate
+  // "a deliberate swap is starting — keep the loader up until its panes paint."
+  // When NO transition is requested shortly after a protocol change (a plain
+  // non-breast study, e.g. US, that only ever gets the default protocol), a
+  // grace timer lets the loader finish on the current protocol so it never
+  // hangs.
+  //
+  // Each transition waits for every pane's first IMAGE_RENDERED with non-zero
+  // dimensions (so partially-empty grids — "WW/WL: -- / --", "1/0", blank panes
+  // — are never shown). For multi-frame stacks (DBT, MRI) only the FIRST frame
+  // is gated; background frame prefetch keeps running. A 30s hard ceiling
+  // guarantees the loader can never trap the user.
+  //
+  // This supersedes the previous modalitySlug-based gate (which waited for a
+  // specific targetProtocolId but was one-shot, so it never covered manual
+  // stage changes). REVERT NOTE: to restore the old behaviour, bring back the
+  // modalitySlug/targetProtocolId gate that finished on the matching
+  // PROTOCOL_CHANGED, and drop the `viewer-hp-transition` dispatch in
+  // HangingProtocolDropdown.tsx (`runHangingProtocol`).
   useEffect(() => {
-    // For BIEDX breast modalities the default OHIF protocol applies first
-    // (firing PROTOCOL_CHANGED), then `HangingProtocolDropdown.tsx`'s
-    // auto-apply setTimeout swaps in the BIEDX MG/MR protocol ~1s later
-    // (another PROTOCOL_CHANGED). The original code hid the loader on the
-    // FIRST event, which let the user see ~1s of wrong-ordered viewports
-    // before the BIEDX RCC/LCC/RMLO/LMLO layout took over.
-    //
-    // Fix: when the current case is one of the modalities that BIEDX maps
-    // to a custom HP, keep the loader visible until that specific protocol
-    // is reported active. For modalities without a custom HP (US, etc.)
-    // and for the early-mount case where modalitySlug hasn't arrived yet,
-    // fall back to the original "hide on first event" behavior so we
-    // never get stuck.
-    const slug = (modalitySlug || '').toUpperCase();
-    // CEM has its OWN protocol (@ohif/hpCEM) — keeping it bucketed with
-    // MG/DBT would mean the loader waits for hpMammo's PROTOCOL_CHANGED
-    // forever while HangingProtocolDropdown actually fires hpCEM. That
-    // bug manifested as "loader visible, viewports never appear" for
-    // CEM cases. MG and DBT still share hpMammo.
-    const targetProtocolId =
-      slug === 'MG' || slug === 'DBT'
-        ? '@ohif/hpMammo'
-        : slug === 'CEM'
-          ? '@ohif/hpCEM'
-          : slug === 'MR' || slug === 'MRI'
-            ? '@ohif/hpMR'
-            : null;
-
-    // Two-phase loader gate:
-    //   Phase 1: PROTOCOL_CHANGED for target HP — protocol is now active, layout
-    //            is correct, but image pixels for the N viewports may still be
-    //            fetching/decoding.
-    //   Phase 2: every viewport's first IMAGE_RENDERED with non-zero dimensions —
-    //            pixels are decoded and the breast/scan is actually painted.
-    // Hiding the loader at Phase 1 alone (the previous behavior) let the user
-    // see partially-empty grids ("WW/WL: -- / --", "1/0", blank panes) until
-    // the remaining viewports caught up. We now hold the loader until Phase 2
-    // completes. For multi-frame stacks (DBT, MRI) only the FIRST frame is
-    // gated — subsequent frame prefetch keeps running in the background,
-    // preserving the existing scroll-to-next-frame behavior.
-    //
-    // Safety net: 30s hard ceiling so a stuck decode never traps the user.
     const HARD_TIMEOUT_MS = 30000;
-    const renderedElements = new Set<HTMLElement>();
-    const attachedListeners: Array<{ el: HTMLElement; fn: EventListener }> = [];
+    // Must stay LARGER than the auto-apply delay in HangingProtocolDropdown
+    // (currently 250ms) so the breast protocol's transition always arrives
+    // before the default protocol's grace window elapses.
+    const GRACE_MS = 900;
+
+    let renderedElements = new Set<HTMLElement>();
+    let attachedListeners: Array<{ el: HTMLElement; fn: EventListener }> = [];
     let viewportDataUnsub: (() => void) | null = null;
     let hardTimer: ReturnType<typeof setTimeout> | null = null;
-    let resolved = false;
+    let graceTimer: ReturnType<typeof setTimeout> | null = null;
     let watchStarted = false;
+    let settled = false;
+    let transitionRequested = false;
 
-    const detachAll = () => {
+    const clearWatchResources = () => {
       attachedListeners.forEach(({ el, fn }) =>
         el.removeEventListener(CoreEnums.Events.IMAGE_RENDERED, fn)
       );
-      attachedListeners.length = 0;
+      attachedListeners = [];
       if (viewportDataUnsub) {
         viewportDataUnsub();
         viewportDataUnsub = null;
@@ -310,10 +315,10 @@ function ViewerLayout({
     };
 
     const finish = () => {
-      if (resolved) return;
-      resolved = true;
+      if (settled) return;
+      settled = true;
       setShowLoadingIndicator(false);
-      detachAll();
+      clearWatchResources();
     };
 
     const hasValidDims = (vp: any): boolean => {
@@ -373,32 +378,66 @@ function ViewerLayout({
         /* non-fatal */
       }
 
+      if (hardTimer) clearTimeout(hardTimer);
       hardTimer = setTimeout(finish, HARD_TIMEOUT_MS);
     };
 
+    // Re-arm for a brand-new transition: drop any in-flight watch, reset the
+    // pane tally, bring the loader back over the viewport, and re-arm the hard
+    // ceiling so a transition that never lands a PROTOCOL_CHANGED can't hang.
+    const armForNewTransition = () => {
+      clearWatchResources();
+      renderedElements = new Set();
+      watchStarted = false;
+      settled = false;
+      setShowLoadingIndicator(true);
+      hardTimer = setTimeout(finish, HARD_TIMEOUT_MS);
+    };
+
+    const onTransitionRequested = () => {
+      transitionRequested = true;
+      if (graceTimer) {
+        clearTimeout(graceTimer);
+        graceTimer = null;
+      }
+      armForNewTransition();
+    };
+
+    const onProtocolChanged = () => {
+      if (transitionRequested) {
+        // The deliberate swap we were told to wait for just applied — watch its
+        // panes and hide the loader once they paint.
+        transitionRequested = false;
+        watchStarted = false;
+        beginViewportWatch();
+        return;
+      }
+      // Unsolicited change (default protocol at init, or an external caller).
+      // Give the dropdown a short window to request a transition; if none comes,
+      // treat this protocol as final so the loader never hangs.
+      if (!graceTimer && !settled) {
+        graceTimer = setTimeout(() => {
+          graceTimer = null;
+          if (!transitionRequested && !settled) {
+            beginViewportWatch();
+          }
+        }, GRACE_MS);
+      }
+    };
+
+    window.addEventListener('viewer-hp-transition', onTransitionRequested);
     const { unsubscribe } = hangingProtocolService.subscribe(
       HangingProtocolService.EVENTS.PROTOCOL_CHANGED,
-      event => {
-        if (resolved) return;
-        if (!targetProtocolId) {
-          // No custom-HP mapping (e.g. US). Original behavior: hide on first
-          // PROTOCOL_CHANGED — but still wait for the panes to render so the
-          // user doesn't see a half-empty grid.
-          beginViewportWatch();
-          return;
-        }
-        const activeId = event?.protocol?.id ?? hangingProtocolService.protocol?.id;
-        if (activeId === targetProtocolId) {
-          beginViewportWatch();
-        }
-      }
+      onProtocolChanged
     );
 
     return () => {
+      window.removeEventListener('viewer-hp-transition', onTransitionRequested);
       unsubscribe();
-      detachAll();
+      if (graceTimer) clearTimeout(graceTimer);
+      clearWatchResources();
     };
-  }, [hangingProtocolService, modalitySlug, cornerstoneViewportService]);
+  }, [hangingProtocolService, cornerstoneViewportService]);
 
   const getViewportComponentData = viewportComponent => {
     const { entry } = getComponent(viewportComponent.namespace);
@@ -804,7 +843,25 @@ function ViewerLayout({
       getToolMapping();
       getAcrValues();
     }, 1000);
-  }, [isAddAnswerClicked]);
+  }, [isAddAnswerClicked, annotationsReloadKey]);
+
+  // Expose a window-attached trigger that the toolbar Reset command
+  // calls after `measurementService.clearMeasurements()`. Bumping
+  // `annotationsReloadKey` re-runs the fetch effect above, which
+  // already correctly gates by userType/isPreview/isAddAnswerClicked:
+  //   - student         → re-fetches /user/cases/annotation-measurements
+  //   - faculty + addAnswer → re-fetches /admin/cases/annotation-measurements
+  //   - faculty no addAnswer → fetch path is a no-op (annotations
+  //     were unsaved, so they stay cleared — the desired behaviour)
+  //   - preview         → re-fetches preview-measurements (both sides)
+  // The window key is scoped to the viewer mount/unmount so it can't
+  // leak across navigations.
+  useEffect(() => {
+    (window as any).__reloadSavedAnnotations = () => setAnnotationsReloadKey(k => k + 1);
+    return () => {
+      delete (window as any).__reloadSavedAnnotations;
+    };
+  }, []);
 
   /**
    * Persist `studentAcrValues` to the backend. Mirrors the body shape that
@@ -912,7 +969,11 @@ function ViewerLayout({
         setCurrentCaseIndex(resolvedIndex);
 
         // Store current case_title on window for viewport overlay access
-        (window as any).__currentCaseTitle = cases[resolvedIndex]?.case_title || '';
+        const studentCaseTitle = cases[resolvedIndex]?.case_title || '';
+        (window as any).__currentCaseTitle = studentCaseTitle;
+        // Also push to the UI state store so the StudyBrowser sidebar can
+        // display the case title in place of StudyDescription (reactive read).
+        setUIState('caseTitle', studentCaseTitle);
 
         // Store current case's subspeciality and modality slugs in global state
         const currentCase = cases[resolvedIndex];
@@ -1065,7 +1126,11 @@ function ViewerLayout({
       if (result.success) {
         const caseData = result.data?.data;
         if (caseData) {
-          (window as any).__currentCaseTitle = caseData.case_id || '';
+          const facultyCaseTitle = caseData.case_id || '';
+          (window as any).__currentCaseTitle = facultyCaseTitle;
+          // Mirror to the UI state store so the StudyBrowser sidebar can show
+          // the case title (reactive — see PanelStudyBrowser).
+          setUIState('caseTitle', facultyCaseTitle);
           setUIState('subSpecialitySlug', caseData.sub_speciality_slug || null);
           setUIState('modalitySlug', caseData.modality_slug || null);
           setCaseHistoryText(caseData.case_history || '');
