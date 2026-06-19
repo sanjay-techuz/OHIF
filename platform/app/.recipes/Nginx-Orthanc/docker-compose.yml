@@ -20,6 +20,9 @@ services:
       # Let's Encrypt
       # - letsencrypt_certificates:/etc/letsencrypt
       # - letsencrypt_challenges:/var/www/letsencrypt
+      # TLS certificates and ACME HTTP challenge files
+      - ./certificates/letsencrypt:/etc/letsencrypt:ro
+      - ./certificates/letsencrypt-challenges:/var/www/letsencrypt
     ports:
       - '443:443' # SSL
       - '80:80' # Web
