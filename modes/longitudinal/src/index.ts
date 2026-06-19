@@ -94,7 +94,10 @@ function modeFactory({ modeConfiguration }) {
 
       // remove toolbar buttons from below, just remove from array and it will hide.
       toolbarService.updateSection(toolbarService.sections.primary, [
+        'Clear',
         'MeasurementTools',
+        'Undo',
+        'Redo',
         'Zoom',
         'Pan',
         'invert',

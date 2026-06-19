@@ -35,7 +35,18 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
       },
       {
         toolName: toolNames.StackScroll,
-        bindings: [{ mouseButton: Enums.MouseBindings.Wheel }, { numTouchPoints: 3 }],
+        // Bindings:
+        //   Wheel              — primary scroll input
+        //   3-finger touch     — touchpad equivalent
+        //   Primary_And_Secondary (left+right chord, value 3) — hold both
+        //     mouse buttons and drag to scroll the stack. Cornerstone3D
+        //     matches against MouseEvent.buttons bitmask (1=left, 2=right
+        //     → 3 when both held). No-ops on single-frame images.
+        bindings: [
+          { mouseButton: Enums.MouseBindings.Wheel },
+          { numTouchPoints: 3 },
+          { mouseButton: Enums.MouseBindings.Primary_And_Secondary },
+        ],
       },
     ],
     passive: [
@@ -145,7 +156,18 @@ function initSRToolGroup(extensionManager, toolGroupService) {
       },
       {
         toolName: toolNames.StackScroll,
-        bindings: [{ mouseButton: Enums.MouseBindings.Wheel }, { numTouchPoints: 3 }],
+        // Bindings:
+        //   Wheel              — primary scroll input
+        //   3-finger touch     — touchpad equivalent
+        //   Primary_And_Secondary (left+right chord, value 3) — hold both
+        //     mouse buttons and drag to scroll the stack. Cornerstone3D
+        //     matches against MouseEvent.buttons bitmask (1=left, 2=right
+        //     → 3 when both held). No-ops on single-frame images.
+        bindings: [
+          { mouseButton: Enums.MouseBindings.Wheel },
+          { numTouchPoints: 3 },
+          { mouseButton: Enums.MouseBindings.Primary_And_Secondary },
+        ],
       },
     ],
     passive: [
@@ -196,7 +218,18 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
       },
       {
         toolName: toolNames.StackScroll,
-        bindings: [{ mouseButton: Enums.MouseBindings.Wheel }, { numTouchPoints: 3 }],
+        // Bindings:
+        //   Wheel              — primary scroll input
+        //   3-finger touch     — touchpad equivalent
+        //   Primary_And_Secondary (left+right chord, value 3) — hold both
+        //     mouse buttons and drag to scroll the stack. Cornerstone3D
+        //     matches against MouseEvent.buttons bitmask (1=left, 2=right
+        //     → 3 when both held). No-ops on single-frame images.
+        bindings: [
+          { mouseButton: Enums.MouseBindings.Wheel },
+          { numTouchPoints: 3 },
+          { mouseButton: Enums.MouseBindings.Primary_And_Secondary },
+        ],
       },
     ],
     passive: [

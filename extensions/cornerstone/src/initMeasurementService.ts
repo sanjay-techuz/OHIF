@@ -487,9 +487,52 @@ const connectMeasurementServiceToTools = ({
       };
       annotationManager.addAnnotation(newAnnotation);
 
-      // Set annotation color using Cornerstone Tools style API
+      // Cornerstone3D's low-level `annotationManager.addAnnotation` does
+      // NOT fire ANNOTATION_ADDED (only a tool's `addNewAnnotation` does;
+      // see FrameOfReferenceSpecificAnnotationManager.js:76-95). So React
+      // overlays that listen for ANNOTATION_ADDED never get notified
+      // about API-loaded annotations — labels then only show after the
+      // next CAMERA_MODIFIED (sidebar toggle / HP change).
+      //
+      // We dispatch a plain DOM `annotation-load-complete` event here so
+      // overlays that care (e.g. `CustomLabelsOverlay`) can re-read state.
+      // Plain window event chosen over cornerstone ANNOTATION_MODIFIED so
+      // it does NOT pass through the BIEDX update-save chain — re-firing
+      // MODIFIED for every loaded annotation would trigger a debounced
+      // POST back to the backend on every load, which is wasteful and
+      // potentially creates write-loops.
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('annotation-load-complete', {
+              detail: { annotationUID: newAnnotation.annotationUID },
+            })
+          );
+        }
+      } catch {
+        /* non-fatal */
+      }
+
+      // Set annotation color using Cornerstone Tools style API.
+      // Override every state + mode variant so the color survives hover
+      // (`colorHighlighted`), selection (`colorSelected`), and lock states —
+      // cornerstone3D's global defaults set `colorHighlighted: rgb(0,255,0)`
+      // (bright green) which would otherwise win over an annotation-specific
+      // `color` whenever the annotation is hovered/selected.
       if (annotationColor) {
-        annotation.config.style.setAnnotationStyles(measurement.uid, { color: annotationColor });
+        annotation.config.style.setAnnotationStyles(measurement.uid, {
+          color: annotationColor,
+          colorHighlighted: annotationColor,
+          colorSelected: annotationColor,
+          colorLocked: annotationColor,
+          colorActive: annotationColor,
+          colorPassive: annotationColor,
+          colorEnabled: annotationColor,
+          colorHighlightedActive: annotationColor,
+          colorHighlightedPassive: annotationColor,
+          colorSelectedActive: annotationColor,
+          colorSelectedPassive: annotationColor,
+        });
       }
       commandsManager.run('triggerCreateAnnotationMemo', {
         annotation: newAnnotation,

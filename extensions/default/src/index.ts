@@ -35,6 +35,7 @@ import { useToggleHangingProtocolStore } from './stores/useToggleHangingProtocol
 import { useToggleOneUpViewportGridStore } from './stores/useToggleOneUpViewportGridStore';
 import { callInputDialogAutoComplete, callInputDialog } from './utils/callInputDialog';
 import colorPickerDialog from './utils/colorPickerDialog';
+import multiLabelDialog from './utils/multiLabelDialog';
 
 import promptSaveReport from './utils/promptSaveReport';
 import promptLabelAnnotation from './utils/promptLabelAnnotation';
@@ -44,6 +45,7 @@ import * as utils from './utils';
 import { Toolbox } from './utils';
 import MoreDropdownMenu from './Components/MoreDropdownMenu';
 import requestDisplaySetCreationForStudy from './Panels/requestDisplaySetCreationForStudy';
+import { getViewLabel, getDisplaySetInstance } from './utils/getViewLabel';
 const defaultExtension: Types.Extensions.Extension = {
   /**
    * Only required property. Should be a unique value across all extensions.
@@ -107,6 +109,7 @@ export {
   promptSaveReport,
   promptLabelAnnotation,
   colorPickerDialog,
+  multiLabelDialog,
   usePatientInfo,
   PanelStudyBrowserHeader,
   utils,
@@ -115,6 +118,8 @@ export {
   requestDisplaySetCreationForStudy,
   callInputDialog,
   createReportDialogPrompt,
+  getViewLabel,
+  getDisplaySetInstance,
 };
 export type {
   OverlayFieldId,

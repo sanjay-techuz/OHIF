@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useSystem } from '@ohif/core';
 import PanelStudyBrowser from '@ohif/extension-default/src/Panels/StudyBrowser/PanelStudyBrowser';
+import { getViewLabel, getDisplaySetInstance } from '@ohif/extension-default';
 import { UntrackSeriesModal } from './untrackSeriesModal';
 import { useTrackedMeasurements } from '../../getContextModule';
 
@@ -89,9 +90,16 @@ export default function PanelStudyBrowserTracking({
 
         const loadingProgress = displaySetLoadingState?.[displaySetInstanceUID];
 
+        // Sidebar card label: prefer a clinical view label (RCC / LMLO /
+        // Axial T1 / etc.) derived from per-instance DICOM tags so cards
+        // match the viewport overlay. Falls back to SeriesDescription when
+        // the view label can't be derived. Same source the overlay uses —
+        // see @ohif/extension-default/src/utils/getViewLabel.ts.
+        const viewLabel = getViewLabel(getDisplaySetInstance(ds));
+
         array.push({
           displaySetInstanceUID,
-          description: ds.SeriesDescription || '',
+          description: viewLabel || ds.SeriesDescription || '',
           seriesNumber: ds.SeriesNumber,
           modality: ds.Modality,
           seriesDate: ds.SeriesDate ? new Date(ds.SeriesDate).toLocaleDateString() : '',

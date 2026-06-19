@@ -30,8 +30,18 @@ import {
  * read CC and MLO with R-on-left by convention.
  */
 
+// `imageArea: [1.0, 1.0]` tells cornerstone to scale the image so the
+// constraining dimension exactly fills the canvas — no cutoff on the
+// sides, no chest-wall pinning. This cancels the 10% `insetImageMultiplier`
+// cornerstone bakes into its fit-to-canvas camera. End result: image
+// fills 100% of canvas width (or height, whichever is constraining)
+// with no cutoff. Smaller values like 0.9 over-zoom and PUSH THE IMAGE
+// PAST the canvas edges (the horizontal cut-off seen in earlier
+// iterations). All CEM stages use centered fit — there are no chest-
+// wall-pinned variants in this protocol.
 const defaultDisplayArea = {
   storeAsInitialCamera: true,
+  imageArea: [1.0, 1.0],
 };
 
 const hpCEM = {

@@ -59,13 +59,30 @@ FooterAction.Right = ({ children }: FooterActionProps) => {
 };
 FooterAction.Right.displayName = 'FooterAction.Right';
 
-// Primary action: Solid button (default)
-FooterAction.Primary = ({ children, onClick, className = 'min-w-[80px]' }: ActionProps) => {
+// BIEDX-themed action buttons. Match the ACR / Question modal pattern
+// (see `platform/ui-next/src/components/ACRSelectorModal/ACRSelectorModal.tsx`
+// ~ln 161-193): pink/amber highlight for primary, transparent ghost with
+// dark hover for secondary, rounded-8 / min-w-28 / white text. Editing the
+// single source here themes every Cancel/Save popup in the app at once
+// (Edit Measurement Label, Color Picker, future dialogs).
+const BIEDX_ACTION_BASE =
+  'min-w-28 h-auto rounded-[8px] px-4 py-2 text-base font-medium text-white';
+
+// Primary action: BIEDX highlight (pink) solid button.
+FooterAction.Primary = ({ children, onClick, className }: ActionProps) => {
   return (
     <Button
       variant="default"
       onClick={onClick}
-      className={className}
+      className={cn(BIEDX_ACTION_BASE, className)}
+      style={{ backgroundColor: 'hsl(var(--highlight))' }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor =
+          'hsl(var(--highlight) / 0.9)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'hsl(var(--highlight))';
+      }}
     >
       {children}
     </Button>
@@ -73,13 +90,20 @@ FooterAction.Primary = ({ children, onClick, className = 'min-w-[80px]' }: Actio
 };
 FooterAction.Primary.displayName = 'FooterAction.Primary';
 
-// Secondary action: Ghost button
-FooterAction.Secondary = ({ children, onClick, className = 'min-w-[80px]' }: ActionProps) => {
+// Secondary action: transparent ghost with dark hover.
+FooterAction.Secondary = ({ children, onClick, className }: ActionProps) => {
   return (
     <Button
-      variant="secondary"
+      variant="ghost"
       onClick={onClick}
-      className={className}
+      className={cn(BIEDX_ACTION_BASE, className)}
+      style={{ backgroundColor: 'transparent' }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = '#2E2E2E';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+      }}
     >
       {children}
     </Button>

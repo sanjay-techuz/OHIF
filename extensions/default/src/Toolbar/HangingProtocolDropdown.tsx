@@ -84,6 +84,20 @@ const ALL_HANGING_PROTOCOLS = [
   { label: 'RMLO-LMLO-BOTTOM', stageIndex: 21, icon: HPRLMOMBOTTOM },
 ];
 
+// Announce a deliberate hanging-protocol / stage swap to the ViewerLayout
+// loader gate, THEN run it. The gate holds a full-screen loader over the
+// viewport until the new protocol's panes have painted, so the default→target
+// swap on initial load and every manual stage swap stay flicker-free. See the
+// loader gate in extensions/default/src/ViewerLayout/index.tsx (listens for the
+// `viewer-hp-transition` event).
+const runHangingProtocol = (
+  commandsManager: CommandsManager,
+  commandOptions: Record<string, unknown>
+) => {
+  window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+  commandsManager.run({ commandName: 'setHangingProtocol', commandOptions });
+};
+
 const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   commandsManager,
   servicesManager,
@@ -239,12 +253,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   useEffect(() => {
     if (isMammo && !isCEM) {
       setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setHangingProtocol',
-          commandOptions: {
-            protocolId: '@ohif/hpMammo',
-            stageIndex: allHangingProtocols[0]?.stageIndex ?? 2,
-          },
+        runHangingProtocol(commandsManager, {
+          protocolId: '@ohif/hpMammo',
+          stageIndex: allHangingProtocols[0]?.stageIndex ?? 2,
         });
         // Apply zoom immediately after hanging protocol change
         setTimeout(() => {
@@ -253,7 +264,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
             commandOptions: {},
           });
         }, 100);
-      }, 1000);
+      }, 250);
     }
   }, [isMammo, isCEM, allHangingProtocols, commandsManager]);
 
@@ -270,12 +281,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       return;
     }
     const timeoutId = setTimeout(() => {
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: '@ohif/hpCEM',
-          stageIndex: 0,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: '@ohif/hpCEM',
+        stageIndex: 0,
       });
       // Reuse the MG zoom callback — CEM LE images are dimensionally
       // identical to MG so the same anchor math works.
@@ -285,7 +293,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
           commandOptions: {},
         });
       }, 100);
-    }, 1000);
+    }, 250);
     return () => clearTimeout(timeoutId);
   }, [isCEM, commandsManager, hangingProtocolService]);
 
@@ -303,14 +311,11 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
 
     // Apply MRI hanging protocol when MR display sets are detected
     const timeoutId = setTimeout(() => {
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: '@ohif/hpMR',
-          stageIndex: 0, // Default stage (2x3 grid)
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: '@ohif/hpMR',
+        stageIndex: 0, // Default stage (2x3 grid)
       });
-    }, 1000);
+    }, 250);
 
     return () => {
       clearTimeout(timeoutId);
@@ -323,6 +328,37 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     setSelected(allHangingProtocols[0]?.stageIndex ?? 2);
   }, [isDBT, hasPrior, allHangingProtocols]);
 
+  // Keep the dropdown's selected label in sync with the active stage
+  // whenever something OUTSIDE this component changes the protocol/stage —
+  // e.g. the toolbar `resetView` command calling
+  // `hangingProtocolService.setProtocol(id, { stageIndex })` directly.
+  // Without this, the dropdown still shows the user's previously-picked
+  // stage label (e.g. "Right MLO Current/Prior") even after Reset has
+  // moved the viewports back to the default stage ("All Current").
+  // PROTOCOL_CHANGED fires from the HP service's own `_setProtocol` path
+  // (HangingProtocolService.ts:1676) with the new `stageIdx` payload, so
+  // this is the canonical signal to re-sync.
+  useEffect(() => {
+    if (!hangingProtocolService) {
+      return;
+    }
+    const { unsubscribe } = hangingProtocolService.subscribe(
+      hangingProtocolService.EVENTS.PROTOCOL_CHANGED,
+      (payload: any) => {
+        const stageIdx = payload?.stageIdx;
+        if (typeof stageIdx !== 'number') {
+          return;
+        }
+        const idx = allHangingProtocols.findIndex(p => p.stageIndex === stageIdx);
+        if (idx >= 0) {
+          setSelected(stageIdx);
+          setCurrentStageIndex(idx);
+        }
+      }
+    );
+    return () => unsubscribe();
+  }, [hangingProtocolService, allHangingProtocols]);
+
   const handleChange = useCallback(
     event => {
       const stageIndex = parseInt(event, 10);
@@ -332,12 +368,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         protocol => protocol.stageIndex === stageIndex
       );
       setCurrentStageIndex(stageIndexInArray >= 0 ? stageIndexInArray : 0);
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: activeProtocolId,
-          stageIndex,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: activeProtocolId,
+        stageIndex,
       });
 
       // Apply zoom immediately after hanging protocol change
@@ -359,12 +392,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       const protocol = allHangingProtocols[nextIndex];
       setSelected(protocol.stageIndex);
 
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: activeProtocolId,
-          stageIndex: protocol.stageIndex,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: activeProtocolId,
+        stageIndex: protocol.stageIndex,
       });
 
       // Apply zoom immediately after hanging protocol change
@@ -379,12 +409,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       setCurrentStageIndex(0);
       const protocol = allHangingProtocols[0];
       setSelected(protocol.stageIndex);
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: activeProtocolId,
-          stageIndex: protocol.stageIndex,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: activeProtocolId,
+        stageIndex: protocol.stageIndex,
       });
 
       // Apply zoom immediately after hanging protocol change
@@ -404,12 +431,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       const protocol = allHangingProtocols[prevIndex];
       setSelected(protocol.stageIndex);
 
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: activeProtocolId,
-          stageIndex: protocol.stageIndex,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: activeProtocolId,
+        stageIndex: protocol.stageIndex,
       });
 
       // Apply zoom immediately after hanging protocol change
@@ -425,12 +449,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       setCurrentStageIndex(lastIndex);
       const protocol = allHangingProtocols[lastIndex];
       setSelected(protocol.stageIndex);
-      commandsManager.run({
-        commandName: 'setHangingProtocol',
-        commandOptions: {
-          protocolId: activeProtocolId,
-          stageIndex: protocol.stageIndex,
-        },
+      runHangingProtocol(commandsManager, {
+        protocolId: activeProtocolId,
+        stageIndex: protocol.stageIndex,
       });
 
       // Apply zoom immediately after hanging protocol change
@@ -479,9 +500,44 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       return;
     }
 
+    // Ignore the arrow-key navigation when the user is interacting with any
+    // form control (typing) or while ANY modal / popover / dropdown is open
+    // on the page. Without this guard, pressing left/right inside an input
+    // (e.g. typing in the WorkList filter, the Calibration mm prompt, a
+    // RTE in the Lexa panel, any radix dropdown) would silently swap the
+    // viewer's hanging protocol behind the open UI.
+    //
+    // Detection — one DOM query covers the common patterns:
+    //   - `[role="dialog"]` / `[role="alertdialog"]` — any modal
+    //   - `[data-state="open"][role="menu"|"listbox"]` — radix dropdowns
+    //   - `[data-radix-popper-content-wrapper]` — radix popovers/tooltips
+    //   - active element is an input / textarea / select / contenteditable
+    const shouldSkipHpHotkey = (): boolean => {
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae) {
+        const tag = ae.tagName;
+        if (
+          tag === 'INPUT' ||
+          tag === 'TEXTAREA' ||
+          tag === 'SELECT' ||
+          ae.isContentEditable
+        ) {
+          return true;
+        }
+      }
+      return !!document.querySelector(
+        '[role="dialog"], [role="alertdialog"], [data-state="open"][role="menu"], [data-state="open"][role="listbox"], [data-radix-popper-content-wrapper]'
+      );
+    };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       // Only handle if no modifier keys are pressed
       if (event.ctrlKey || event.altKey || event.metaKey) {
+        return;
+      }
+
+      // Suppress HP nav when an input/modal/popup is active.
+      if (shouldSkipHpHotkey()) {
         return;
       }
 

@@ -45,6 +45,12 @@ import {
 
 import CalibrationLineTool from './tools/CalibrationLineTool';
 import ImageOverlayViewerTool from './tools/ImageOverlayViewerTool';
+import {
+  CustomCircleROITool,
+  CustomEllipticalROITool,
+  CustomRectangleROITool,
+} from './tools/CustomRoiHitTesting';
+import { CustomLengthTool } from './tools/CustomLengthTool';
 
 export default function initCornerstoneTools(configuration = {}) {
   CrosshairsTool.isAnnotation = false;
@@ -72,11 +78,20 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(ZoomTool);
   addTool(ProbeTool);
   addTool(MIPJumpToClickTool);
-  addTool(LengthTool);
-  addTool(RectangleROITool);
+  // UX fix: subclass repositions the textbox so the mm label lands near the
+  // line midpoint instead of 25px off the right endpoint. Same toolName so
+  // existing measurements + LengthTool config (textBoxVisibility: true,
+  // textBoxLinkLineWidth: '0') still apply. See CustomLengthTool.ts.
+  addTool(CustomLengthTool);
+  // UX fix: replace stock CircleROI/RectangleROI/EllipticalROI with subclasses
+  // that add a visible move handle and a border-resize affordance. See
+  // CustomRoiHitTesting.ts. The subclasses keep the same static toolName
+  // ('CircleROI' etc.) so saved measurements + measurement-service mappings
+  // keep working untouched.
+  addTool(CustomRectangleROITool);
   addTool(RectangleROIThresholdTool);
-  addTool(EllipticalROITool);
-  addTool(CircleROITool);
+  addTool(CustomEllipticalROITool);
+  addTool(CustomCircleROITool);
   addTool(BidirectionalTool);
   addTool(ArrowAnnotateTool);
   addTool(DragProbeTool);
@@ -117,6 +132,19 @@ export default function initCornerstoneTools(configuration = {}) {
     global: {
       ...defaultStyles.global,
       ...annotationStyle,
+    },
+    // Per-tool override: Length tool should show its textbox so the line
+    // length (mm) is rendered next to the line. Other tools stay hidden via
+    // the global `textBoxVisibility: false` above.
+    //
+    // `textBoxLinkLineWidth: '0'` hides the dashed connector. Must be the
+    // STRING '0' — `drawLine` does `strokeWidth = lineWidth || width`, so a
+    // numeric 0 is falsy and falls back to the default 2px (which made the
+    // line thicker, not invisible). '0' is a truthy string, so it survives
+    // the fallback and ends up as `stroke-width="0"` → invisible.
+    [LengthTool.toolName]: {
+      textBoxVisibility: true,
+      textBoxLinkLineWidth: '0',
     },
   });
 }

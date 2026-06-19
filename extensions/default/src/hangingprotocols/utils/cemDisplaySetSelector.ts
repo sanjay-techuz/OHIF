@@ -28,6 +28,18 @@ const priorStudyMatchingRules = [
 
 const currentStudyMatchingRules: unknown[] = [];
 
+// Same standard-vs-modified tie-breaker used by mammoDisplaySetSelector: a
+// plain CC/MLO acquisition has no ViewModifierCodeSequence, a spot/mag view
+// does. This optional bonus keeps a standard view ahead of a same-(laterality,
+// view) spot/mag acquisition. Weight stays below the laterality weight (25) so
+// it only breaks a same-view tie and never disturbs cross-view ranking.
+const standardViewBonusRule = {
+  weight: 15,
+  attribute: 'ViewModifier',
+  required: false,
+  constraint: { equals: 'NONE' },
+};
+
 // --- Modality + ImageType filters shared by every CEM selector. ---
 //
 // Modality is reported as 'MG' for CEM (DICOM doesn't have a separate CEM
@@ -65,6 +77,7 @@ const RCCViewRules = [
     required: false,
     constraint: { equals: 'R' },
   },
+  standardViewBonusRule,
 ];
 
 const LCCViewRules = [
@@ -86,6 +99,7 @@ const LCCViewRules = [
     required: false,
     constraint: { equals: 'L' },
   },
+  standardViewBonusRule,
 ];
 
 const RMLOViewRules = [
@@ -107,6 +121,7 @@ const RMLOViewRules = [
     required: false,
     constraint: { equals: 'R' },
   },
+  standardViewBonusRule,
 ];
 
 const LMLOViewRules = [
@@ -128,6 +143,7 @@ const LMLOViewRules = [
     required: false,
     constraint: { equals: 'L' },
   },
+  standardViewBonusRule,
 ];
 
 // --- 8 selectors: 4 LE + 4 Recombined ---

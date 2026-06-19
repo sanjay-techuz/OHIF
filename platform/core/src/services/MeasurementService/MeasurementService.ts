@@ -1,3 +1,4 @@
+import { metaData } from '@cornerstonejs/core';
 import { annotation } from '@cornerstonejs/tools';
 import { useUIStateStore } from '../../../../../extensions/default/src/stores/useUIStateStore';
 import log from '../../log';
@@ -6,6 +7,40 @@ import { buildFellowshipBody, getCustomParams } from '../../utils/urlUtils';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
 import { apiService } from '../ApiService/ApiService';
 import DisplaySetService from '../DisplaySetService';
+
+// Resolve the DICOM Modality for an annotation. The backend Joi validator
+// for /annotation-measurements rejects empty strings, so we must always
+// produce a real value (MG / CT / MR / etc.).
+//
+// `new DisplaySetService()` (used elsewhere in this file) instantiates a
+// FRESH empty service — not the real singleton kept by the services
+// manager — so `displaySet?.Modality` from that path is ALWAYS undefined.
+// That has silently sent `modality: ''` for a long time. Cornerstone's
+// `metaData.get('instance', referencedImageId)` is service-injection-free
+// and returns the cached DICOM tags for the loaded image, including
+// Modality — making it the canonical source here.
+function getModalityForMeasurement(measurement: any, annotationData: any): string {
+  const referencedImageId =
+    annotationData?.metadata?.referencedImageId || measurement?.referencedImageId;
+  if (referencedImageId) {
+    const instance: any = metaData.get('instance', referencedImageId);
+    if (instance?.Modality) {
+      return instance.Modality;
+    }
+  }
+  return '';
+}
+
+// Debounced backend save for annotation updates (move / resize / color
+// change). Annotation drag events fire MEASUREMENT_UPDATED many times per
+// second; we collapse those into a single POST 500ms after the user
+// pauses or releases. Keyed by measurement UID so different annotations
+// can be saved in parallel without one drag canceling another's save.
+// The POST endpoint is an upsert on `measurement_uid` (cases.service.ts
+// upsert path), so re-posting the same UID writes the updated
+// annotation_data JSON — handles, coordinates, color, etc. — without
+// creating a duplicate row.
+const pendingMeasurementUpdateSaves = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
  * Measurement source schema
@@ -574,6 +609,99 @@ class MeasurementService extends PubSubService {
           measurement: newMeasurement,
           notYetUpdatedAtSource: false,
         });
+
+        // BIEDX: persist the move/resize/color change to the backend.
+        // Same body shape as the ADD path below — re-POSTing with the
+        // same `measurement_uid` upserts the row (cases.service.ts
+        // checks for existing measurement_uid and patches annotation_data).
+        // Debounced 500ms because a drag fires this event ~10× per second;
+        // we only want one network round-trip per gesture.
+        // Skipped in screening/preview mode and for faculty without
+        // Add-Answer clicked — same gates as the ADD path.
+        try {
+          if (
+            localStorage.getItem('ohif-viewType') === 'diagnostic' &&
+            typeof window !== 'undefined'
+          ) {
+            const {
+              courseId: u_courseId,
+              caseId: u_caseId,
+              studentId: u_studentId,
+              viewType: u_viewType,
+              moduleId: u_moduleId,
+              userType: u_userType,
+              facultyId: u_facultyId,
+              isPreview: u_isPreview,
+              isFellowship: u_isFellowship,
+              programId: u_programId,
+              phaseId: u_phaseId,
+            } = getCustomParams();
+
+            if (!u_isPreview) {
+              const isFacultyAddAnswerClicked =
+                u_userType === 'student' ||
+                !!useUIStateStore.getState().uiState.addAnswerClicked;
+
+              if (isFacultyAddAnswerClicked) {
+                const existing = pendingMeasurementUpdateSaves.get(internalUID);
+                if (existing) {
+                  clearTimeout(existing);
+                }
+                const timer = setTimeout(async () => {
+                  pendingMeasurementUpdateSaves.delete(internalUID);
+                  try {
+                    const annotationData = annotation.state.getAnnotation(internalUID);
+                    const displaySet = new DisplaySetService().getDisplaySetByUID(
+                      newMeasurement.displaySetInstanceUID
+                    );
+                    const modality =
+                      getModalityForMeasurement(newMeasurement, annotationData) ||
+                      displaySet?.Modality ||
+                      '';
+                    if (!modality) {
+                      console.warn(
+                        'Measurement update save skipped — could not resolve modality',
+                        internalUID
+                      );
+                      return;
+                    }
+                    const body: Record<string, unknown> = {
+                      ...(u_isFellowship
+                        ? buildFellowshipBody({
+                            isFellowship: u_isFellowship,
+                            programId: u_programId,
+                            phaseId: u_phaseId,
+                            moduleId: u_moduleId,
+                          })
+                        : { course_id: u_courseId, module_id: u_moduleId }),
+                      case_id: u_caseId,
+                      view_type: u_viewType,
+                      study_instance_uid: newMeasurement.referenceStudyUID,
+                      measurement_uid: newMeasurement.uid,
+                      tool_name: newMeasurement.toolName,
+                      measurement_data: newMeasurement,
+                      annotation_data: annotationData,
+                      modality,
+                      is_recall: false,
+                    };
+                    if (u_userType === 'student') {
+                      body.student_id = u_studentId;
+                      await apiService.post('/user/cases/annotation-measurements', body);
+                    } else {
+                      body.faculty_id = u_facultyId;
+                      await apiService.post('/admin/cases/annotation-measurements', body);
+                    }
+                  } catch (err) {
+                    console.warn('Measurement update save failed', err);
+                  }
+                }, 500);
+                pendingMeasurementUpdateSaves.set(internalUID, timer);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Measurement update save scheduling failed', err);
+        }
       } else {
         log.info(':::::ANNOTATION RESPONSE::::', annotation.state.getAnnotation(internalUID));
 
@@ -610,12 +738,22 @@ class MeasurementService extends PubSubService {
           newMeasurement.displaySetInstanceUID
         );
 
-        // Create the measurement on the server
+        // Create the measurement on the server.
+        // BI-RADS / form modal: only auto-open for CircleROI annotations.
+        // Other measurement tools (Length, Rectangle, Ellipse, etc.) draw on
+        // the case for reference / measurement but don't carry a BI-RADS
+        // form, so they should NOT trigger the question modal on completion.
+        // The right-click "Show Question Modal" context-menu entry is already
+        // gated on `toolName === 'CircleROI'` (defaultContextMenuCustomization.ts)
+        // and the double-click reopener checks the same condition
+        // (initDoubleClick.ts:46-47) — this brings the auto-open path in sync.
         if (localStorage.getItem('ohif-viewType') === 'diagnostic' && !isPreview) {
-          this._broadcastEvent(this.EVENTS.SHOW_MEASUREMENT_MODAL, {
-            measurementUid: newMeasurement.uid || {},
-            measurement: newMeasurement,
-          });
+          if (newMeasurement.toolName === 'CircleROI') {
+            this._broadcastEvent(this.EVENTS.SHOW_MEASUREMENT_MODAL, {
+              measurementUid: newMeasurement.uid || {},
+              measurement: newMeasurement,
+            });
+          }
 
           const body: Record<string, unknown> = {
             ...(isFellowship
@@ -628,7 +766,8 @@ class MeasurementService extends PubSubService {
             tool_name: newMeasurement.toolName,
             measurement_data: newMeasurement,
             annotation_data: annotationData,
-            modality: displaySet?.Modality || '',
+            modality:
+              getModalityForMeasurement(newMeasurement, annotationData) || displaySet?.Modality || '',
             student_id: '',
             faculty_id: '',
             is_recall: false,
@@ -652,7 +791,10 @@ class MeasurementService extends PubSubService {
             measurementUid: newMeasurement.uid || {},
             measurement: newMeasurement,
             annotationData: annotationData,
-            modality: displaySet?.Modality || '',
+            modality:
+              getModalityForMeasurement(newMeasurement, annotationData) ||
+              displaySet?.Modality ||
+              '',
           });
         }
       }

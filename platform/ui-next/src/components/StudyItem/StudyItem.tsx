@@ -78,9 +78,8 @@ const StudyItem = ({
                   </TooltipTrigger>
                 </Tooltip>
               </div>
-              <div className="flex items-end gap-1 pl-[10px] text-[12px] text-white/80">
+              <div className="flex items-center pl-[10px] text-[12px] text-white/80">
                 <span className="max-w-[150px] overflow-hidden text-ellipsis">{modalities}</span>
-                <span>{numInstances}</span>
               </div>
               {StudyMenuItems && (
                 <div className="ml-2 flex items-center">

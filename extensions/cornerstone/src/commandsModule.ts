@@ -4,9 +4,12 @@ import {
   Enums as CoreEnums,
   Types as CoreTypes,
   utilities as csUtils,
+  eventTarget as csEventTarget,
   getEnabledElement,
   getRenderingEngines,
+  metaData,
   StackViewport,
+  triggerEvent as csTriggerEvent,
   VolumeViewport,
 } from '@cornerstonejs/core';
 import * as labelmapInterpolation from '@cornerstonejs/labelmap-interpolation';
@@ -25,6 +28,7 @@ import {
   callInputDialog,
   callInputDialogAutoComplete,
   colorPickerDialog,
+  multiLabelDialog,
   createReportAsync,
   useUIStateStore,
 } from '@ohif/extension-default';
@@ -410,39 +414,73 @@ function commandsModule({
      * @returns Promise that resolves when the label is updated
      */
     _handleMeasurementLabelDialog: async uid => {
-      const labelConfig = customizationService.getCustomization('measurementLabels');
-      const renderContent = customizationService.getCustomization('ui.labellingComponent');
+      // Right-click → "Add Label" now opens the multi-label dialog. Each
+      // annotation can hold a list of custom labels (text + font size +
+      // color + draggable world position) on `data.customLabels`. The
+      // labels render via `CustomLabelsOverlay.tsx` and persist through
+      // the existing annotation save path because they live inside the
+      // annotation's `data` object.
+      //
+      // The old single-label flow (`measurement.label`) is unrelated — it
+      // drives the "Reference Annotation"/"Your Annotation" pill in
+      // `AnnotationTooltipsOverlay` and is set automatically by user-
+      // type. We leave it alone.
       const measurement = measurementService.getMeasurement(uid);
-
       if (!measurement) {
         console.debug('No measurement found for label editing');
         return;
       }
 
-      if (!labelConfig) {
-        const label = await callInputDialog({
-          uiDialogService,
-          title: 'Edit Measurement Label',
-          placeholder: measurement.label || 'Enter new label',
-          defaultValue: measurement.label,
-        });
-
-        if (label !== undefined && label !== null) {
-          measurementService.update(uid, { ...measurement, label }, true);
-        }
+      const ann: any = annotation.state.getAnnotation(uid);
+      if (!ann?.data) {
+        console.debug('No cornerstone annotation found for label editing');
         return;
       }
 
-      const val = await callInputDialogAutoComplete({
-        measurement,
-        uiDialogService,
-        labelConfig,
-        renderContent,
-      });
+      const existing = Array.isArray(ann.data.customLabels) ? ann.data.customLabels : [];
 
-      if (val !== undefined && val !== null) {
-        measurementService.update(uid, { ...val }, true);
-      }
+      uiDialogService.show({
+        content: multiLabelDialog,
+        title: 'Annotation Labels',
+        contentProps: {
+          value: existing,
+          onSave: (labels: any[]) => {
+            // Write to annotation.data so the overlay re-reads on the
+            // next ANNOTATION_MODIFIED.
+            ann.data.customLabels = labels;
+            // Fire ANNOTATION_MODIFIED via the SAME `eventTarget` instance
+            // the overlay imports (NOT via require() — that risked picking
+            // up a different module copy under webpack ESM/CJS interop,
+            // which is why the label didn't appear until a viewport
+            // change forced a CAMERA_MODIFIED). Same event also triggers
+            // initMeasurementService's MODIFIED listener which routes
+            // through annotationToMeasurement(isUpdate=true), and that
+            // is what kicks the BIEDX debounced backend save.
+            try {
+              const re = cornerstoneViewportService.getRenderingEngine();
+              const reId = re?.id;
+              const viewports: any = viewportGridService.getState()?.viewports;
+              const firstViewportId = viewports?.keys
+                ? viewports.keys().next().value
+                : undefined;
+              csTriggerEvent(csEventTarget, Enums.Events.ANNOTATION_MODIFIED, {
+                annotation: ann,
+                viewportId: firstViewportId,
+                renderingEngineId: reId,
+              });
+            } catch {
+              /* event dispatch failed — labels still saved on annotation */
+            }
+            // Touch the measurement service too so any panels that watch
+            // it re-render.
+            try {
+              measurementService.update(uid, { ...measurement }, true);
+            } catch {
+              /* non-fatal */
+            }
+          },
+        },
+      });
     },
     /**
      * Show the measurement labelling input dialog and update the label
@@ -453,6 +491,230 @@ function commandsModule({
     },
     renameMeasurement: async ({ uid }) => {
       await actions._handleMeasurementLabelDialog(uid);
+    },
+    /**
+     * Right-click → "Change Color" → existing `colorPickerDialog` → applies the
+     * chosen color to the annotation via cornerstone3D's per-annotation style
+     * API. The color is ALSO mirrored onto `annotation.data.color`, which is
+     * exactly the field the existing `RAW_MEASUREMENT_ADDED` handler reads on
+     * load (see `initMeasurementService.ts:458-463`). That gives us a clean
+     * round-trip: if the surrounding save flow persists `annotation_data`
+     * (the JSON column the GET endpoint returns), the color comes back colored
+     * on the next mount — no extra save endpoint needed.
+     *
+     * Args shape — the context-menu invoker passes the full `selectorProps`,
+     * so we accept either an explicit `{ uid }` (programmatic call) or a
+     * `nearbyToolData` (right-click invocation).
+     */
+    changeMeasurementColor: (args: any = {}) => {
+      const uid: string | undefined =
+        args?.uid ?? args?.nearbyToolData?.annotationUID ?? args?.measurement?.uid;
+      if (!uid) {
+        return;
+      }
+      const sourceAnnotation = annotation.state.getAnnotation(uid);
+      if (!sourceAnnotation) {
+        return;
+      }
+
+      // Seed the picker with the current annotation color if we have one;
+      // otherwise default to a neutral starting point (cornerstone yellow).
+      const parseRgbString = (s: string | undefined): [number, number, number] | null => {
+        if (!s) {
+          return null;
+        }
+        const m = s.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+        if (!m) {
+          return null;
+        }
+        return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
+      };
+      const existing =
+        parseRgbString(sourceAnnotation.data?.color as string | undefined) ||
+        parseRgbString(
+          annotation.config.style.getAnnotationToolStyles(uid)?.color as string | undefined
+        );
+      const seed = existing || [255, 255, 0];
+
+      uiDialogService.show({
+        content: colorPickerDialog,
+        title: 'Change Annotation Color',
+        contentProps: {
+          value: { r: seed[0], g: seed[1], b: seed[2], a: 1 },
+          onSave: (rgba: { r: number; g: number; b: number; a: number }) => {
+            const colorStr = `rgb(${Math.round(rgba.r)}, ${Math.round(rgba.g)}, ${Math.round(
+              rgba.b
+            )})`;
+            // 1. Apply via the per-annotation style override. Cornerstone3D's
+            //    style lookup tries `colorHighlightedActive`, `colorHighlighted`,
+            //    then `color` (in that order, more specific first). The global
+            //    defaults in `@cornerstonejs/tools` set `colorHighlighted:
+            //    rgb(0,255,0)` (BRIGHT GREEN) and `colorSelected: rgb(0,220,0)`
+            //    — if we only set the base `color`, the lookup hits the global
+            //    `colorHighlighted` first whenever the annotation is hovered/
+            //    selected/locked, and the override is ignored. We MUST set every
+            //    state + mode variant so the user-chosen color wins in all states.
+            const styleOverride = {
+              color: colorStr,
+              colorHighlighted: colorStr,
+              colorSelected: colorStr,
+              colorLocked: colorStr,
+              colorActive: colorStr,
+              colorPassive: colorStr,
+              colorEnabled: colorStr,
+              colorHighlightedActive: colorStr,
+              colorHighlightedPassive: colorStr,
+              colorSelectedActive: colorStr,
+              colorSelectedPassive: colorStr,
+            };
+            annotation.config.style.setAnnotationStyles(uid, styleOverride);
+            // 2. Mirror onto annotation.data.color so re-renders + load-from-
+            //    JSON round-trips pick it up (see initMeasurementService.ts:
+            //    458-463). Also drives the per-annotation move handle in
+            //    CustomRoiHitTesting.decorateRender (reads data.color).
+            if (sourceAnnotation.data) {
+              (sourceAnnotation.data as any).color = colorStr;
+            }
+            // 3. Tell MeasurementService the measurement was updated — this
+            //    fires MEASUREMENT_UPDATED to subscribers (panels, save flows
+            //    in main OHIF) without re-creating the measurement.
+            try {
+              const m = measurementService.getMeasurement(uid);
+              if (m) {
+                measurementService.update(uid, { ...m, color: colorStr } as any, true);
+              }
+            } catch {
+              /* measurement may not be tracked — style change still applies */
+            }
+            // 4. Force the SVG annotation layer to redraw with the new style.
+            //    `renderingEngine.render()` repaints the image layer but does
+            //    NOT redraw cached SVG annotations — that's why the move
+            //    handle (drawn fresh each render in `decorateRender` reading
+            //    data.color) updated but the stock cornerstone border didn't.
+            //    `triggerAnnotationRenderForViewportIds` invalidates the SVG
+            //    cache and forces a fresh `renderAnnotation` pass with the
+            //    new style.
+            try {
+              const viewportIds: string[] = [];
+              const gridState: any = viewportGridService.getState();
+              if (gridState?.viewports?.forEach) {
+                gridState.viewports.forEach((_vp: any, id: string) => viewportIds.push(id));
+              }
+              if (viewportIds.length) {
+                (cornerstoneTools as any).utilities.triggerAnnotationRenderForViewportIds(
+                  viewportIds
+                );
+              }
+            } catch {
+              /* no enabled viewports — ignore */
+            }
+            // 5. Also kick the image-layer render so cornerstone fully flushes.
+            try {
+              cornerstoneViewportService.getRenderingEngine()?.render();
+            } catch {
+              /* engine may be gone; ignore */
+            }
+            // 6. Persist the new color to the BIEDX backend so it survives
+            //    reload. The POST /annotation-measurements endpoint is an
+            //    UPSERT (cases.service.ts:319-327: existing measurement_uid →
+            //    `patchAndFetchById` of `annotation_data`). Re-posting with
+            //    the now-updated `sourceAnnotation` (whose data.color we set
+            //    above) writes the new color into `annotation_data` JSON.
+            //    Round-trip on next load: initMeasurementService reads
+            //    `data.annotation.data.color` and re-applies the full state
+            //    variant set we just expanded.
+            //
+            //    Gated the same way as the existing delete (commandsModule.ts:
+            //    681-690): no save in preview mode; faculty saves only when
+            //    addAnswerClicked is on. Failure here is non-fatal — the
+            //    in-session color change still applies; user can retry.
+            try {
+              const { courseId, moduleId, caseId, studentId, userType, viewType, isPreview } =
+                getCustomParams();
+              if (!isPreview && sourceAnnotation && (sourceAnnotation as any).metadata) {
+                const measurementForSave = measurementService.getMeasurement(uid);
+                const meta: any = (sourceAnnotation as any).metadata;
+                const studyUID =
+                  measurementForSave?.referenceStudyUID ||
+
+
+                  meta?.referenceStudyUID ||
+                  meta?.StudyInstanceUID;
+                const toolName = meta?.toolName || measurementForSave?.toolName;
+                // Modality must come from the displaySet OR cornerstone's
+                // cached DICOM instance metadata — measurement objects do NOT
+                // carry a top-level `modality` field. The backend Joi
+                // validator rejects an empty string (cases.validation.ts), so
+                // if we can't resolve it we abandon the save rather than fire
+                // a doomed POST. `displaySetService` here is the real singleton
+                // (destructured from servicesManager near the top of actions),
+                // unlike `new DisplaySetService()` which would return an empty
+                // instance.
+                const dsUID = measurementForSave?.displaySetInstanceUID;
+                const ds = dsUID ? displaySetService.getDisplaySetByUID(dsUID) : undefined;
+                let modality: string = ds?.Modality || meta?.Modality || '';
+                if (!modality) {
+                  const refImgId = meta?.referencedImageId;
+                  if (refImgId) {
+                    const instance: any = metaData.get('instance', refImgId);
+                    if (instance?.Modality) {
+                      modality = instance.Modality;
+                    }
+                  }
+                }
+                if (!modality) {
+                  console.warn(
+                    'changeMeasurementColor: could not resolve modality — skipping save',
+                    uid
+                  );
+                  return;
+                }
+                if (!studyUID) {
+                  console.warn(
+                    'changeMeasurementColor: missing study UID — skipping save',
+                    uid
+                  );
+                  return;
+                }
+                const body: any = {
+                  course_id: courseId,
+                  module_id: moduleId,
+                  case_id: caseId,
+                  view_type: viewType,
+                  study_instance_uid: studyUID,
+                  measurement_uid: uid,
+                  tool_name: toolName,
+                  measurement_data: measurementForSave,
+                  annotation_data: sourceAnnotation,
+                  modality,
+                  is_recall: !!(measurementForSave as any)?.is_recall,
+                };
+                if (userType === 'student') {
+                  body.student_id = studentId;
+                  apiService
+                    .post('/user/cases/annotation-measurements', body)
+                    .catch(err =>
+                      console.warn('changeMeasurementColor: student save failed', err)
+                    );
+                } else {
+                  body.faculty_id = (getCustomParams() as any)?.facultyId;
+                  const isAddAnswerClicked = !!useUIStateStore.getState().uiState
+                    .addAnswerClicked;
+                  if (isAddAnswerClicked) {
+                    apiService
+                      .post('/admin/cases/annotation-measurements', body)
+                      .catch(err =>
+                        console.warn('changeMeasurementColor: faculty save failed', err)
+                      );
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('changeMeasurementColor: persist step failed', err);
+            }
+          },
+        },
+      });
     },
     /**
      *
@@ -1040,6 +1302,170 @@ function commandsModule({
         }
       }
     },
+    resetView: () => {
+      // NARROW Reset View — only the hanging protocol snaps back to its
+      // default stage; everything else (W/L, zoom, pan, annotations) is
+      // left as the user has it. For the full reset behaviour (clear
+      // annotations + per-viewport reset + re-fetch from DB) use the
+      // separate `clearView` command (Toolbar "Clear" button).
+      //
+      // Default stage per protocol:
+      //   hpMammo (MG)  → stageIndex 2  ("All Current")
+      //   hpCEM         → stageIndex 0  ("Paired LE/Recombined (All)")
+      //   hpMR          → stageIndex 0  (2x3 grid)
+      //   any other     → stageIndex 0
+      //
+      // Always re-fires `setProtocol(defaultStage)` + `setMammographyZoomConditional`
+      // — even when the user is already on the default stage — so the HP/zoom
+      // can snap back from a custom layout or zoomed-in state.
+      //
+      // Why `hangingProtocolService.setProtocol(id, { stageIndex })` directly
+      // instead of the OHIF `setHangingProtocol` command wrapper: the wrapper's
+      // `reset: true` branch calls `hangingProtocolService.run(study, id)`
+      // WITHOUT options, so the `stageIndex` we pass gets dropped and
+      // `_setProtocol` defaults to `options?.stageIndex || 0`. Direct
+      // setProtocol respects the stageIndex.
+      try {
+        const active = hangingProtocolService.getActiveProtocol();
+        const protocolId = active?.protocol?.id;
+        if (protocolId) {
+          const defaultStageIndex = protocolId === '@ohif/hpMammo' ? 2 : 0;
+          hangingProtocolService.setProtocol(protocolId, {
+            stageIndex: defaultStageIndex,
+          });
+        }
+      } catch (e) {
+        console.warn('resetView: HP setProtocol failed', e);
+      }
+
+      // Replay BIEDX MG-zoom step (no-op for non-MG).
+      try {
+        commandsManager.run('setMammographyZoomConditional', {});
+      } catch {
+        /* command may not exist in non-BIEDX modes */
+      }
+    },
+
+    clearView: () => {
+      // Toolbar Clear (full reset): bring viewports back to the
+      // "fresh case-open" state WITHOUT reloading the page (DICOM cache
+      // preserved so large cases don't re-download).
+      //
+      // Strategy:
+      //
+      //   1. Clear EVERY in-memory annotation. Faculty draws that were
+      //      never saved (no Add-Answer click) stay gone — what the user
+      //      wants ("Clear drops unsaved work"). Saved annotations come
+      //      back via the DB re-fetch path (step 5).
+      //
+      //   2. Per-viewport reset on every viewport that has a loaded image.
+      //      `viewport.resetProperties()` re-derives VOI from the image's
+      //      modality LUT (true W/L reset — fixes "slight darkening"),
+      //      restores `initialInvert`, restores the original colormap.
+      //      `viewport.resetCamera()` resets zoom / pan / rotation.
+      //      Runs while images are stable, so cornerstone3D's internal
+      //      `_getVOIRangeForCurrentImage()` succeeds and the viewport
+      //      paints immediately — no blanking.
+      //
+      //   3. Detect whether the user is on a custom layout (Layout-menu
+      //      override) by comparing the current viewport-pane count to the
+      //      default HP stage's viewport count. Only re-run HP when needed.
+      //
+      //   4. Re-run HP with the default stageIndex when stage or layout
+      //      differs from default. Direct setProtocol (not the
+      //      `setHangingProtocol` command wrapper which drops stageIndex
+      //      on `reset: true`).
+      //
+      //   5. Replay `setMammographyZoomConditional` — BIEDX-specific MG
+      //      zoom step that HangingProtocolDropdown.useEffect runs after
+      //      HP on initial mount. Idempotent for non-MG.
+      //
+      //   6. Ask ViewerLayout to re-fetch DB-saved annotations.
+      //      `window.__reloadSavedAnnotations` is registered by ViewerLayout
+      //      on mount. The fetch effect re-runs and gates correctly by
+      //      userType/isPreview/isAddAnswerClicked.
+
+      // ---- 1. Clear all annotations (in-memory) ----
+      try {
+        measurementService.clearMeasurements();
+      } catch (e) {
+        console.warn('clearView: clearMeasurements failed', e);
+      }
+
+      // ---- 2. Per-viewport reset ----
+      try {
+        getRenderingEngines().forEach(re => {
+          re.getViewports().forEach((viewport: any) => {
+            try {
+              if (!viewport?.element || !viewport.getImageData?.()) {
+                return;
+              }
+              if (typeof viewport.resetProperties === 'function') {
+                viewport.resetProperties();
+              }
+              viewport.resetCamera?.();
+              viewport.render?.();
+            } catch {
+              /* skip viewports that aren't alive */
+            }
+          });
+        });
+      } catch (e) {
+        console.warn('clearView: per-viewport reset failed', e);
+      }
+
+      // ---- 3. Detect whether HP needs re-running ----
+      let needsHpRerun = false;
+      let protocolId: string | undefined;
+      let defaultStageIndex = 0;
+      try {
+        const active = hangingProtocolService.getActiveProtocol();
+        protocolId = active?.protocol?.id;
+        const currentStageIndex = active?.stageIndex ?? 0;
+        if (protocolId) {
+          if (protocolId === '@ohif/hpMammo') {
+            defaultStageIndex = 2;
+          }
+          if (currentStageIndex !== defaultStageIndex) {
+            needsHpRerun = true;
+          } else {
+            const protocol = hangingProtocolService.getProtocolById(protocolId);
+            const expectedCount = protocol?.stages?.[defaultStageIndex]?.viewports?.length || 0;
+            const currentCount = viewportGridService.getNumViewportPanes();
+            if (expectedCount > 0 && expectedCount !== currentCount) {
+              needsHpRerun = true;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('clearView: layout detection failed', e);
+      }
+
+      // ---- 4. Re-run HP only when custom layout or non-default stage ----
+      if (needsHpRerun && protocolId) {
+        try {
+          hangingProtocolService.setProtocol(protocolId, {
+            stageIndex: defaultStageIndex,
+          });
+        } catch (e) {
+          console.warn('clearView: HP setProtocol failed', e);
+        }
+      }
+
+      // ---- 5. Replay BIEDX MG-zoom step ----
+      try {
+        commandsManager.run('setMammographyZoomConditional', {});
+      } catch {
+        /* command may not exist in non-BIEDX modes */
+      }
+
+      // ---- 6. Re-fetch DB-saved annotations ----
+      try {
+        (window as any).__reloadSavedAnnotations?.();
+      } catch {
+        /* trigger not registered — viewer not mounted; safe to ignore */
+      }
+    },
     scaleViewport: ({ direction }) => {
       const enabledElement = _getActiveViewportEnabledElement();
       const scaleFactor = direction > 0 ? 0.9 : 1.1;
@@ -1215,68 +1641,22 @@ function commandsModule({
             viewport.render();
           });
         } else {
-          // Normal stages (0-6) - 1.4x zoom
-          readyViewports.forEach((viewport, index) => {
+          // Normal stages (0-15) — no manual zoom or pan. The hanging
+          // protocol's displayArea (`centeredFitDisplayArea`, imageArea
+          // [1.0, 1.0]) already gives a clean centered fit that exactly
+          // cancels cornerstone's `insetImageMultiplier = 1.1` so the
+          // image lands flush on the constraining canvas dimension with
+          // no cutoff. Just call `resetCamera()` so any race-condition
+          // camera state gets reset back to the displayArea's intended
+          // fit. The previous implementation here applied a
+          // `Math.max(scaleX,scaleY)/2` parallelScale plus a ±115-canvas-
+          // pixel horizontal pan, which produced the "Zoom: 1.35x with
+          // chest-wall cropping" view on initial load AND re-fired
+          // whenever the viewport was resized (sidebar open/close),
+          // hijacking the displayArea fit. Standalone removed this code
+          // 2026-05-26; main OHIF brought into sync 2026-06-04.
+          readyViewports.forEach(viewport => {
             viewport.resetCamera();
-            const { parallelScale } = viewport.getCamera();
-            const imageData = viewport.getImageData();
-            const zoomFactor = 1 / 1.4; // 0.714
-            // const newParallelScale = parallelScale * zoomFactor;
-
-            const [width, height] = imageData.dimensions;
-            const [spacingX, spacingY] = imageData.spacing;
-            const scaleX = width * spacingX;
-            const scaleY = height * spacingY;
-            const newParallelScale = Math.max(scaleX, scaleY) / 2;
-            const noneViewports = [0, 1, 2, 11];
-            // if (!noneViewports.includes(currentStageIndex)) {
-            // Determine viewport type based on display set
-            let panX = 0;
-            try {
-              // Get the current stage and viewport configuration
-              const currentStage = hangingProtocolService.protocol?.stages?.[currentStageIndex];
-              if (currentStage && currentStage.viewports && currentStage.viewports[index]) {
-                const viewportConfig = currentStage.viewports[index];
-                if (viewportConfig.displaySets && viewportConfig.displaySets[0]) {
-                  const displaySetId = viewportConfig.displaySets[0].id;
-                  // Apply pan based on display set type (both FFDM and DBT)
-                  if (
-                    displaySetId === 'LCC' ||
-                    displaySetId === 'LMLO' ||
-                    displaySetId === 'LCC3D' ||
-                    displaySetId === 'LMLO3D'
-                  ) {
-                    if (!noneViewports.includes(currentStageIndex)) {
-                      panX = -115; // Left side - pan left
-                    } else {
-                      panX = 42; // Left side - pan left
-                    }
-                  } else if (
-                    displaySetId === 'RCC' ||
-                    displaySetId === 'RMLO' ||
-                    displaySetId === 'RCC3D' ||
-                    displaySetId === 'RMLO3D'
-                  ) {
-                    if (!noneViewports.includes(currentStageIndex)) {
-                      panX = 115; // Right side - pan right
-                    } else {
-                      panX = -42; // Right side - pan right
-                    }
-                  }
-                }
-              }
-            } catch (error) {
-              // Fallback: use viewport index to determine side
-              if (index === 0 || index === 2) {
-                panX = 100; // RCC, RMLO
-              } else if (index === 1 || index === 3) {
-                panX = -100; // LCC, LMLO
-              }
-            }
-            viewport.setPan([panX, 0]);
-            // }
-
-            viewport.setCamera({ parallelScale: newParallelScale });
             viewport.render();
           });
         }
@@ -1996,9 +2376,23 @@ function commandsModule({
     },
 
     deleteActiveAnnotation: () => {
-      const activeAnnotationsUID = cornerstoneTools.annotation.selection.getAnnotationsSelected();
-      activeAnnotationsUID.forEach(activeAnnotationUID => {
-        measurementService.remove(activeAnnotationUID);
+      // Route through removeMeasurement so backend DELETE fires (right-click
+      // "Delete Measurement" goes through the same path). Without this the
+      // annotation comes back from the DB on next mount.
+      //
+      // Cornerstone's selection API can be empty even when the user clearly
+      // has an annotation highlighted (it only populates on certain
+      // interactions). Fall back to MeasurementService.isSelected, which
+      // initMeasurementService keeps in sync via ANNOTATION_SELECTION_CHANGE.
+      let uids: string[] = cornerstoneTools.annotation.selection.getAnnotationsSelected() || [];
+      if (!uids.length) {
+        uids = measurementService
+          .getMeasurements()
+          .filter((m: any) => m.isSelected)
+          .map((m: any) => m.uid);
+      }
+      uids.forEach(uid => {
+        commandsManager.run('removeMeasurement', { uid });
       });
     },
     setDisplaySetsForViewports: ({ viewportsToUpdate }) => {
@@ -2314,6 +2708,9 @@ function commandsModule({
     renameMeasurement: {
       commandFn: actions.renameMeasurement,
     },
+    changeMeasurementColor: {
+      commandFn: actions.changeMeasurementColor,
+    },
     updateMeasurement: {
       commandFn: actions.updateMeasurement,
     },
@@ -2376,6 +2773,12 @@ function commandsModule({
     },
     resetViewport: {
       commandFn: actions.resetViewport,
+    },
+    resetView: {
+      commandFn: actions.resetView,
+    },
+    clearView: {
+      commandFn: actions.clearView,
     },
     scaleUpViewport: {
       commandFn: actions.scaleViewport,

@@ -63,11 +63,13 @@ const AnnotationTooltipsOverlay = ({ element, viewportId }) => {
     updateTooltips();
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_ADDED, updateTooltips);
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_MODIFIED, updateTooltips);
+    eventTarget.addEventListener(csToolsEvents.ANNOTATION_REMOVED, updateTooltips);
     eventTarget.addEventListener(csToolsEvents.CAMERA_MODIFIED, updateTooltips);
 
     return () => {
       eventTarget.removeEventListener(csToolsEvents.ANNOTATION_ADDED, updateTooltips);
       eventTarget.removeEventListener(csToolsEvents.ANNOTATION_MODIFIED, updateTooltips);
+      eventTarget.removeEventListener(csToolsEvents.ANNOTATION_REMOVED, updateTooltips);
       eventTarget.removeEventListener(csToolsEvents.CAMERA_MODIFIED, updateTooltips);
     };
   }, [element, viewportId]);

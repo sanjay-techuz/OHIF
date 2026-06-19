@@ -8,6 +8,7 @@ import PropTypes from 'prop-types';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StackViewportData, VolumeViewportData } from '../../types/CornerstoneCacheService';
 import AnnotationTooltipsOverlay from './AnnotationTooltipsOverlay';
+import CustomLabelsOverlay from './CustomLabelsOverlay';
 import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
 
 import { useViewportRendering } from '../../hooks';
@@ -291,6 +292,11 @@ function CustomizableViewportOverlay({
       />
       {/* Always-visible annotation label tooltips */}
       <AnnotationTooltipsOverlay
+        element={element}
+        viewportId={viewportId}
+      />
+      {/* User-added multi-label overlay (draggable per-label) */}
+      <CustomLabelsOverlay
         element={element}
         viewportId={viewportId}
       />
