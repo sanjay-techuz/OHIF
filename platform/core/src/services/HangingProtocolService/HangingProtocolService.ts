@@ -1355,8 +1355,25 @@ export default class HangingProtocolService extends PubSubService {
     const { StudyInstanceUID: activeStudyUID } = this.activeStudy;
     viewport.displaySets.forEach(displaySetOptions => {
       const { id, matchedDisplaySetsIndex = 0 } = displaySetOptions;
-      const reuseDisplaySetUID =
+      const cachedReuseDisplaySetUID =
         id && displaySetSelectorMap[`${activeStudyUID}:${id}:${matchedDisplaySetsIndex || 0}`];
+      // Ignore a cached selector entry that points to a user-attachment
+      // displaySet (JPG/PNG AI image). It lands in the selector map when a user
+      // drags such an image into an HP slot; honoring it on the next stage
+      // application would freeze the attachment in that slot and bypass the
+      // matcher (which would have picked the real radiology series). Falling
+      // through to the matcher re-populates the slot with the natural HP match.
+      // Symmetric with the `excludeFromHangingProtocolMatching` filter below.
+      const reuseDisplaySetUID = (() => {
+        if (!cachedReuseDisplaySetUID) {
+          return cachedReuseDisplaySetUID;
+        }
+        const { displaySetService } = this._servicesManager.services;
+        const reusedDisplaySet = displaySetService?.getDisplaySetByUID?.(cachedReuseDisplaySetUID);
+        return reusedDisplaySet?.excludeFromHangingProtocolMatching
+          ? undefined
+          : cachedReuseDisplaySetUID;
+      })();
       const viewportDisplaySetMain = this.displaySetMatchDetails.get(id);
 
       const viewportDisplaySet = this.findDeduplicatedMatchDetails(
@@ -1506,8 +1523,17 @@ export default class HangingProtocolService extends PubSubService {
         return;
       }
 
+      // `excludeFromHangingProtocolMatching` is set on displaySets that exist
+      // purely as user attachments (JPG/PNG AI reports wrapped as Secondary
+      // Capture, Modality ∈ {XC, OT, ...}). They stay visible + draggable in the
+      // study browser but must never be auto-picked by a hanging-protocol
+      // selector. Filtering at this single point keeps every protocol (default,
+      // hpMammo, hpMR, future ones) consistent without per-selector rules.
       const studyDisplaySets = this.displaySets.filter(
-        it => it.StudyInstanceUID === study.StudyInstanceUID && !it?.unsupported
+        it =>
+          it.StudyInstanceUID === study.StudyInstanceUID &&
+          !it?.unsupported &&
+          !it?.excludeFromHangingProtocolMatching
       );
 
       const studyMatchDetails = this.protocolEngine.findMatch(study, studyMatchingRules, {

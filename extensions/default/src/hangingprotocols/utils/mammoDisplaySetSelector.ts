@@ -50,6 +50,40 @@ const standardViewBonusRule = {
   },
 };
 
+// A single DBT acquisition emits several display sets that ALL share the Breast
+// Tomosynthesis SOP Class (1.2.840.10008.5.1.4.1.1.13.1.3): the real
+// reconstructed volume (ImageType ...\TOMOSYNTHESIS\NONE, multi-frame), MIP
+// slabs (...\MAXIMUM) and a synthetic "C-View" 2D (...\GENERATED_2D, single
+// frame). Because SOP class / modality / view are identical across them, they
+// tie on every other scored attribute and the flat synthetic 2D can win the DBT
+// pane — the user then sees a "duplicate 2D" instead of the tomosynthesis.
+//
+// The `TomoType` custom attribute classifies each from its ImageType. These two
+// optional bonuses pin the pane to the reconstructed volume ('RECON'), with a
+// smaller fallback so a MIP fills the pane only when a view has no recon volume.
+// Both are optional (required: false) so a study that only has a synthetic
+// acquisition still fills the pane with it. The RECON weight (40) is set ABOVE
+// the SOPClassUID weight (30) so it dominates the DBT-internal tie-break without
+// disturbing the cross-view (CC vs MLO) ranking.
+const tomoVolumeBonusRules = [
+  {
+    weight: 40,
+    attribute: 'TomoType',
+    required: false,
+    constraint: {
+      equals: 'RECON',
+    },
+  },
+  {
+    weight: 12,
+    attribute: 'TomoType',
+    required: false,
+    constraint: {
+      contains: ['RECON', 'MIP'],
+    },
+  },
+];
+
 const LCCSeriesMatchingRules = [
   {
     weight: 10,
@@ -318,6 +352,7 @@ const RCC3DSeriesMatchingRules = [
     },
   },
   standardViewBonusRule,
+  ...tomoVolumeBonusRules,
 ];
 
 const LCC3DSeriesMatchingRules = [
@@ -359,6 +394,7 @@ const LCC3DSeriesMatchingRules = [
     },
   },
   standardViewBonusRule,
+  ...tomoVolumeBonusRules,
 ];
 
 const RMLO3DSeriesMatchingRules = [
@@ -409,6 +445,7 @@ const RMLO3DSeriesMatchingRules = [
     },
   },
   standardViewBonusRule,
+  ...tomoVolumeBonusRules,
 ];
 
 const LMLO3DSeriesMatchingRules = [
@@ -459,6 +496,7 @@ const LMLO3DSeriesMatchingRules = [
     },
   },
   standardViewBonusRule,
+  ...tomoVolumeBonusRules,
 ];
 
 // DBT Display Set Objects

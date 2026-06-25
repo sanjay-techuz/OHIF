@@ -125,6 +125,10 @@ const makeDisplaySet = instances => {
       instance.SeriesDescription ||
       `${i18n.t('Series')} ${instance.SeriesNumber} - ${i18n.t(instance.Modality)}`,
     FrameOfReferenceUID: instance.FrameOfReferenceUID,
+    // Picked up by the matcher in HangingProtocolService to globally skip
+    // user-attached JPG/PNG (Modality ∈ {XC, OT, ...}) from automatic viewport
+    // assignment. They remain draggable thumbnails in the study browser.
+    excludeFromHangingProtocolMatching: isUserAttachmentInstance(instance),
   });
 
   imageSet.sortBy(instancesSortCriteria.default);
@@ -151,6 +155,30 @@ const makeDisplaySet = instances => {
 const isSingleImageModality = modality => {
   return modality === 'CR' || modality === 'MG' || modality === 'DX';
 };
+
+// Non-radiology DICOM modalities that mean "this is a user-attached artifact,
+// not a real imaging series" — JPG/PNG screenshots, AI reports, photos, scanned
+// documents, etc. DisplaySets for these instances must still appear in the
+// study browser sidebar and be draggable into any viewport (so the user can
+// manually pull them in when needed), but they must NEVER be auto-picked by a
+// hanging-protocol selector and load by default.
+//
+// Modality is the load-bearing signal because Orthanc DICOMizes uploaded JPGs
+// inconsistently — sometimes as Secondary Capture (`SC`), sometimes External-
+// Camera Photography (`XC`) with no SOPClassUID set. The biedx-node LMS upload
+// wraps AI images as `OT`. Filtering on Modality covers every wrapping path.
+//
+// Tagged displaySets get `excludeFromHangingProtocolMatching` so the matcher in
+// HangingProtocolService skips them globally.
+const NON_RADIOLOGY_MODALITIES = new Set([
+  'XC', // External-camera Photography (OE2 "Add Series" default for JPG)
+  'OT', // Other (biedx-node LMS + standalone upload wrap for JPG/PNG)
+  'DOC', // Document
+  'AU', // Audio
+  'ECG', // Electrocardiogram
+]);
+const isUserAttachmentInstance = instance =>
+  !!instance && NON_RADIOLOGY_MODALITIES.has(instance.Modality);
 
 function getSopClassUids(instances) {
   const uniqueSopClassUidsInSeries = new Set();
