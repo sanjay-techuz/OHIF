@@ -136,6 +136,8 @@ const Results: React.FC<ResultsProps> = ({
 
                 return {
                   id: detail.case_id,
+                  case_no: detail.module_case_no || null,
+                  case_number: detail.case_number || null,
                   study_instance_uid: detail.study_instance_uid,
                   view_type: viewType,
                   case_type: caseType,
@@ -180,6 +182,8 @@ const Results: React.FC<ResultsProps> = ({
 
                 return {
                   id: detail.case_id,
+                  case_no: detail.module_case_no || null,
+                  case_number: detail.case_number || null,
                   study_instance_uid: detail.study_instance_uid,
                   view_type: viewType,
                   case_type: caseType,
@@ -617,7 +621,18 @@ const Results: React.FC<ResultsProps> = ({
                           key={row.id}
                           className="border-t border-white/10"
                         >
-                          <td className="px-5 py-3">{row.id}</td>
+                          <td className="px-5 py-3">
+                            {row.case_no ? (
+                              <div className="flex flex-col">
+                                <span className="font-medium">{row.case_no}</span>
+                                <span className="text-[11px] text-white/60">
+                                  {row.case_number || `Case ${row.id}`}
+                                </span>
+                              </div>
+                            ) : (
+                              row.case_number || `Case ${row.id}`
+                            )}
+                          </td>
                           <td className="px-5 py-3">{row.view_type || '-'}</td>
                           {isOverall ? (
                             <>
