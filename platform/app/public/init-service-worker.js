@@ -1,8 +1,9 @@
-navigator.serviceWorker.getRegistrations().then(function (registrations) {
-  for (let registration of registrations) {
-    registration.unregister();
-  }
-});
+// NOTE (BIEDX): the previous blanket `getRegistrations().then(... unregister())`
+// that ran on EVERY page load was removed. It tore down and re-registered the
+// service worker on each load, which left windows where no SW controlled the
+// page — breaking the DICOM prefetch cache (the viewer couldn't serve frames
+// from Cache Storage). The Workbox update flow below handles new versions; we
+// no longer nuke the registration each load.
 
 // https://developers.google.com/web/tools/workbox/modules/workbox-window
 // All major browsers that support service worker also support native JavaScript
