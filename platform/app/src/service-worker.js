@@ -1,67 +1,32 @@
 /**
  * @author Sanjay Balai
- * @description BIEDX OHIF service worker.
+ * @description BIEDX OHIF service worker — DICOM prefetch cache ONLY.
  *
- * In addition to the stock OHIF app-shell caching, this adds a DICOM frame
- * cache so a study's pixel data can be prefetched into the browser (see the
- * /prefetch page) and the viewer can then open it with NO pixel network at all
- * (Cache Storage HIT). Per-instance DICOMweb resources are immutable once the
- * file lands in Orthanc, so CacheFirst is safe; `ignoreVary` makes the viewer's
- * Accept/transfer-syntax variations still hit the cached entry.
+ * Unlike stock OHIF, this deliberately does NOT cache the app shell (JS/CSS/
+ * WASM/fonts). We only cache per-instance DICOMweb resources so a study can be
+ * prefetched into the browser (see the /prefetch page) and the viewer opens it
+ * with NO pixel network. This matches LifeTrack's behaviour (only instances are
+ * stored locally; everything else loads normally).
  *
- * NOTE: the previous `navigator.serviceWorker.getRegistrations()...` block was
- * removed — that API does not exist in ServiceWorkerGlobalScope and threw on SW
- * startup. (Registration/cleanup belongs in init-service-worker.js, in the page.)
+ * Cache match tolerance is important: cornerstone retrieves frames in several
+ * ways (plain XHR, streaming `fetch`, and sometimes with appended query
+ * arguments) — so we match with `ignoreSearch` + `ignoreVary`, otherwise a
+ * prefetched frame can MISS just because the viewer added `?...` or a different
+ * Accept. Per-instance DICOMweb bytes are immutable, so this is safe.
  */
 
-// https://developers.google.com/web/tools/workbox/guides/troubleshoot-and-debug
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.0.0-beta.1/workbox-sw.js');
 
-// Install newest immediately and take control of open clients so the viewer
-// (and the /prefetch page) are intercepted without a manual reload.
+// Activate the newest SW immediately and take control of open clients so the
+// /prefetch page and the viewer are intercepted without a manual reload.
 workbox.core.skipWaiting();
 workbox.core.clientsClaim();
 
 // ---------------------------------------------------------------------------
-// App shell (unchanged from stock OHIF)
-// ---------------------------------------------------------------------------
-workbox.routing.registerRoute(
-  /\.(?:js|css|json5)$/,
-  new workbox.strategies.StaleWhileRevalidate({
-    cacheName: 'static-resources',
-  })
-);
-
-workbox.routing.registerRoute(
-  /^https:\/\/fonts\.googleapis\.com/,
-  new workbox.strategies.StaleWhileRevalidate({
-    cacheName: 'google-fonts-stylesheets',
-  })
-);
-
-workbox.routing.registerRoute(
-  /^https:\/\/fonts\.gstatic\.com/,
-  new workbox.strategies.CacheFirst({
-    cacheName: 'google-fonts-webfonts',
-    plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      new workbox.expiration.ExpirationPlugin({
-        maxAgeSeconds: 60 * 60 * 24 * 365, // 1 Year
-        maxEntries: 30,
-      }),
-    ],
-  })
-);
-
-// ---------------------------------------------------------------------------
-// BIEDX: DICOM prefetch cache
-// Matches per-instance DICOMweb resources only:
+// DICOM prefetch cache (the ONLY thing we cache)
+// Matches per-instance DICOMweb resources:
 //   /pacs/dicom-web/studies/{S}/series/{Se}/instances/{I}[/frames/N|/metadata]
 // (study/series LISTS are intentionally not matched — they must stay fresh.)
-// The /prefetch page warms this by fetching frame URLs (those requests pass
-// through this SW and get cached here); the viewer later serves them from cache.
 // ---------------------------------------------------------------------------
 const DICOM_CACHE = 'biedx-dicom-prefetch';
 
@@ -70,7 +35,11 @@ workbox.routing.registerRoute(
     /^\/pacs\/dicom-web\/studies\/[^/]+\/series\/[^/]+\/instances\/[^/]+/.test(url.pathname),
   new workbox.strategies.CacheFirst({
     cacheName: DICOM_CACHE,
-    matchOptions: { ignoreVary: true },
+    // ignoreSearch: a prefetched frame (plain URL) must still HIT when the
+    //   viewer requests it with appended `?...` retrieve arguments.
+    // ignoreVary:  ignore Accept/transfer-syntax differences between the
+    //   prefetch fetch and cornerstone's request.
+    matchOptions: { ignoreSearch: true, ignoreVary: true },
     plugins: [
       new workbox.cacheableResponse.CacheableResponsePlugin({
         statuses: [0, 200],
@@ -83,8 +52,6 @@ workbox.routing.registerRoute(
 // Message API (page <-> SW)
 //   CLEAR_DICOM_CACHE  -> drop all prefetched DICOM data (manual "Clear cache")
 //   SKIP_WAITING       -> activate a freshly installed SW
-// Prefetching itself needs no message: the /prefetch page simply fetches the
-// frame URLs, which this SW caches via the route above.
 // ---------------------------------------------------------------------------
 self.addEventListener('message', event => {
   const data = event.data || {};
@@ -106,4 +73,8 @@ self.addEventListener('message', event => {
   }
 });
 
-workbox.precaching.precacheAndRoute(self.__WB_MANIFEST);
+// Webpack's InjectManifest requires a reference to `self.__WB_MANIFEST`. We
+// deliberately DO NOT precache the app shell (we only want DICOM frames cached),
+// so the manifest is referenced but intentionally unused.
+// eslint-disable-next-line no-unused-expressions
+self.__WB_MANIFEST;

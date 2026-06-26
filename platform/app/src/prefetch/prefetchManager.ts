@@ -163,6 +163,28 @@ export async function ensureServiceWorkerControlling(): Promise<boolean> {
   }
 }
 
+/** Fetch one frame URL (through the SW → cached), retrying transient failures.
+ *  Returns true only when a 2xx response was fully received (so the SW's
+ *  cache.put has the complete body). */
+async function fetchFrameWithRetry(url: string, attempts = 3): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, { headers: { Accept: FRAME_ACCEPT }, credentials: 'same-origin' });
+      if (res.ok) {
+        // Drain the body so the transfer (and the SW's cache.put) completes.
+        await res.arrayBuffer();
+        return true;
+      }
+    } catch {
+      /* network blip — retry */
+    }
+    if (i < attempts - 1) {
+      await new Promise(r => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  return false;
+}
+
 /** Run async tasks with a fixed concurrency. */
 async function runWithConcurrency<T>(
   items: T[],
@@ -207,25 +229,32 @@ export async function prefetchStudies(
       const urls = await enumerateStudyFrameUrls(studyUid);
       const total = urls.length;
       let done = 0;
+      let failed = 0;
       onProgress?.({ studyInstanceUid: studyUid, done, total, state: 'warming' });
 
       await runWithConcurrency(urls, concurrency, async url => {
-        try {
-          const res = await fetch(url, {
-            headers: { Accept: FRAME_ACCEPT },
-            credentials: 'same-origin',
-          });
-          // Drain the body so the transfer (and the SW's cache.put) completes.
-          await res.arrayBuffer().catch(() => undefined);
-        } catch {
-          /* a single failed frame shouldn't abort the whole study */
+        const ok = await fetchFrameWithRetry(url);
+        if (!ok) {
+          failed++;
         }
         done++;
         onProgress?.({ studyInstanceUid: studyUid, done, total, state: 'warming' });
       });
 
-      markStudyPrefetched(studyUid);
-      onProgress?.({ studyInstanceUid: studyUid, done, total, state: 'ready' });
+      if (failed === 0) {
+        // Only mark "Ready" when EVERY frame is cached — otherwise opening the
+        // case would still hit the network for the missing frames.
+        markStudyPrefetched(studyUid);
+        onProgress?.({ studyInstanceUid: studyUid, done, total, state: 'ready' });
+      } else {
+        onProgress?.({
+          studyInstanceUid: studyUid,
+          done,
+          total,
+          state: 'error',
+          error: `${failed}/${total} frame(s) failed — open will be partly online`,
+        });
+      }
     } catch (err: any) {
       onProgress?.({
         studyInstanceUid: studyUid,
