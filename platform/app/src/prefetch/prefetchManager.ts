@@ -130,6 +130,39 @@ export async function enumerateStudyFrameUrls(studyInstanceUid: string): Promise
   return urls;
 }
 
+/**
+ * Ensure a service worker is active AND controlling this page before we fetch —
+ * otherwise the fetches bypass the SW and nothing lands in the prefetch cache
+ * (the exact symptom we hit on first load). Returns true when controlling.
+ */
+export async function ensureServiceWorkerControlling(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return false;
+  }
+  try {
+    await navigator.serviceWorker.ready; // an active SW exists
+    if (navigator.serviceWorker.controller) {
+      return true;
+    }
+    // clientsClaim() in the SW claims this page shortly after activation; wait
+    // briefly for that to happen.
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, 3000);
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        { once: true }
+      );
+    });
+    return !!navigator.serviceWorker.controller;
+  } catch {
+    return false;
+  }
+}
+
 /** Run async tasks with a fixed concurrency. */
 async function runWithConcurrency<T>(
   items: T[],
@@ -157,6 +190,16 @@ export async function prefetchStudies(
 ): Promise<void> {
   const { onProgress, concurrency = 6 } = opts;
   const uniqueUids = Array.from(new Set(studyInstanceUids.filter(Boolean)));
+
+  // Without a controlling SW the fetches below go straight to the network and
+  // never reach the prefetch cache — warn loudly rather than fake "Ready".
+  const controlling = await ensureServiceWorkerControlling();
+  if (!controlling) {
+    console.warn(
+      '[BIEDX prefetch] Service worker is not controlling this page; prefetched data will NOT be cached. ' +
+        'Check that sw.js loads (200) and is activated in DevTools > Application > Service Workers.'
+    );
+  }
 
   for (const studyUid of uniqueUids) {
     try {
