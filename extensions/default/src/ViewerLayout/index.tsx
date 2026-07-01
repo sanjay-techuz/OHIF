@@ -839,10 +839,81 @@ function ViewerLayout({
       }
     };
 
-    setTimeout(() => {
-      getToolMapping();
-      getAcrValues();
-    }, 1000);
+    // Load saved annotations + ACR only once the viewport has actually
+    // RENDERED an image — not after a guessed fixed delay.
+    //
+    // The previous `setTimeout(1000)` was a race: on fast machines (local) 1s
+    // was enough for the first frame to render, so annotations applied and drew.
+    // On UAT (remote server, larger studies, and slower first-frame decode since
+    // the JPEG2000-lossless transcoding rollout) the first render often lands
+    // AFTER 1s, so annotations were added before the image/displaySet was ready
+    // and never drew — even though the fetch API still ran (data applied too
+    // early). Gating on real readiness makes it deterministic regardless of
+    // network/decode speed. A generous fallback ceiling still attempts once even
+    // if no image ever renders (broken case), matching the old "always attempts"
+    // behaviour.
+    let cancelled = false;
+    const startedAt = Date.now();
+    const READY_POLL_MS = 200;
+    const READY_MAX_WAIT_MS = 15000;
+
+    // True once any viewport has a real (non-zero) image on screen. Same check
+    // the HP-loader gate above uses (`getImageData().dimensions`).
+    const isAnyViewportRendered = (): boolean => {
+      try {
+        const re = cornerstoneViewportService?.getRenderingEngine?.();
+        const viewports = re?.getViewports?.();
+        if (!viewports) {
+          return false;
+        }
+        return Object.values(viewports).some((vp: any) => {
+          const dims = vp?.getImageData?.()?.dimensions;
+          return Array.isArray(dims) && dims[0] > 0 && dims[1] > 0;
+        });
+      } catch {
+        return false;
+      }
+    };
+
+    const runLoad = async () => {
+      if (cancelled) {
+        return;
+      }
+      await getToolMapping();
+      if (cancelled) {
+        return;
+      }
+      await getAcrValues();
+      if (cancelled) {
+        return;
+      }
+      // Cornerstone's low-level `annotationManager.addAnnotation` does NOT
+      // trigger a render (see initMeasurementService.ts), so force one render
+      // now to paint the just-loaded annotations immediately instead of waiting
+      // for an incidental camera/render event.
+      try {
+        const re = cornerstoneViewportService?.getRenderingEngine?.();
+        re?.render?.();
+      } catch {
+        /* non-fatal */
+      }
+    };
+
+    const waitForViewportThenLoad = () => {
+      if (cancelled) {
+        return;
+      }
+      if (isAnyViewportRendered() || Date.now() - startedAt >= READY_MAX_WAIT_MS) {
+        runLoad();
+      } else {
+        setTimeout(waitForViewportThenLoad, READY_POLL_MS);
+      }
+    };
+    waitForViewportThenLoad();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isAddAnswerClicked, annotationsReloadKey]);
 
   // Expose a window-attached trigger that the toolbar Reset command
