@@ -56,6 +56,31 @@ const NotificationProvider = ({
       ...options,
     };
 
+    // -----------------------------------------------------------------------
+    // GLOBAL production error suppression (single source of truth).
+    //
+    // EVERY toast in the app funnels through this function — both
+    // `uiNotificationService.show()` (core service -> _show -> here) AND direct
+    // `useNotification().show()` calls (e.g. the ErrorBoundary "Something went
+    // wrong" toast, which bypasses the core service). So this is the one place
+    // to gate error toasts.
+    //
+    // In a PRODUCTION build we do NOT surface error toasts/popups to end users —
+    // uncaught technical errors (cornerstone image-load, destroyed-viewport
+    // scroll race, etc.) would otherwise pop a persistent toast and ruin the
+    // experience. We log them to the console instead so they stay fully
+    // diagnosable in DevTools. Non-error toasts (success/info/warning/loading)
+    // and dev builds are completely unaffected.
+    console.log(
+      `NotificationProvider.show() called with type: ${type}, title: ${title}`,
+      process.env.NODE_ENV
+    );
+    if (process.env.NODE_ENV === 'production' && type === 'error') {
+      // eslint-disable-next-line no-console
+      console.error('[error notification suppressed in production]', title, message);
+      return undefined;
+    }
+
     // Use the provider's deduplicationInterval by default, but allow it to be overridden per notification
     const notificationDeduplicationInterval = optionsDeduplicationInterval || deduplicationInterval;
 

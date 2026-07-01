@@ -442,6 +442,12 @@ function commandsModule({
       uiDialogService.show({
         content: multiLabelDialog,
         title: 'Annotation Labels',
+        // The dialog frame is max-w-md (448px) with symmetric p-10 (40px) →
+        // only 368px of content width. multiLabelDialog's root is min-w-[400px],
+        // so it overflowed to the RIGHT, eating the right padding and making the
+        // modal look left-heavy. Widen to max-w-lg (512px) so the content fits
+        // inside the padding and both sides stay symmetric.
+        containerClassName: 'max-w-lg',
         contentProps: {
           value: existing,
           onSave: (labels: any[]) => {
