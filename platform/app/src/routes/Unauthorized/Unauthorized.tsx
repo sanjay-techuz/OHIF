@@ -6,7 +6,11 @@ const Unauthorized = () => {
   const [appConfig] = useAppConfig();
 
   const handleLogin = () => {
-    window.location.href = 'https://uatlms.biedx.com/login';
+    // LMS login URL is environment-specific (UAT vs prod). Read from env
+    // (webpack DefinePlugin replaces `process.env.REACT_APP_LMS_LOGIN_URL` at
+    // build time); fall back to the UAT URL so nothing breaks if it's unset.
+    window.location.href =
+      process.env.REACT_APP_LMS_LOGIN_URL || 'https://biedx.com/learnings/login';
   };
 
   return (
