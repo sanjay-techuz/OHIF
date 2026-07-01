@@ -14,26 +14,33 @@ export default {
         });
       },
     },
-    {
-      id: 'addAsLayer',
-      label: 'Add as Layer',
-      iconName: 'ViewportViews',
-      onClick: ({ commandsManager, displaySetInstanceUID, servicesManager }: withAppTypes) => {
-        const { viewportGridService } = servicesManager.services;
-
-        // Get the active viewport
-        const { activeViewportId } = viewportGridService.getState();
-        if (!activeViewportId) {
-          return;
-        }
-
-        // Use the new command to add the display set as a layer
-        commandsManager.runCommand('addDisplaySetAsLayer', {
-          viewportId: activeViewportId,
-          displaySetInstanceUID,
-        });
-      },
-    },
+    // "Add as Layer" — HIDDEN for BIEDX. This stock-OHIF action overlays a
+    // series as a fusion/volume layer (PET/CT-style workflows) which BIEDX does
+    // not use. Adding an incompatible display set (e.g. an OT secondary-capture
+    // "AI image" or a plain 2D mammogram stack) builds a vtk.js volume actor
+    // with a null mapper and crashes in setMapperShaderParameters
+    // (`Cannot read properties of null (reading 'isAttributeUsed')`), blanking
+    // the viewport. Uncomment to restore.
+    // {
+    //   id: 'addAsLayer',
+    //   label: 'Add as Layer',
+    //   iconName: 'ViewportViews',
+    //   onClick: ({ commandsManager, displaySetInstanceUID, servicesManager }: withAppTypes) => {
+    //     const { viewportGridService } = servicesManager.services;
+    //
+    //     // Get the active viewport
+    //     const { activeViewportId } = viewportGridService.getState();
+    //     if (!activeViewportId) {
+    //       return;
+    //     }
+    //
+    //     // Use the new command to add the display set as a layer
+    //     commandsManager.runCommand('addDisplaySetAsLayer', {
+    //       viewportId: activeViewportId,
+    //       displaySetInstanceUID,
+    //     });
+    //   },
+    // },
   ],
   'studyBrowser.sortFunctions': [
     {
