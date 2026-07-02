@@ -1,4 +1,4 @@
-import { eventTarget, getEnabledElement, triggerEvent } from '@cornerstonejs/core';
+import { Enums as coreEnums, eventTarget, getEnabledElement, triggerEvent } from '@cornerstonejs/core';
 import { Enums, annotation } from '@cornerstonejs/tools';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -35,6 +35,9 @@ type RenderedLabel = {
  */
 const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId: string }) => {
   const [rendered, setRendered] = useState<RenderedLabel[]>([]);
+  // True while the user is actively zooming/panning — labels are hidden during
+  // the interaction and re-shown (repositioned) once it settles.
+  const [interacting, setInteracting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -49,6 +52,9 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
     if (!element || !viewportId) {
       return;
     }
+
+    // Timer to detect when a zoom/pan interaction has settled.
+    let interactionTimer: ReturnType<typeof setTimeout> | null = null;
 
     function recompute() {
       const enabledElement = getEnabledElement(element);
@@ -98,11 +104,30 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
       setRendered(next);
     }
 
+    // While the camera is actively changing (zoom / pan) HIDE all labels so
+    // they don't lag or flicker mid-interaction, then recompute their positions
+    // and SHOW them once it settles (~150ms after the last CAMERA_MODIFIED).
+    // CAMERA_MODIFIED is a CORE event fired on the viewport ELEMENT (not the
+    // tools eventTarget), so we listen on `element` with the core Enums — the
+    // previous `eventTarget.addEventListener(csToolsEvents.CAMERA_MODIFIED, …)`
+    // was a no-op (tools' Enums.Events has no CAMERA_MODIFIED), which is also
+    // why labels never repositioned during zoom before.
+    function onCameraModified() {
+      setInteracting(true);
+      if (interactionTimer) {
+        clearTimeout(interactionTimer);
+      }
+      interactionTimer = setTimeout(() => {
+        recompute();
+        setInteracting(false);
+      }, 150);
+    }
+
     recompute();
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_ADDED, recompute);
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_MODIFIED, recompute);
     eventTarget.addEventListener(csToolsEvents.ANNOTATION_REMOVED, recompute);
-    eventTarget.addEventListener(csToolsEvents.CAMERA_MODIFIED, recompute);
+    element.addEventListener(coreEnums.Events.CAMERA_MODIFIED, onCameraModified);
     // Cornerstone's low-level `annotationManager.addAnnotation` (the path
     // BIEDX uses to load saved annotations from the API) does NOT fire
     // ANNOTATION_ADDED. `initMeasurementService.ts` dispatches a plain
@@ -117,7 +142,10 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
       eventTarget.removeEventListener(csToolsEvents.ANNOTATION_ADDED, recompute);
       eventTarget.removeEventListener(csToolsEvents.ANNOTATION_MODIFIED, recompute);
       eventTarget.removeEventListener(csToolsEvents.ANNOTATION_REMOVED, recompute);
-      eventTarget.removeEventListener(csToolsEvents.CAMERA_MODIFIED, recompute);
+      element.removeEventListener(coreEnums.Events.CAMERA_MODIFIED, onCameraModified);
+      if (interactionTimer) {
+        clearTimeout(interactionTimer);
+      }
       if (typeof window !== 'undefined') {
         window.removeEventListener('annotation-load-complete', recompute);
       }
@@ -154,21 +182,42 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragRef.current) {
+    // Snapshot the drag state into a local. The `setRendered` updater below
+    // runs asynchronously (on the next render), but must NOT reference
+    // `dragRef.current` — dragging a label out of the viewport fires
+    // pointercancel/up which sets `dragRef.current = null`, so by the time
+    // React runs the queued updater it could be null → "Cannot read properties
+    // of null (reading 'annotationUID')". Reading from the captured `drag`
+    // local keeps the update crash-safe and correct.
+    const drag = dragRef.current;
+    if (!drag) {
       return;
     }
     const containerRect = containerRef.current?.getBoundingClientRect();
     if (!containerRect) {
       return;
     }
-    const cx = e.clientX - containerRect.left - dragRef.current.startCanvasOffset[0];
-    const cy = e.clientY - containerRect.top - dragRef.current.startCanvasOffset[1];
+    // Clamp the label inside the viewport pane: it can be dragged up to the
+    // border but never beyond, so a label can't go off-screen (and can't hit
+    // the drag-out-of-viewport crash path). The container is the viewport pane
+    // (100% x 100%), so we bound the label's top-left to keep the whole label
+    // visible.
+    const labelW = e.currentTarget.offsetWidth || 0;
+    const labelH = e.currentTarget.offsetHeight || 0;
+    const cx = Math.max(
+      0,
+      Math.min(e.clientX - containerRect.left - drag.startCanvasOffset[0], containerRect.width - labelW)
+    );
+    const cy = Math.max(
+      0,
+      Math.min(e.clientY - containerRect.top - drag.startCanvasOffset[1], containerRect.height - labelH)
+    );
+    const { annotationUID: dragUID, labelId: dragLabelId } = drag;
     // Live-update the canvas position locally; don't recompute world yet
     // (avoids flicker on every move). World coords are written on drop.
     setRendered(curr =>
       curr.map(r =>
-        r.annotationUID === dragRef.current!.annotationUID &&
-        r.label.id === dragRef.current!.labelId
+        r && r.annotationUID === dragUID && r.label.id === dragLabelId
           ? { ...r, canvasX: cx, canvasY: cy }
           : r
       )
@@ -208,8 +257,25 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
       const { viewport } = enabledElement as any;
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (containerRect && viewport?.canvasToWorld) {
-        const cx = e.clientX - containerRect.left - dragRef.current.startCanvasOffset[0];
-        const cy = e.clientY - containerRect.top - dragRef.current.startCanvasOffset[1];
+        // Clamp the drop position inside the viewport too, so the world coord
+        // we persist matches the on-screen (in-bounds) label — the label can
+        // never be saved off-screen.
+        const labelW = e.currentTarget.offsetWidth || 0;
+        const labelH = e.currentTarget.offsetHeight || 0;
+        const cx = Math.max(
+          0,
+          Math.min(
+            e.clientX - containerRect.left - dragRef.current.startCanvasOffset[0],
+            containerRect.width - labelW
+          )
+        );
+        const cy = Math.max(
+          0,
+          Math.min(
+            e.clientY - containerRect.top - dragRef.current.startCanvasOffset[1],
+            containerRect.height - labelH
+          )
+        );
         try {
           const world = viewport.canvasToWorld([cx, cy]);
           // Mutate the annotation's customLabels in place. Then fire
@@ -260,7 +326,8 @@ const CustomLabelsOverlay = ({ element, viewportId }: { element: any; viewportId
         overflow: 'hidden',
       }}
     >
-      {rendered.map(r => (
+      {!interacting &&
+        rendered.map(r => (
         <div
           key={`${r.annotationUID}:${r.label.id}`}
           onPointerDown={e => onPointerDown(e, r.annotationUID, r.label)}
