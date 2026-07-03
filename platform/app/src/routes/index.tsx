@@ -14,7 +14,6 @@ import Local from './Local';
 import NotFound from './NotFound';
 import PrivateRoute from './PrivateRoute';
 import Results from './Results';
-import Prefetch from './Prefetch/Prefetch';
 import Unauthorized from './Unauthorized';
 import WorkList from './WorkList';
 
@@ -92,11 +91,6 @@ const bakedInRoutes = [
   {
     path: `/results`,
     children: Results,
-    private: true,
-  },
-  {
-    path: `/prefetch`,
-    children: Prefetch,
     private: true,
   },
 ];
