@@ -56,6 +56,14 @@ const NotificationProvider = ({
       ...options,
     };
 
+    // BIEDX: in PRODUCTION never surface error/warning toasts to end users —
+    // these are technical alerts (crashes, load failures, hanging-protocol
+    // warnings, the ErrorBoundary) that only confuse users. They still show in
+    // DEVELOPMENT so developers can debug. Success/info confirmations are kept.
+    if (process.env.NODE_ENV === 'production' && (type === 'error' || type === 'warning')) {
+      return undefined;
+    }
+
     // Use the provider's deduplicationInterval by default, but allow it to be overridden per notification
     const notificationDeduplicationInterval = optionsDeduplicationInterval || deduplicationInterval;
 
