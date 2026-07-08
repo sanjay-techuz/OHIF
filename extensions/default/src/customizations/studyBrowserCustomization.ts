@@ -4,36 +4,38 @@ const { formatDate } = utils;
 export default {
   'studyBrowser.studyMenuItems': [],
   'studyBrowser.thumbnailMenuItems': [
-    {
-      id: 'tagBrowser',
-      label: 'Tag Browser',
-      iconName: 'DicomTagBrowser',
-      onClick: ({ commandsManager, displaySetInstanceUID }: withAppTypes) => {
-        commandsManager.runCommand('openDICOMTagViewer', {
-          displaySetInstanceUID,
-        });
-      },
-    },
-    {
-      id: 'addAsLayer',
-      label: 'Add as Layer',
-      iconName: 'ViewportViews',
-      onClick: ({ commandsManager, displaySetInstanceUID, servicesManager }: withAppTypes) => {
-        const { viewportGridService } = servicesManager.services;
-
-        // Get the active viewport
-        const { activeViewportId } = viewportGridService.getState();
-        if (!activeViewportId) {
-          return;
-        }
-
-        // Use the new command to add the display set as a layer
-        commandsManager.runCommand('addDisplaySetAsLayer', {
-          viewportId: activeViewportId,
-          displaySetInstanceUID,
-        });
-      },
-    },
+    // Tag Browser thumbnail menu item hidden for BIEDX (commented, not removed).
+    // {
+    //   id: 'tagBrowser',
+    //   label: 'Tag Browser',
+    //   iconName: 'DicomTagBrowser',
+    //   onClick: ({ commandsManager, displaySetInstanceUID }: withAppTypes) => {
+    //     commandsManager.runCommand('openDICOMTagViewer', {
+    //       displaySetInstanceUID,
+    //     });
+    //   },
+    // },
+    // Add as Layer thumbnail menu item hidden for BIEDX (commented, not removed).
+    // {
+    //   id: 'addAsLayer',
+    //   label: 'Add as Layer',
+    //   iconName: 'ViewportViews',
+    //   onClick: ({ commandsManager, displaySetInstanceUID, servicesManager }: withAppTypes) => {
+    //     const { viewportGridService } = servicesManager.services;
+    //
+    //     // Get the active viewport
+    //     const { activeViewportId } = viewportGridService.getState();
+    //     if (!activeViewportId) {
+    //       return;
+    //     }
+    //
+    //     // Use the new command to add the display set as a layer
+    //     commandsManager.runCommand('addDisplaySetAsLayer', {
+    //       viewportId: activeViewportId,
+    //       displaySetInstanceUID,
+    //     });
+    //   },
+    // },
   ],
   'studyBrowser.sortFunctions': [
     {

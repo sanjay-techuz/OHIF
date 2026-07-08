@@ -239,6 +239,23 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'flipVertical',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-flip-vertical',
+      label: 'Flip Vertical',
+      tooltip: 'Flip Vertically',
+      commands: 'flipViewportVertical',
+      evaluate: [
+        'evaluate.viewportProperties.toggle',
+        {
+          name: 'evaluate.viewport.supported',
+          unsupportedViewportTypes: ['video', 'volume3d'],
+        },
+      ],
+    },
+  },
+  {
     id: 'ImageSliceSync',
     uiType: 'ohif.toolButton',
     props: {
@@ -386,9 +403,9 @@ const toolbarButtons: Button[] = [
     id: 'Magnify',
     uiType: 'ohif.toolButton',
     props: {
-      icon: 'tool-magnify',
-      label: 'Zoom-in',
-      tooltip: 'Zoom-in',
+      icon: 'icon-tool-loupe',
+      label: 'Magnify Probe',
+      tooltip: 'Magnify Probe',
       commands: setToolActiveToolbar,
       evaluate: [
         'evaluate.cornerstoneTool',
@@ -482,8 +499,8 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-length',
-      label: 'Length',
-      tooltip: 'Length Tool',
+      label: 'Measurement',
+      tooltip: 'Measurement Tool',
       commands: setToolActiveToolbar,
       evaluate: 'evaluate.cornerstoneTool',
     },

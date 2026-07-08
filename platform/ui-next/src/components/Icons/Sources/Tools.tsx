@@ -1063,6 +1063,14 @@ export const ToolFlipHorizontal = (props: IconProps) => (
   </svg>
 );
 
+// Flip Vertical reuses the Flip Horizontal artwork rotated 90° (no separate SVG asset);
+// the underlying flipViewportVertical command already works for all viewport types.
+export const ToolFlipVertical = (props: IconProps) =>
+  ToolFlipHorizontal({
+    ...props,
+    style: { ...((props as any).style || {}), transform: 'rotate(90deg)' },
+  } as IconProps);
+
 export const ToolFreehandPolygon = (props: IconProps) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
