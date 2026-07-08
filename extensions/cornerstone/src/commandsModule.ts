@@ -1326,10 +1326,22 @@ function commandsModule({
       // `_setProtocol` defaults to `options?.stageIndex || 0`. Direct
       // setProtocol respects the stageIndex.
       try {
+        // Prefer the INITIAL protocol captured on case load (HangingProtocolDropdown).
+        // It survives custom-layout switches that swap the ACTIVE protocol to a
+        // generic single-viewport grid — so Reset always restores the modality HP
+        // (MG → RCC/LCC/RMLO/LMLO, CEM/MR → their first default stage). Falls back
+        // to the active protocol when nothing was captured.
+        const initial =
+          (typeof window !== 'undefined' && (window as any).__initialHangingProtocol) || null;
         const active = hangingProtocolService.getActiveProtocol();
-        const protocolId = active?.protocol?.id;
+        const protocolId = initial?.protocolId || active?.protocol?.id;
         if (protocolId) {
-          const defaultStageIndex = protocolId === '@ohif/hpMammo' ? 2 : 0;
+          const defaultStageIndex =
+            initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+              ? initial.stageIndex
+              : protocolId === '@ohif/hpMammo'
+                ? 2
+                : 0;
           hangingProtocolService.setProtocol(protocolId, {
             stageIndex: defaultStageIndex,
           });
@@ -1419,14 +1431,25 @@ function commandsModule({
       let protocolId: string | undefined;
       let defaultStageIndex = 0;
       try {
+        // Prefer the INITIAL protocol captured on case load — a custom layout
+        // swaps the ACTIVE protocol to a generic grid, so re-running the active
+        // one would leave a single viewport instead of the modality HP.
+        const initial =
+          (typeof window !== 'undefined' && (window as any).__initialHangingProtocol) || null;
         const active = hangingProtocolService.getActiveProtocol();
-        protocolId = active?.protocol?.id;
+        const activeId = active?.protocol?.id;
+        protocolId = initial?.protocolId || activeId;
         const currentStageIndex = active?.stageIndex ?? 0;
         if (protocolId) {
-          if (protocolId === '@ohif/hpMammo') {
-            defaultStageIndex = 2;
-          }
-          if (currentStageIndex !== defaultStageIndex) {
+          defaultStageIndex =
+            initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+              ? initial.stageIndex
+              : protocolId === '@ohif/hpMammo'
+                ? 2
+                : 0;
+          // Re-run when the active protocol/stage/layout differs from the initial
+          // (covers custom-layout switch, non-default stage, or changed pane count).
+          if (activeId !== protocolId || currentStageIndex !== defaultStageIndex) {
             needsHpRerun = true;
           } else {
             const protocol = hangingProtocolService.getProtocolById(protocolId);

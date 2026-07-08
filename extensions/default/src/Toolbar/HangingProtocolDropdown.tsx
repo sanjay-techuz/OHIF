@@ -253,9 +253,17 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   useEffect(() => {
     if (isMammo && !isCEM) {
       setTimeout(() => {
+        const initialStage = allHangingProtocols[0]?.stageIndex ?? 2;
+        // Remember the INITIAL protocol + stage so Reset/Clear can always snap
+        // back to it — even after the user picks a custom layout (which swaps
+        // the ACTIVE protocol to a generic single-viewport grid).
+        (window as any).__initialHangingProtocol = {
+          protocolId: '@ohif/hpMammo',
+          stageIndex: initialStage,
+        };
         runHangingProtocol(commandsManager, {
           protocolId: '@ohif/hpMammo',
-          stageIndex: allHangingProtocols[0]?.stageIndex ?? 2,
+          stageIndex: initialStage,
         });
         // Apply zoom immediately after hanging protocol change
         setTimeout(() => {
@@ -281,6 +289,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       return;
     }
     const timeoutId = setTimeout(() => {
+      (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpCEM', stageIndex: 0 };
       runHangingProtocol(commandsManager, {
         protocolId: '@ohif/hpCEM',
         stageIndex: 0,
@@ -311,6 +320,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
 
     // Apply MRI hanging protocol when MR display sets are detected
     const timeoutId = setTimeout(() => {
+      (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpMR', stageIndex: 0 };
       runHangingProtocol(commandsManager, {
         protocolId: '@ohif/hpMR',
         stageIndex: 0, // Default stage (2x3 grid)
