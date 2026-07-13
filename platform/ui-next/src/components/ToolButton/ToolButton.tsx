@@ -41,6 +41,13 @@ interface ToolButtonProps {
   children?: React.ReactNode;
 }
 
+// BIEDX: tool tooltips show only the keyword (label) — the longer secondary
+// description line is intentionally suppressed for all tools EXCEPT these ids,
+// where the extra explanation matters (Clear = full reset, Reset = HP reset).
+// The disabled-reason tooltip is always shown regardless (it explains why a
+// tool is unavailable).
+const TOOLS_WITH_DESCRIPTION = ['Reset', 'Clear'];
+
 function ToolButton(props: ToolButtonProps) {
   const {
     id,
@@ -117,7 +124,10 @@ function ToolButton(props: ToolButtonProps) {
             {disabledTooltip ? (
               <div className="text-muted-foreground text-xs">{disabledTooltip}</div>
             ) : (
-              tooltip && <div className="text-muted-foreground text-xs">{tooltip}</div>
+              tooltip &&
+              TOOLS_WITH_DESCRIPTION.includes(id) && (
+                <div className="text-muted-foreground text-xs">{tooltip}</div>
+              )
             )}
           </div>
         )}

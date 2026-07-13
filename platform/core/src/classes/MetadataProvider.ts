@@ -204,7 +204,28 @@ class MetadataProvider {
           return;
         }
         const windowCenter = Array.isArray(WindowCenter) ? WindowCenter : [WindowCenter];
-        const windowWidth = Array.isArray(WindowWidth) ? WindowWidth : [WindowWidth];
+        let windowWidth = Array.isArray(WindowWidth) ? WindowWidth : [WindowWidth];
+
+        // Sigmoid VOI: render + report the DICOM's NOMINAL window (match Weasis /
+        // RadiAnt). Cornerstone3D represents a SIGMOID window internally as a
+        // logit(0.01..0.99) range — exactly ln(99)/2 (~2.2976x) WIDER than the
+        // DICOM WindowWidth — and createSigmoidRGBTransferFunction then rebuilds
+        // the curve from that widened range. The net effect is that every
+        // viewport AND thumbnail renders a window ~2.3x too wide and the WW/WL
+        // readout reads ~2.3x high vs other viewers. Pre-shrink the width by the
+        // same factor for sigmoid images so cornerstone's re-expansion lands
+        // exactly on the DICOM's true nominal sigmoid (correct curve + readout).
+        // Applied at the metadata origin so it is deterministic for all
+        // consumers on every load — no per-viewport timing/race. Non-sigmoid
+        // images are untouched. Nothing in the app reads this width directly;
+        // only cornerstone consumes it to build the VOI range.
+        if (VOILUTFunction === 'SIGMOID') {
+          const SIGMOID_RANGE_EXPANSION = Math.log(99) / 2; // cs3d logit(0.01..0.99)
+          windowWidth = windowWidth.map(w => {
+            const n = Number(w); // DICOM DS values may arrive as strings
+            return isFinite(n) && n > 0 ? n / SIGMOID_RANGE_EXPANSION : w;
+          });
+        }
 
         metadata = {
           windowCenter: toNumber(windowCenter),

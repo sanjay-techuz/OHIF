@@ -187,7 +187,7 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-reset',
-      label: 'Reset View',
+      label: 'Restore View',
       tooltip: 'Reset hanging protocol to default stage',
       commands: 'resetView',
       evaluate: 'evaluate.action',
@@ -198,8 +198,8 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-seg-eraser',
-      label: 'Clear',
-      tooltip: 'Clear annotations + reset everything (full reset)',
+      label: 'Reset Image',
+      tooltip: 'Restores the image to its default display settings and removes all user edits',
       commands: 'clearView',
       evaluate: 'evaluate.action',
     },

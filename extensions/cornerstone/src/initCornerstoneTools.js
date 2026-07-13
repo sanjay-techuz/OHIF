@@ -52,6 +52,48 @@ import {
 } from './tools/CustomRoiHitTesting';
 import { CustomLengthTool } from './tools/CustomLengthTool';
 
+// ---------------------------------------------------------------------------
+// Fix Cornerstone3D WindowLevelTool drag for SIGMOID-windowed images (common on
+// mammography). The stock tool recomputes the VOI range on every mouse move by
+// round-tripping through cornerstone's windowLevel helpers:
+//     { ww, wc } = toWindowLevel(lower, upper)       // linear: ww = upper-lower+1
+//     ww += dx; wc += dy
+//     return toLowHighRange(ww, wc, VOILUTFunction)   // sigmoid: logit(0.01/0.99)
+// toWindowLevel and toLowHighRange are exact inverses ONLY for LINEAR. For
+// SIGMOID (VOILUTFunction === 'SIGMOID') toLowHighRange uses logit, producing a
+// range ~2.3x wider than `ww`. So each event re-reads an inflated width and
+// writes an even wider range — the window width compounds ~2.3x per mouse move
+// and explodes to 1e+200+ within a single drag (image blows out, dragging feels
+// random). This is a stock OHIF/cs3d issue, not a BIEDX change.
+//
+// Fix: apply the delta DIRECTLY to the range's width/center instead of
+// round-tripping through the VOILUTFunction. This is VOILUTFunction-agnostic and
+// perfectly stable; the renderer still applies the image's own (sigmoid)
+// transfer curve over the adjusted range, so images keep their look while Window
+// Level stays smooth on every modality — matching other viewers. We patch the
+// original tool's own method rather than adding a separate tool.
+//
+// Guarded for cornerstone version upgrades: if the private helper
+// `_getMultiplierFromDynamicRange` is ever renamed/removed, fall back to a fixed
+// multiplier instead of throwing, so Window Level dragging degrades gracefully
+// rather than crashing.
+const _WL_DEFAULT_MULTIPLIER = 4;
+WindowLevelTool.prototype.getNewRange = function ({
+  viewport,
+  deltaPointsCanvas,
+  volumeId,
+  lower,
+  upper,
+}) {
+  let multiplier = _WL_DEFAULT_MULTIPLIER;
+  if (typeof this._getMultiplierFromDynamicRange === 'function') {
+    multiplier = this._getMultiplierFromDynamicRange(viewport, volumeId) || _WL_DEFAULT_MULTIPLIER;
+  }
+  const width = Math.max(upper - lower + deltaPointsCanvas[0] * multiplier, 1);
+  const center = (upper + lower) / 2 + deltaPointsCanvas[1] * multiplier;
+  return { lower: center - width / 2, upper: center + width / 2 };
+};
+
 export default function initCornerstoneTools(configuration = {}) {
   CrosshairsTool.isAnnotation = false;
   LabelmapSlicePropagationTool.isAnnotation = false;
