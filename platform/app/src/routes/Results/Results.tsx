@@ -585,7 +585,7 @@ const Results: React.FC<ResultsProps> = ({
                   <table className="w-full min-w-[1000px] border-collapse text-[14px]">
                     <thead className="border-b border-none border-white/10 bg-[#0B0A0A]">
                       <tr>
-                        <th className="px-5 py-3 text-left font-medium">Case</th>
+                        <th className="px-5 py-3 text-left font-medium">Case Name</th>
                         <th className="px-5 py-3 text-left font-medium">Case Type</th>
                         {isOverall ? (
                           <>
@@ -622,16 +622,7 @@ const Results: React.FC<ResultsProps> = ({
                           className="border-t border-white/10"
                         >
                           <td className="px-5 py-3">
-                            {row.case_no ? (
-                              <div className="flex flex-col">
-                                <span className="font-medium">{row.case_no}</span>
-                                <span className="text-[11px] text-white/60">
-                                  {row.case_number || `Case ${row.id}`}
-                                </span>
-                              </div>
-                            ) : (
-                              row.case_number || `Case ${row.id}`
-                            )}
+                            {row.case_no || row.case_number || `Case ${row.id}`}
                           </td>
                           <td className="px-5 py-3">{row.view_type || '-'}</td>
                           {isOverall ? (

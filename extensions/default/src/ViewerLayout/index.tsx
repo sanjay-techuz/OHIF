@@ -968,8 +968,12 @@ function ViewerLayout({
         const resolvedIndex = currentIndex >= 0 ? currentIndex : 0;
         setCurrentCaseIndex(resolvedIndex);
 
-        // Store current case_title on window for viewport overlay access
-        const studentCaseTitle = cases[resolvedIndex]?.case_title || '';
+        // Store the case label on window for viewport overlay access. Students see
+        // the course-wide case number (case_no, e.g. "Case 1"), NOT the folder
+        // name (folder name is admin-only). Fall back to case_title only if the
+        // sequence hasn't been generated yet.
+        const studentCaseTitle =
+          cases[resolvedIndex]?.case_no || cases[resolvedIndex]?.case_title || '';
         (window as any).__currentCaseTitle = studentCaseTitle;
         // Also push to the UI state store so the StudyBrowser sidebar can
         // display the case title in place of StudyDescription (reactive read).
@@ -1126,7 +1130,7 @@ function ViewerLayout({
       if (result.success) {
         const caseData = result.data?.data;
         if (caseData) {
-          const facultyCaseTitle = caseData.case_id || '';
+          const facultyCaseTitle = caseData.folder_name || caseData.case_id || '';
           (window as any).__currentCaseTitle = facultyCaseTitle;
           // Mirror to the UI state store so the StudyBrowser sidebar can show
           // the case title (reactive — see PanelStudyBrowser).
