@@ -20,6 +20,12 @@ export function getViewLabel(instance: any): string | null {
   if (!instance) {
     return null;
   }
+  // AI overlays (e.g. Lunit) are wrapped as Secondary Capture (Modality 'MG',
+  // no ImageLaterality). Label them explicitly as "AI Image" rather than a
+  // derived view (RCC/MLO/…), which would be meaningless for an overlay.
+  if (instance.SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
+    return 'AI Image';
+  }
   try {
     const modality = String(instance.Modality || '').toUpperCase();
     if (modality === 'MG') {

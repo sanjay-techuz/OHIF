@@ -451,6 +451,16 @@ export default class DisplaySetService extends PubSubService {
         return true; // Keep non-mammography instances
       }
 
+      // Keep Secondary Capture instances (AI overlays, e.g. Lunit). They report
+      // Modality 'MG' but have NO ImageLaterality by nature, so the FFDM
+      // ImageLaterality requirement below would wrongly delete them here — the
+      // reason AI DICOM never appeared in the viewer. They are excluded from the
+      // hanging protocol separately (see getSopClassHandlerModule's
+      // excludeFromHangingProtocolMatching), so keeping them is HP-safe.
+      if (instance.SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
+        return true;
+      }
+
       // Use mammography detection utility
       try {
         const caseType = detectMammographyCaseType(instance);

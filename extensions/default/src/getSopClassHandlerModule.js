@@ -177,8 +177,15 @@ const NON_RADIOLOGY_MODALITIES = new Set([
   'AU', // Audio
   'ECG', // Electrocardiogram
 ]);
+// DICOM-wrapped AI overlays (e.g. Lunit) arrive as real .dcm with Modality 'MG'
+// — so the Modality set above misses them — but their SOPClassUID is Secondary
+// Capture, which real MG/DBT/CEM/MR/US diagnostic images NEVER use. Verified
+// across the client's AI files; note InstanceNumber (999999) is NOT reliable
+// (some AI images are 1), so SOP Class is the load-bearing signal here.
 const isUserAttachmentInstance = instance =>
-  !!instance && NON_RADIOLOGY_MODALITIES.has(instance.Modality);
+  !!instance &&
+  (NON_RADIOLOGY_MODALITIES.has(instance.Modality) ||
+    instance.SOPClassUID === sopClassDictionary.SecondaryCaptureImageStorage);
 
 function getSopClassUids(instances) {
   const uniqueSopClassUidsInSeries = new Set();
