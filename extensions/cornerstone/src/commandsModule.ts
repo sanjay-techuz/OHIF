@@ -39,6 +39,7 @@ import { usePositionPresentationStore, useSegmentationPresentationStore } from '
 import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
 import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import reconcileInvertLut from './utils/reconcileInvertLut';
 import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
@@ -140,6 +141,35 @@ function commandsModule({
       segmentIndex: activeSegmentIndex,
     };
   }
+
+  // Re-assert LUT/flag consistency (see reconcileInvertLut) on every READY stack
+  // viewport, retrying until viewports have decoded image data — a reset can
+  // trigger an async hanging-protocol re-run whose viewports load a tick later.
+  // The load path (CornerstoneViewportService) reconciles reloaded viewports too;
+  // this is the backstop for the direct `resetProperties()` path.
+  const resyncInvertWhenReady = (attempt = 1, maxAttempts = 5) => {
+    let sawReady = false;
+    try {
+      getRenderingEngines().forEach(re => {
+        re.getViewports().forEach((viewport: any) => {
+          if (!(viewport instanceof StackViewport)) {
+            return;
+          }
+          const dims = viewport.getImageData?.()?.dimensions;
+          if (!(Array.isArray(dims) && dims[0] > 0 && dims[1] > 0)) {
+            return; // image not decoded yet — a later retry will catch it
+          }
+          sawReady = true;
+          reconcileInvertLut(viewport);
+        });
+      });
+    } catch {
+      /* rendering engines not ready yet */
+    }
+    if (!sawReady && attempt < maxAttempts) {
+      setTimeout(() => resyncInvertWhenReady(attempt + 1, maxAttempts), 200 * attempt);
+    }
+  };
 
   const actions = {
     hydrateSecondaryDisplaySet: async ({ displaySet, viewportId }) => {
@@ -1251,12 +1281,20 @@ function commandsModule({
         // Get current properties to check what needs to be reset
         const currentProperties = viewport.getProperties();
 
+        // Reset invert to the photometric-derived default, NOT a hardcoded false.
+        // Cornerstone auto-inverts MONOCHROME1 images (e.g. mammography), so their
+        // correct default is `invert: true`; forcing false here resets them to a
+        // white background. `initialInvert` is what setStack derived from
+        // PhotometricInterpretation (true for MONOCHROME1, false otherwise).
+        const defaultInvert =
+          (viewport as unknown as { initialInvert?: boolean }).initialInvert ?? false;
+
         // Create a safe reset properties object
         const resetProperties = {
           // Reset window/level to default
           voiRange: undefined,
-          // Reset invert to false
-          invert: false,
+          // Reset invert to the modality's correct default
+          invert: defaultInvert,
           // Reset rotation to 0
           rotation: 0,
         };
@@ -1284,10 +1322,12 @@ function commandsModule({
         try {
           viewport.resetCamera();
 
-          // Try to reset properties with null-safe colormap
+          // Try to reset properties with null-safe colormap. Same rule as above:
+          // reset invert to the photometric-derived default so MONOCHROME1 images
+          // don't reset to a white background.
           const safeProperties = {
             voiRange: undefined,
-            invert: false,
+            invert: (viewport as unknown as { initialInvert?: boolean }).initialInvert ?? false,
             rotation: 0,
             colormap: { name: 'Grayscale', opacity: 1 },
           };
@@ -1349,6 +1389,12 @@ function commandsModule({
       } catch (e) {
         console.warn('resetView: HP setProtocol failed', e);
       }
+
+      // Re-sync each viewport's LUT to its invert flag. The HP re-run can reuse a
+      // viewport and rebuild its LUT non-inverted while the flag stays true — that
+      // desync is what flipped a MONOCHROME1 mammogram to white. The load path
+      // reconciles reloaded viewports; this backstops the current ones.
+      resyncInvertWhenReady();
 
       // Replay BIEDX MG-zoom step (no-op for non-MG).
       try {
@@ -1475,14 +1521,21 @@ function commandsModule({
         }
       }
 
-      // ---- 5. Replay BIEDX MG-zoom step ----
+      // ---- 5. Re-sync LUT to the invert flag ----
+      // `resetProperties()` (step 2) rebuilds the LUT non-inverted but leaves the
+      // invert flag true, so a MONOCHROME1 image renders white with invert===true.
+      // Flip the LUT back to match the flag (no-op when already correct; a step-4
+      // HP re-run is also reconciled by the load path).
+      resyncInvertWhenReady();
+
+      // ---- 6. Replay BIEDX MG-zoom step ----
       try {
         commandsManager.run('setMammographyZoomConditional', {});
       } catch {
         /* command may not exist in non-BIEDX modes */
       }
 
-      // ---- 6. Re-fetch DB-saved annotations ----
+      // ---- 7. Re-fetch DB-saved annotations ----
       try {
         (window as any).__reloadSavedAnnotations?.();
       } catch {

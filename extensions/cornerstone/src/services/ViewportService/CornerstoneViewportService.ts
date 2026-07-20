@@ -36,6 +36,7 @@ import { usePositionPresentationStore } from '../../stores/usePositionPresentati
 import { useSegmentationPresentationStore } from '../../stores/useSegmentationPresentationStore';
 import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
 import JumpPresets from '../../utils/JumpPresets';
+import reconcileInvertLut from '../../utils/reconcileInvertLut';
 
 const EVENTS = {
   VIEWPORT_DATA_CHANGED: 'event::cornerstoneViewportService:viewportDataChanged',
@@ -358,6 +359,19 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         const csProps = cleanProperties(csViewport.getProperties(volumeId));
         properties.set(volumeId, csProps);
       });
+    } else if (properties) {
+      // Do NOT persist `invert` when it merely reflects the photometric-derived
+      // default (Cornerstone auto-inverts MONOCHROME1 on every setStack). Storing
+      // it and replaying it via setProperties races with stack init: if the
+      // presentation is captured before a viewport finishes initializing (common
+      // during the multi-stage mammo hanging protocol), a stale `invert:false`
+      // gets frozen in and cancels the auto-inversion on the next load, flipping
+      // MONOCHROME1 mammograms to a white background on some reloads. Only a
+      // genuine user override (invert !== initialInvert) is worth keeping.
+      const initialInvert = (csViewport as unknown as { initialInvert?: boolean }).initialInvert;
+      if (properties.invert === initialInvert) {
+        delete properties.invert;
+      }
     }
 
     const viewportInfo = this.viewportsById.get(viewportId);
@@ -696,6 +710,18 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         }
         if (flipHorizontal && isViewportAlive()) {
           viewport.setCamera({ flipHorizontal: true });
+        }
+
+        // setStack rebuilds the color LUT non-inverted; when this viewport is
+        // REUSED (a hanging-protocol / layout change) and its invert flag was
+        // already true (MONOCHROME1, e.g. mammography), Cornerstone's
+        // setInvertColor skips the flip because the flag didn't change — leaving
+        // the LUT non-inverted while invert===true, so the image renders white.
+        // Reconcile the LUT to the flag here, at the one choke point every
+        // (re)load passes through, so a MONOCHROME1 image stays black across
+        // protocol changes and layout swaps (and a manual invert is preserved).
+        if (isViewportAlive()) {
+          reconcileInvertLut(viewport);
         }
       } catch (err) {
         console.warn('[CornerstoneViewportService] post-setStack apply skipped:', err);
