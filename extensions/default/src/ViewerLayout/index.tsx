@@ -1624,7 +1624,11 @@ function ViewerLayout({
               </svg>
             </Button>
 
-            {/* Case History Button - Faculty (edit mode) or Student (read-only) */}
+            {/* Case History Button - Faculty (edit mode) or Student (read-only).
+                COMMENTED OUT to hide it from the bottom bar. To restore the
+                feature, uncomment this block AND the <CaseHistoryModal> mount
+                near the end of this file. */}
+            {/*
             {((userType === 'faculty' && isAddAnswerClicked) || userType === 'student') && (
               <Button
                 variant="ghost"
@@ -1668,6 +1672,7 @@ function ViewerLayout({
                 </svg>
               </Button>
             )}
+            */}
           </div>
 
           {/* //Center Section - Main Toolbar
@@ -1719,6 +1724,10 @@ function ViewerLayout({
                 before the faculty has committed to writing an answer, and
                 showing it pre-edit clutters the read-only review state.
                 Students always see it. */}
+            {/* COMMENTED OUT to hide Generate Report / Correct Report from the
+                bottom bar. To restore, uncomment this block AND the
+                <LexaReportingPanel> mount near the end of this file. */}
+            {/*
             {(userType !== 'faculty' || isAddAnswerClicked) && (
               <div className="flex items-center overflow-hidden rounded-lg bg-[#232323]">
                 <button
@@ -1771,6 +1780,7 @@ function ViewerLayout({
                 </button>
               </div>
             )}
+            */}
 
             {/* Case Navigation Buttons */}
             {caseList.length > 1 && (
@@ -2209,6 +2219,9 @@ function ViewerLayout({
         }}
       />
 
+      {/* CaseHistoryModal — commented out along with its bottom-bar button.
+          Uncomment both to restore the feature. */}
+      {/*
       <CaseHistoryModal
         open={showCaseHistoryModal}
         onClose={() => setShowCaseHistoryModal(false)}
@@ -2233,7 +2246,11 @@ function ViewerLayout({
         }
         readOnly={userType === 'student'}
       />
+      */}
 
+      {/* LexaReportingPanel — commented out along with its bottom-bar buttons.
+          Uncomment both to restore the feature. */}
+      {/*
       <LexaReportingPanel
         open={lexaPanelMode !== null}
         mode={lexaPanelMode || 'generate'}
@@ -2253,6 +2270,7 @@ function ViewerLayout({
         programId={programId}
         phaseId={phaseId}
       />
+      */}
     </div>
   );
 }
