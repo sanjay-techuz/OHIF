@@ -45,6 +45,11 @@ interface HangingProtocolDropdownProps {
 // pure-cosmetic upgrade and can be swapped in without touching this
 // stage mapping.
 const CEM_HANGING_PROTOCOLS = [
+  // Prior/Current recombined comparison (stage 7 in hpCEM). Listed FIRST so that
+  // when a prior is present it becomes the default selected entry (mirrors MG's
+  // 'All Prior and Current' being first). Filtered out entirely when there's no
+  // prior (requiresPrior), so no-prior CEM falls back to 'Paired' as the default.
+  { label: 'Prior/Current Recombined', stageIndex: 7, icon: HPALLCP, requiresPrior: true },
   { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HPALL },
   { label: 'All Low-Energy', stageIndex: 1, icon: HPALL },
   { label: 'All Recombined', stageIndex: 2, icon: HPALL },
@@ -238,8 +243,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   // Unified array for both dropdown and navigation - filter based on prior/DBT availability
   const allHangingProtocols = useMemo(() => {
     if (isCEM) {
-      // CEM has no prior or DBT stages — return its fixed 7-stage list.
-      return CEM_HANGING_PROTOCOLS;
+      // CEM: 7 base stages + an optional Prior/Current stage that only shows
+      // when the user has picked a study to compare.
+      return CEM_HANGING_PROTOCOLS.filter(protocol => !(protocol.requiresPrior && !hasPrior));
     }
     return ALL_HANGING_PROTOCOLS.filter(protocol => {
       // Filter out prior-only stages if no prior exists
@@ -456,6 +462,12 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     const { unsubscribe } = hangingProtocolService.subscribe(
       hangingProtocolService.EVENTS.PROTOCOL_CHANGED,
       (payload: any) => {
+        // A manual prior comparison (applied/cleared from the study browser)
+        // re-runs the protocol with 2 studies / 1 study. This is the canonical
+        // signal that the prior-aware stages should appear or disappear from the
+        // dropdown — the mount-time `checkForPrior` can't see a later comparison.
+        setHasPrior((hangingProtocolService.studies?.length || 0) > 1);
+
         const stageIdx = payload?.stageIdx;
         if (typeof stageIdx !== 'number') {
           return;

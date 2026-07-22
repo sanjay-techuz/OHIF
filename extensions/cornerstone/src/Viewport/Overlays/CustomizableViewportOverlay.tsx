@@ -12,7 +12,7 @@ import CustomLabelsOverlay from './CustomLabelsOverlay';
 import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
 
 import { useViewportRendering } from '../../hooks';
-import { useOverlayFieldsStore } from '@ohif/extension-default';
+import { useOverlayFieldsStore, useUIStateStore } from '@ohif/extension-default';
 import './CustomizableViewportOverlay.css';
 
 const EPSILON = 1e-4;
@@ -82,6 +82,13 @@ function CustomizableViewportOverlay({
   // re-run those conditions when the store changes. Without this line,
   // "Done" updates the store but the viewport keeps showing the old picks.
   useOverlayFieldsStore(s => s.version);
+
+  // Same reasoning for the folder-name map: the `case_id` extractor reads it
+  // fresh via getState(), and it arrives asynchronously (ViewerLayout fetches it
+  // from the LMS by PatientID). Without this subscription the overlay would keep
+  // rendering the pre-fetch fallback until some unrelated re-render happened.
+  useUIStateStore(s => s.uiState.studyFolderNames);
+  useUIStateStore(s => s.uiState.studyOverlayLabels);
 
   // Historical usage defined the overlays as separate items due to lack of
   // append functionality.  This code enables the historical usage, but

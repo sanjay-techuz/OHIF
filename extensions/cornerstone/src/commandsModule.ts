@@ -1343,6 +1343,17 @@ function commandsModule({
       }
     },
     resetView: () => {
+      // Drop any manual prior comparison first, so Reset returns to the plain
+      // single-study hang AND the study browser's "Compare Studies" dropdown
+      // clears. The command self-guards: it no-ops unless the user actually
+      // started a comparison, so a normal reset (and a multi-study URL load) is
+      // completely untouched.
+      try {
+        commandsManager.run('clearPriorComparison', {});
+      } catch {
+        /* command may not exist in every mode; ignore */
+      }
+
       // NARROW Reset View — only the hanging protocol snaps back to its
       // default stage; everything else (W/L, zoom, pan, annotations) is
       // left as the user has it. For the full reset behaviour (clear
@@ -1405,6 +1416,14 @@ function commandsModule({
     },
 
     clearView: () => {
+      // Drop any manual prior comparison first (same reasoning as resetView):
+      // a full Clear must also reset the "Compare Studies" dropdown.
+      try {
+        commandsManager.run('clearPriorComparison', {});
+      } catch {
+        /* command may not exist in every mode; ignore */
+      }
+
       // Toolbar Clear (full reset): bring viewports back to the
       // "fresh case-open" state WITHOUT reloading the page (DICOM cache
       // preserved so large cases don't re-download).

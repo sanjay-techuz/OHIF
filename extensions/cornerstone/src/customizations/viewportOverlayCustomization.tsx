@@ -1,5 +1,6 @@
 import {
   useOverlayFieldsStore,
+  useUIStateStore,
   OverlayFieldId,
   getViewLabel,
 } from '@ohif/extension-default';
@@ -83,8 +84,28 @@ const FIELD_EXTRACTORS: Record<
   patient_age: { label: 'Age:', title: 'Patient age', getValue: getPatientAge },
   case_id: {
     label: '',
-    title: 'Case ID',
-    getValue: () => ((window as any).__currentCaseTitle as string) || null,
+    title: 'Case Name',
+    // The study's upload FOLDER NAME, resolved PER STUDY from the instance's
+    // StudyInstanceUID, so a compared current/prior pair shows each study's own
+    // name. `folder_name` is not a DICOM tag — it lives in our `cases` table —
+    // so ViewerLayout fetches it from the LMS by PatientID and parks the map in
+    // useUIStateStore. Falls back to the open case's title when a study has no
+    // folder name (e.g. a ZIP/single-file upload).
+    // Students get "Case 1 - Case 13 FU" (course-wide case number + folder
+    // name) from `studyOverlayLabels`; faculty/admin get the plain folder name
+    // from `studyFolderNames`. Both are keyed by StudyInstanceUID and published
+    // by ViewerLayout, so a compared current/prior pair labels each study
+    // correctly. Falls back to the open case's title.
+    getValue: instance => {
+      const uiState = useUIStateStore.getState().uiState;
+      const studyUID = instance?.StudyInstanceUID;
+      return (
+        (uiState.studyOverlayLabels as Record<string, string>)?.[studyUID] ||
+        (uiState.studyFolderNames as Record<string, string>)?.[studyUID] ||
+        ((window as any).__currentCaseTitle as string) ||
+        null
+      );
+    },
   },
   view: {
     label: '',

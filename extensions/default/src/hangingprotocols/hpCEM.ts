@@ -1,12 +1,16 @@
 import {
     LCC_LE,
     LCC_Recomb,
+    LCC_Recomb_Prior,
     LMLO_LE,
     LMLO_Recomb,
+    LMLO_Recomb_Prior,
     RCC_LE,
     RCC_Recomb,
+    RCC_Recomb_Prior,
     RMLO_LE,
     RMLO_Recomb,
+    RMLO_Recomb_Prior,
 } from './utils/cemDisplaySetSelector';
 
 /**
@@ -83,6 +87,12 @@ const hpCEM = {
     LCC_Recomb,
     RMLO_Recomb,
     LMLO_Recomb,
+    // Prior-study recombined counterparts (studyInstanceUIDsIndex === 1) — used
+    // by the prior-comparison stage below.
+    RCC_Recomb_Prior,
+    LCC_Recomb_Prior,
+    RMLO_Recomb_Prior,
+    LMLO_Recomb_Prior,
   },
   callbacks: {
     onViewportDataInitialized: [
@@ -273,6 +283,57 @@ const hpCEM = {
         {
           viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
           displaySets: [{ id: 'LMLO_Recomb' }],
+        },
+      ],
+    },
+
+    // ---- Stage 7: Prior/Current Recombined (2x4) ----
+    // Appended (not inserted) so stages 0-6 keep their indices and the existing
+    // no-comparison CEM flow is completely unchanged. Only selected when the user
+    // explicitly picks a study to compare from the study browser.
+    //   Row 1 (top)    = CURRENT recombined  (studyInstanceUIDsIndex 0)
+    //   Row 2 (bottom) = PRIOR recombined    (studyInstanceUIDsIndex 1)
+    // Recombined-vs-recombined is the standard CEM temporal comparison (contrast
+    // uptake over time); columns keep each view stacked current-over-prior.
+    {
+      name: 'Prior/Current Recombined',
+      viewportStructure: {
+        type: 'grid',
+        layoutType: 'grid',
+        properties: { rows: 2, columns: 4 },
+      },
+      viewports: [
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'RCC_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LCC_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'RMLO_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LMLO_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'RCC_Recomb_Prior' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LCC_Recomb_Prior' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'RMLO_Recomb_Prior' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LMLO_Recomb_Prior' }],
         },
       ],
     },

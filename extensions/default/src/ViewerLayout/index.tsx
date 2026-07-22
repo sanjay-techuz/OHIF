@@ -109,6 +109,9 @@ function ViewerLayout({
   // were just persisted by the ACR modal's manual Save (avoids double
   // round-trips). Both refs are updated *before* a setStudentAcrValues
   // call whenever the new value is already in-sync with the backend.
+  // PatientID we've already fetched folder names for — the display-set
+  // subscription below fires repeatedly, and this keeps it to one request.
+  const folderNamesPatientRef = useRef<string | null>(null);
   const initialAcrLoadedRef = useRef(false);
   const lastSavedAcrRef = useRef<string | null>(null);
   const [currentFormData, setCurrentFormData] = useState<any>(null);
@@ -476,6 +479,33 @@ function ViewerLayout({
         sex = instance.PatientSex || '';
       }
       setPatientInfo({ age: ageDigits, sex });
+
+      // Folder names for EVERY study of this patient. The module case list only
+      // covers the current module, so a same-patient study opened from another
+      // module (or the compare dropdown) had no label. `folder_name` lives only
+      // in our `cases` table — it is not a DICOM tag — so it must come from the
+      // LMS, keyed by PatientID. Merged into the same store key the module list
+      // writes, so the sidebar rows, the compare dropdown and the viewport
+      // overlay all read one map. Fetched once per PatientID.
+      const patientId = instance.PatientID as string | undefined;
+      if (patientId && patientId !== folderNamesPatientRef.current) {
+        folderNamesPatientRef.current = patientId;
+        const endpoint = userType === 'faculty' ? '/admin/cases/folder-names' : '/user/cases/folder-names';
+        apiCall(() => apiService.get(`${endpoint}?patient_id=${encodeURIComponent(patientId)}`))
+          .then((result: any) => {
+            const map = (result?.success ? result?.data?.data : null) as Record<string, string> | null;
+            if (!map || typeof map !== 'object') {
+              return;
+            }
+            setUIState('studyFolderNames', {
+              ...((useUIStateStore.getState().uiState.studyFolderNames as Record<string, string>) || {}),
+              ...map,
+            });
+          })
+          .catch(() => {
+            /* Non-fatal — labels just fall back to their previous value. */
+          });
+      }
     };
 
     // Run once in case display sets are already loaded by the time we mount.
@@ -486,7 +516,7 @@ function ViewerLayout({
       computePatientInfo
     );
     return () => subscription?.unsubscribe?.();
-  }, [displaySetService]);
+  }, [displaySetService, userType, setUIState]);
 
   useEffect(() => {
     const { unsubscribe } = panelService.subscribe(
@@ -978,6 +1008,46 @@ function ViewerLayout({
         // Also push to the UI state store so the StudyBrowser sidebar can
         // display the case title in place of StudyDescription (reactive read).
         setUIState('caseTitle', studentCaseTitle);
+
+        // StudyInstanceUID -> folder name, built from the case list we just
+        // fetched (it already carries `study_instance_uid` + `folder_name`), so
+        // the StudyBrowser's "Compare Studies" dropdown can label each study by
+        // the folder it was uploaded from instead of a date/modality pair. No
+        // extra request. Studies outside this module simply aren't in the map
+        // and the dropdown falls back to date · modality.
+        setUIState(
+          'studyFolderNames',
+          cases.reduce((acc, c) => {
+            if (c?.study_instance_uid && c?.folder_name) {
+              acc[c.study_instance_uid] = c.folder_name;
+            }
+            return acc;
+          }, {} as Record<string, string>)
+        );
+
+        // Viewport overlay label for STUDENTS: "Case 1 - Case 13 FU", i.e. the
+        // course-wide case number (what a student sees everywhere else in the
+        // LMS) followed by the case's folder name. Faculty/admin deliberately
+        // keep the plain folder name — they work in folder terms — so this map
+        // is built for students only and the overlay falls back to
+        // `studyFolderNames` when a study isn't in it. Either part may be
+        // missing (e.g. no folder name on a ZIP upload); we join whatever
+        // exists rather than rendering a dangling separator.
+        if (userType !== 'faculty') {
+          setUIState(
+            'studyOverlayLabels',
+            cases.reduce((acc, c) => {
+              if (!c?.study_instance_uid) {
+                return acc;
+              }
+              const label = [c.case_no, c.folder_name].filter(Boolean).join(' - ');
+              if (label) {
+                acc[c.study_instance_uid] = label;
+              }
+              return acc;
+            }, {} as Record<string, string>)
+          );
+        }
 
         // Store current case's subspeciality and modality slugs in global state
         const currentCase = cases[resolvedIndex];

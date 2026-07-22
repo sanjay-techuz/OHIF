@@ -1,6 +1,15 @@
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { useSystem, utils } from '@ohif/core';
-import { Separator, StudyBrowser, useImageViewer, useViewportGrid } from '@ohif/ui-next';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  Separator,
+  StudyBrowser,
+  useImageViewer,
+  useViewportGrid,
+} from '@ohif/ui-next';
 import { CallbackCustomization } from 'platform/core/src/types';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -89,6 +98,13 @@ function PanelStudyBrowser({
   const [displaySetsLoadingState, setDisplaySetsLoadingState] = useState({});
   const [thumbnailImageSrcMap, setThumbnailImageSrcMap] = useState({});
   const [jumpToDisplaySet, setJumpToDisplaySet] = useState(null);
+
+  // --- Manual prior comparison ---------------------------------------------
+  // The user explicitly picks ONE other study of this patient to hang as the
+  // prior. The opened study is always the current (studyInstanceUIDsIndex 0) and
+  // the picked one the prior (index 1) — no StudyDate logic, no auto-loading.
+  const [comparePriorUID, setComparePriorUID] = useState<string | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
 
   const [viewPresets, setViewPresets] = useState(
     customizationService.getCustomization('studyBrowser.viewPresets')
@@ -695,9 +711,33 @@ function PanelStudyBrowser({
   // StudyDescription. Reactive — ViewerLayout pushes the title to
   // useUIStateStore for both student and faculty paths.
   const caseTitle = useUIStateStore(state => state.uiState.caseTitle as string | undefined);
-  const displayList = caseTitle
-    ? studyDisplayList.map(s => ({ ...s, description: caseTitle }))
-    : studyDisplayList;
+  // StudyInstanceUID -> folder name, published by ViewerLayout from the
+  // already-fetched module case list (`study_instance_uid` -> `folder_name`),
+  // so this costs no extra request. Used for both the sidebar rows and the
+  // "Compare Studies" dropdown; studies outside the current module aren't in
+  // the map and fall back.
+  // StudyInstanceUID -> folder name, published by ViewerLayout. It merges the
+  // module case list (already loaded) with a lookup by PatientID from the LMS
+  // (`/cases/folder-names`), so same-patient studies from OTHER modules are
+  // covered too. `folder_name` lives only in our `cases` table — it isn't a
+  // DICOM tag, so it can't come from study metadata. Used for both the sidebar
+  // rows and the "Compare Studies" dropdown.
+  const studyFolderNames = useUIStateStore(
+    state => state.uiState.studyFolderNames as Record<string, string> | undefined
+  );
+  // Prefer the study's own FOLDER NAME (per StudyInstanceUID, published by
+  // ViewerLayout from the already-fetched module case list). `caseTitle` is a
+  // single value for the OPEN case, so using it alone labelled every row in the
+  // sidebar identically — no way to tell one study from another. Falls back to
+  // caseTitle, then the raw StudyDescription.
+  const displayList = React.useMemo(
+    () =>
+      (studyDisplayList || []).map(s => ({
+        ...s,
+        description: studyFolderNames?.[s.studyInstanceUid] || caseTitle || s.description,
+      })),
+    [studyDisplayList, studyFolderNames, caseTitle]
+  );
 
   const tabs = createStudyBrowserTabs(StudyInstanceUIDs, displayList, displaySets);
 
@@ -755,6 +795,88 @@ function PanelStudyBrowser({
 
   const activeDisplaySetInstanceUIDs = viewports.get(activeViewportId)?.displaySetInstanceUIDs;
 
+  // --- Manual prior comparison ---------------------------------------------
+  const currentStudyUID = StudyInstanceUIDs?.[0];
+
+  // Only breast studies have prior-aware hanging protocols (hpMammo / hpCEM),
+  // so the control is hidden for everything else.
+  const canCompare = React.useMemo(() => {
+    const active = displaySetService.getActiveDisplaySets?.() || [];
+    return active.some(ds => ds.StudyInstanceUID === currentStudyUID && ds.Modality === 'MG');
+  }, [displaySetService, currentStudyUID, displaySets]);
+
+  // Other studies of the same patient that can serve as a prior. Restricted to
+  // breast studies so an unrelated MR/US/CT can't be hung into panes that will
+  // never match it. `studyDisplayList` is already fetched for the sidebar, so
+  // this costs no extra network call.
+  const comparableStudies = React.useMemo(
+    () =>
+      (studyDisplayList || []).filter(
+        study =>
+          study?.studyInstanceUid &&
+          study.studyInstanceUid !== currentStudyUID &&
+          (study.modalities || '').toUpperCase().includes('MG')
+      ),
+    [studyDisplayList, currentStudyUID]
+  );
+
+  const handleCompareChange = useCallback(
+    async (value: string) => {
+      if (value === 'none') {
+        setComparePriorUID(null);
+        commandsManager.run({ commandName: 'clearPriorComparison', commandOptions: {} });
+        return;
+      }
+
+      setIsComparing(true);
+      try {
+        const applied = await commandsManager.run({
+          commandName: 'applyPriorComparison',
+          commandOptions: { priorStudyInstanceUID: value },
+        });
+        if (applied) {
+          setComparePriorUID(value);
+        }
+        // NOTE: deliberately do NOT touch `expandedStudyInstanceUIDs` here.
+        // `_handleStudyClick` is a pure toggle over that array AND it only calls
+        // requestDisplaySetCreationForStudy when it is expanding. Injecting a UID
+        // here left a stale "expanded" entry after the comparison was cleared, so
+        // the next click on that study collapsed it (and skipped display-set
+        // creation) instead of opening it. Expansion state belongs to the user.
+      } finally {
+        setIsComparing(false);
+      }
+    },
+    [commandsManager]
+  );
+
+  const getCompareStudyLabel = useCallback(
+    study =>
+      studyFolderNames?.[study?.studyInstanceUid] ||
+      `${study?.date || 'No date'} · ${study?.modalities || ''}`,
+    [studyFolderNames]
+  );
+
+  const compareLabel = comparePriorUID
+    ? (() => {
+        const picked = comparableStudies.find(s => s.studyInstanceUid === comparePriorUID);
+        return picked ? getCompareStudyLabel(picked) : 'Comparing';
+      })()
+    : 'Current study';
+
+  // Keep the dropdown in sync with whoever changed the comparison. Reset View /
+  // Reset Image clear the comparison from the toolbar (they re-run the protocol
+  // without the prior), and this event is what drops the stale selection here.
+  useEffect(() => {
+    const onComparisonChanged = (event: Event) => {
+      const uid = (event as CustomEvent)?.detail?.priorStudyInstanceUID ?? null;
+      setComparePriorUID(uid);
+    };
+    window.addEventListener('viewer-prior-comparison-changed', onComparisonChanged);
+    return () =>
+      window.removeEventListener('viewer-prior-comparison-changed', onComparisonChanged);
+  }, []);
+
   return (
     <>
       <PanelStudyBrowserHeader
@@ -763,6 +885,68 @@ function PanelStudyBrowser({
         actionIcons={actionIcons}
         updateActionIconValue={updateActionIconValue}
       />
+
+      {/* Compare with a prior study — manual, one at a time. Selecting a study
+          loads it and applies the prior hanging protocol; "Current study"
+          restores the normal single-study layout. */}
+      {canCompare && comparableStudies.length > 0 && (
+        <div className="bg-popover mb-3 rounded-md px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[13px] font-bold text-white">Compare Studies</span>
+            {comparePriorUID && (
+              <button
+                type="button"
+                onClick={() => handleCompareChange('none')}
+                disabled={isComparing}
+                className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-white/70 underline transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <p className="mb-2 text-[11px] leading-snug text-white/50">
+            Select a study to view side-by-side.
+          </p>
+
+          <Select
+            value={comparePriorUID ?? 'none'}
+            onValueChange={handleCompareChange}
+            disabled={isComparing}
+          >
+            <SelectTrigger
+              className="h-8 w-[180px] text-xs"
+              aria-label="Select a prior study to compare"
+            >
+              <span className="truncate">{isComparing ? 'Loading…' : compareLabel}</span>
+            </SelectTrigger>
+            {/* Pin the popup to the trigger width. The ui-next Select uses
+                position="popper" with min-w-[--radix-select-trigger-width], so
+                by default it GROWS to fit long folder names and overflowed the
+                panel. Fixing the width + truncating each label keeps it aligned
+                with the field; the full name is still available on hover. */}
+            <SelectContent className="w-[var(--radix-select-trigger-width)] overflow-x-hidden">
+              <SelectItem value="none">Current study</SelectItem>
+              {comparableStudies.map(study => {
+                const label = getCompareStudyLabel(study);
+                return (
+                  <SelectItem
+                    key={study.studyInstanceUid}
+                    value={study.studyInstanceUid}
+                  >
+                    <span
+                      className="block truncate"
+                      title={label}
+                    >
+                      {label}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <StudyBrowser
         tabs={tabs}
