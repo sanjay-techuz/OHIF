@@ -171,6 +171,65 @@ function commandsModule({
     }
   };
 
+  // --- MG "wrong sequence" reset fix -----------------------------------------
+  // On rare loads the MG hanging protocol drops its four views into the wrong
+  // panes (a display-set→viewport match race while the images stream in). A
+  // plain Reset does NOT correct it: re-applying the SAME stage keeps the HP
+  // service's stale per-viewport assignment. What DOES correct it is switching
+  // to a DIFFERENT-structure stage and back — the layout change forces the
+  // matcher to rebuild every assignment from scratch, and by reset time all
+  // display sets are fully loaded so the fresh match is deterministic.
+  //
+  // Hop through an intermediate stage, then snap back to the target stage. The
+  // ViewerLayout loader gate RE-ARMS on every `viewer-hp-transition` and only
+  // lifts once the FINAL stage's panes paint, so the intermediate stage is never
+  // shown. Mammo-only; every other protocol resets in one step.
+  const MAMMO_RESET_INTERMEDIATE_STAGE = 21; // intermediate stage to hop through
+  const MAMMO_RESET_HOP_MS = 60; // long enough for the intermediate layout to apply
+
+  const applyMammoResetTwoHop = (
+    protocolId: string,
+    defaultStageIndex: number,
+    afterFinal?: () => void
+  ) => {
+    // Hop 1 — intermediate stage; forces the viewport→displaySet rematch. Sent
+    // with `hold: true` so the loader gate keeps the loader up and does NOT
+    // settle on this intermediate stage (it paints fast on cached images and
+    // would otherwise flash between the two hops).
+    window.dispatchEvent(new CustomEvent('viewer-hp-transition', { detail: { hold: true } }));
+    try {
+      hangingProtocolService.setProtocol(protocolId, {
+        stageIndex: MAMMO_RESET_INTERMEDIATE_STAGE,
+      });
+    } catch (e) {
+      console.warn('mammo reset: intermediate setProtocol failed', e);
+    }
+
+    // Hop 2 — back to the real default once the intermediate has applied. The
+    // second transition keeps the loader up through the final paint.
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+      try {
+        hangingProtocolService.setProtocol(protocolId, { stageIndex: defaultStageIndex });
+      } catch (e) {
+        console.warn('mammo reset: final setProtocol failed', e);
+      }
+      resyncInvertWhenReady();
+      try {
+        commandsManager.run('setMammographyZoomConditional', {});
+      } catch {
+        /* command may not exist in non-BIEDX modes */
+      }
+      if (afterFinal) {
+        try {
+          afterFinal();
+        } catch {
+          /* non-fatal */
+        }
+      }
+    }, MAMMO_RESET_HOP_MS);
+  };
+
   const actions = {
     hydrateSecondaryDisplaySet: async ({ displaySet, viewportId }) => {
       if (!displaySet) {
@@ -1388,11 +1447,24 @@ function commandsModule({
         const protocolId = initial?.protocolId || active?.protocol?.id;
         if (protocolId) {
           const defaultStageIndex =
-            initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
-              ? initial.stageIndex
-              : protocolId === '@ohif/hpMammo'
-                ? 2
+            protocolId === '@ohif/hpMammo'
+              ? // Reset MG to the clean "All Current" 4-up (stage 2). Reset already
+                // drops any prior comparison, so we must NOT restore a captured
+                // initial stage of 0 ("All Prior and Current", an 8-pane grid): on
+                // a study whose 4 prior panes have no image it leaves a half-blank
+                // grid AND the loader waits for panes that never paint (the 10-15s
+                // freeze). Always land on the single-study 4-up.
+                2
+              : initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+                ? initial.stageIndex
                 : 0;
+          if (protocolId === '@ohif/hpMammo') {
+            // Two-hop reset so a wrong-sequence MG layout actually corrects (a
+            // same-stage reset does not). The helper handles the invert resync +
+            // MG zoom after the final hop, so return early.
+            applyMammoResetTwoHop(protocolId, defaultStageIndex);
+            return;
+          }
           hangingProtocolService.setProtocol(protocolId, {
             stageIndex: defaultStageIndex,
           });
@@ -1507,10 +1579,14 @@ function commandsModule({
         const currentStageIndex = active?.stageIndex ?? 0;
         if (protocolId) {
           defaultStageIndex =
-            initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
-              ? initial.stageIndex
-              : protocolId === '@ohif/hpMammo'
-                ? 2
+            protocolId === '@ohif/hpMammo'
+              ? // Reset MG to the clean "All Current" 4-up (stage 2), never the
+                // captured initial stage 0 ("All Prior and Current", 8 panes) — on a
+                // study with empty prior panes that leaves a half-blank grid and the
+                // loader waits for panes that never paint (the 10-15s freeze).
+                2
+              : initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+                ? initial.stageIndex
                 : 0;
           // Re-run when the active protocol/stage/layout differs from the initial
           // (covers custom-layout switch, non-default stage, or changed pane count).
@@ -1529,7 +1605,24 @@ function commandsModule({
         console.warn('clearView: layout detection failed', e);
       }
 
-      // ---- 4. Re-run HP only when custom layout or non-default stage ----
+      // ---- 4. Restore the hanging protocol ----
+      // For MG, ALWAYS do the two-hop reset — even when already on the default
+      // stage (needsHpRerun would be false) — because a wrong-sequence layout
+      // must be corrected here too, and only a different-structure hop rebuilds
+      // the assignment. The helper runs the LUT resync + MG zoom AND reloads the
+      // saved annotations after the final hop, so return early.
+      if (protocolId === '@ohif/hpMammo') {
+        applyMammoResetTwoHop(protocolId, defaultStageIndex, () => {
+          try {
+            (window as any).__reloadSavedAnnotations?.();
+          } catch {
+            /* trigger not registered — viewer not mounted; safe to ignore */
+          }
+        });
+        return;
+      }
+
+      // Non-MG: re-run only when custom layout or non-default stage.
       if (needsHpRerun && protocolId) {
         try {
           hangingProtocolService.setProtocol(protocolId, {

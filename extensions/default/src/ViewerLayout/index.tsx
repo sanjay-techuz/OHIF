@@ -301,6 +301,12 @@ function ViewerLayout({
     let watchStarted = false;
     let settled = false;
     let transitionRequested = false;
+    // HOLD mode: a multi-step transition (e.g. the MG two-hop reset) dispatches
+    // an intermediate `viewer-hp-transition` with `{ hold: true }`. While held,
+    // the loader stays up and does NOT settle on the intermediate stage's paint
+    // — it waits for the FINAL (non-hold) transition. Without this the fast-
+    // painting intermediate stage flashes between the two hops.
+    let holdMode = false;
 
     const clearWatchResources = () => {
       attachedListeners.forEach(({ el, fn }) =>
@@ -397,8 +403,9 @@ function ViewerLayout({
       hardTimer = setTimeout(finish, HARD_TIMEOUT_MS);
     };
 
-    const onTransitionRequested = () => {
+    const onTransitionRequested = (evt?: Event) => {
       transitionRequested = true;
+      holdMode = !!(evt as CustomEvent)?.detail?.hold;
       if (graceTimer) {
         clearTimeout(graceTimer);
         graceTimer = null;
@@ -408,6 +415,12 @@ function ViewerLayout({
 
     const onProtocolChanged = () => {
       if (transitionRequested) {
+        if (holdMode) {
+          // Intermediate hop of a multi-step transition — keep the loader up and
+          // do NOT watch/settle on this stage. Stay armed (transitionRequested
+          // remains true) until the final, non-hold transition arrives.
+          return;
+        }
         // The deliberate swap we were told to wait for just applied — watch its
         // panes and hide the loader once they paint.
         transitionRequested = false;
