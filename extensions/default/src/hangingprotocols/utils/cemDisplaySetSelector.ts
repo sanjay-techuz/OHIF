@@ -62,14 +62,47 @@ const standardViewBonusRule = {
 // modality code). The CEM-specific signal is ImageType[3]. We split into
 // two arrays so the laterality+view rules below can append either LE or
 // RECOMBINED.
+// The CEM contrast image's ImageType[3] varies by VENDOR:
+//   Hologic  → 'RECOMBINED'
+//   GE       → 'SUBTRACTION'  (shown as "DES" = Dual-Energy Subtracted in desc)
+//   others   → 'IODINE' / 'CESM'
+// Match any of them so the contrast pane isn't left showing the LE image.
+const CEM_CONTRAST_IMAGETYPE = ['RECOMBINED', 'SUBTRACTION', 'IODINE', 'CESM'];
+// Secondary (description) hints, case-insensitive, used only to break ties when
+// ImageType is ambiguous. LE desc usually ends " LE"; contrast desc " DES" etc.
+const CEM_CONTRAST_DESC = ['DES', 'RECOMBINED', 'RECOMB', 'CESM', 'IODINE', 'I-VIEW', 'IVIEW', 'CONTRAST'];
+const CEM_LE_DESC = ['LE', 'LOW ENERGY', 'LOW-ENERGY', 'LOWENERGY'];
+
 const cemLECommonRules = [
   { weight: 30, attribute: 'Modality', constraint: { equals: 'MG' } },
   { weight: 25, attribute: 'ImageType', constraint: { contains: 'LOW_ENERGY' } },
+  // Keep LE OFF the contrast image so the LE pane never grabs the recombined one.
+  {
+    weight: 20,
+    attribute: 'ImageType',
+    required: false,
+    constraint: { doesNotContain: CEM_CONTRAST_IMAGETYPE },
+  },
+  { weight: 8, attribute: 'SeriesDescription', required: false, constraint: { containsI: CEM_LE_DESC } },
 ];
 
 const cemRecombinedCommonRules = [
   { weight: 30, attribute: 'Modality', constraint: { equals: 'MG' } },
-  { weight: 25, attribute: 'ImageType', constraint: { contains: 'RECOMBINED' } },
+  // The load-bearing CEM contrast tag — RECOMBINED / SUBTRACTION / IODINE / CESM.
+  { weight: 25, attribute: 'ImageType', constraint: { contains: CEM_CONTRAST_IMAGETYPE } },
+  // Keep recombined OFF the LE image so the two panes never collapse to the same view.
+  {
+    weight: 20,
+    attribute: 'ImageType',
+    required: false,
+    constraint: { doesNotContain: ['LOW_ENERGY'] },
+  },
+  {
+    weight: 8,
+    attribute: 'SeriesDescription',
+    required: false,
+    constraint: { containsI: CEM_CONTRAST_DESC },
+  },
 ];
 
 // --- Laterality + view fragments. Reused for both LE and Recombined. ---

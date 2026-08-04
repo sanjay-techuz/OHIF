@@ -62,12 +62,12 @@ const hpCEM = {
     },
     {
       id: 'CEM-Recombined',
-      // Match when ANY display set in the study has ImageType
-      // containing 'RECOMBINED'. This is the hallmark of CEM —
-      // a plain MG study would never produce a recombined image.
+      // Match when ANY display set in the study has a CEM contrast ImageType —
+      // 'RECOMBINED' (Hologic), 'SUBTRACTION' (GE / "DES"), or IODINE/CESM.
+      // This is the hallmark of CEM; a plain MG study never produces one.
       weight: 15,
       attribute: 'ImageType',
-      constraint: { contains: 'RECOMBINED' },
+      constraint: { contains: ['RECOMBINED', 'SUBTRACTION', 'IODINE', 'CESM'] },
       required: true,
     },
     {
@@ -104,10 +104,11 @@ const hpCEM = {
   },
 
   stages: [
-    // ---- Stage 0 (default): Paired per view (2x4) ----
-    // Mirror columns so R views are on the screen-left, L on the right.
-    //   Row 1: RCC-LE | RCC-Recomb | LCC-Recomb | LCC-LE
-    //   Row 2: RMLO-LE | RMLO-Recomb | LMLO-Recomb | LMLO-LE
+    // ---- Stage 0 (default): all LE on top, all Recombined below (2x4) ----
+    // Row 1 = every LOW-ENERGY (normal) view; Row 2 = every RECOMBINED (CEM)
+    // view, column-aligned so each LE sits directly above its recombined pair.
+    //   Row 1: RCC-LE | LCC-LE | RMLO-LE | LMLO-LE
+    //   Row 2: RCC-Recomb | LCC-Recomb | RMLO-Recomb | LMLO-Recomb
     {
       name: 'Paired LE/Recombined (All)',
       viewportStructure: {
@@ -116,17 +117,10 @@ const hpCEM = {
         properties: { rows: 2, columns: 4 },
       },
       viewports: [
+        // Row 1 — Low-Energy (normal)
         {
           viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
           displaySets: [{ id: 'RCC_LE' }],
-        },
-        {
-          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
-          displaySets: [{ id: 'RCC_Recomb' }],
-        },
-        {
-          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
-          displaySets: [{ id: 'LCC_Recomb' }],
         },
         {
           viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
@@ -138,15 +132,24 @@ const hpCEM = {
         },
         {
           viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LMLO_LE' }],
+        },
+        // Row 2 — Recombined (contrast / CEM)
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'RCC_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
+          displaySets: [{ id: 'LCC_Recomb' }],
+        },
+        {
+          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
           displaySets: [{ id: 'RMLO_Recomb' }],
         },
         {
           viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
           displaySets: [{ id: 'LMLO_Recomb' }],
-        },
-        {
-          viewportOptions: { toolGroupId: 'default', displayArea: defaultDisplayArea },
-          displaySets: [{ id: 'LMLO_LE' }],
         },
       ],
     },
