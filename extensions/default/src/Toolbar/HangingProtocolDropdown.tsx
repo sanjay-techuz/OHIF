@@ -409,7 +409,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
           commandOptions: {},
         });
       }, 100);
-    }, 250);
+    }, 2000);
     return () => clearTimeout(timeoutId);
   }, [isCEM, commandsManager, hangingProtocolService]);
 
