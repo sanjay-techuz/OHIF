@@ -27,6 +27,15 @@ import HPRLMOMBOTTOM from '../../assets/images/RL-MLO-BOTTOM.png';
 import HPRLMOMCENTER from '../../assets/images/RL-MLO-CENTER.png';
 import HPRLMLOTOP from '../../assets/images/RL-MLO-TOP.png';
 
+// CEM (Contrast-Enhanced Mammography) hanging-protocol icons.
+import HP_CEM_ALL from '../../assets/images/HP-CEM-ALL.png';
+import HP_CEM_LE_ALL from '../../assets/images/HP-CEM-LE-ALL.png';
+import HP_CEM_ALL_RE from '../../assets/images/HP-CEM-ALL-RE.png';
+import HP_CEM_RCC from '../../assets/images/HP-CEM-RCC-LE-RE.png';
+import HP_CEM_LCC from '../../assets/images/HP-CEM-LCC-LE-RE.png';
+import HP_CEM_RMLO from '../../assets/images/HP-CEM-RMLO-LE-RE.png';
+import HP_CEM_LMLO from '../../assets/images/HP-CEM-LMLO-LE-RE.png';
+
 interface HangingProtocolDropdownProps {
   id: string;
   options: {
@@ -49,14 +58,14 @@ const CEM_HANGING_PROTOCOLS = [
   // when a prior is present it becomes the default selected entry (mirrors MG's
   // 'All Prior and Current' being first). Filtered out entirely when there's no
   // prior (requiresPrior), so no-prior CEM falls back to 'Paired' as the default.
-  { label: 'Prior/Current Recombined', stageIndex: 7, icon: HPALLCP, requiresPrior: true },
-  { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HPALL },
-  { label: 'All Low-Energy', stageIndex: 1, icon: HPALL },
-  { label: 'All Recombined', stageIndex: 2, icon: HPALL },
-  { label: 'R CC: LE vs Recombined', stageIndex: 3, icon: RLCC },
-  { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: RLCC },
-  { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: RLMLO },
-  { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: RLMLO },
+  { label: 'Prior/Current Recombined', stageIndex: 7, icon: HP_CEM_ALL_RE, requiresPrior: true },
+  { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HP_CEM_ALL },
+  { label: 'All Low-Energy', stageIndex: 1, icon: HP_CEM_LE_ALL },
+  { label: 'All Recombined', stageIndex: 2, icon: HP_CEM_ALL_RE },
+  { label: 'R CC: LE vs Recombined', stageIndex: 3, icon: HP_CEM_RCC },
+  { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: HP_CEM_LCC },
+  { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: HP_CEM_RMLO },
+  { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: HP_CEM_LMLO },
 ];
 
 // Unified array with ALL hanging protocols (used for both dropdown and navigation)
