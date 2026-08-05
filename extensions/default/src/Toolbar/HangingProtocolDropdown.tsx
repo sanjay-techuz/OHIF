@@ -148,15 +148,16 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const modalitySlug = useUIStateStore(s => s.uiState.modalitySlug as string | null | undefined);
   const isCEM = useMemo(() => {
     if ((modalitySlug || '').toUpperCase() === 'CEM') return true;
+    // Vendor-agnostic CEM contrast tag: RECOMBINED (Hologic) / SUBTRACTION (GE "DES") / IODINE / CESM.
+    const CEM_TOKENS = ['RECOMBINED', 'SUBTRACTION', 'IODINE', 'CESM'];
     return activeDisplaySets.some(ds => {
       const imageType = (ds as { ImageType?: unknown }).ImageType;
-      if (Array.isArray(imageType)) {
-        return imageType.some(v => typeof v === 'string' && v.toUpperCase() === 'RECOMBINED');
-      }
-      if (typeof imageType === 'string') {
-        return imageType.toUpperCase().includes('RECOMBINED');
-      }
-      return false;
+      const flat = Array.isArray(imageType)
+        ? imageType.join('|').toUpperCase()
+        : typeof imageType === 'string'
+          ? imageType.toUpperCase()
+          : '';
+      return CEM_TOKENS.some(t => flat.includes(t));
     });
   }, [modalitySlug, activeDisplaySets]);
 
