@@ -105,9 +105,31 @@ const cemRecombinedCommonRules = [
   },
 ];
 
+// Primary CC-vs-MLO discriminator: `MammoView` is derived from ViewPosition
+// (0018,5101) — the SAME tag the sidebar (getMammoViewLabel) uses — so it tells
+// CC from MLO even when the DICOM has NO ViewCodeSequence and the
+// SeriesDescription doesn't spell out the view. Without this, a study that
+// carries only ViewPosition (labels look right in the sidebar) but plain
+// descriptions couldn't distinguish CC from MLO — only R/L — so RCC/LCC landed
+// in the RMLO/LMLO panes (seen on production, not local where descriptions say
+// "R MLO" etc.). Weight 100 (above the sum of the other view rules) so the
+// correct view always wins its pane; required:false so a missing ViewPosition
+// degrades gracefully to the description/laterality rules below.
+// `containsI` (not `equals`): getMammoViewLabel appends a " CEM" suffix for the
+// contrast image, so MammoView is "RMLO" for the LE pane but "RMLO CEM" for the
+// recombined pane. A substring match handles both. The full RCC/LCC/RMLO/LMLO
+// tokens are distinct (RMLO≠LMLO≠RCC≠LCC), so this can't cross-match.
+const cemMammoViewRule = (view: string) => ({
+  weight: 100,
+  attribute: 'MammoView',
+  required: false,
+  constraint: { containsI: [view] },
+});
+
 // --- Laterality + view fragments. Reused for both LE and Recombined. ---
 
 const RCCViewRules = [
+  cemMammoViewRule('RCC'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -130,6 +152,7 @@ const RCCViewRules = [
 ];
 
 const LCCViewRules = [
+  cemMammoViewRule('LCC'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -152,6 +175,7 @@ const LCCViewRules = [
 ];
 
 const RMLOViewRules = [
+  cemMammoViewRule('RMLO'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -174,6 +198,7 @@ const RMLOViewRules = [
 ];
 
 const LMLOViewRules = [
+  cemMammoViewRule('LMLO'),
   {
     weight: 10,
     attribute: 'ViewCode',
