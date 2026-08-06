@@ -10,7 +10,8 @@
     "isModifiedByLua": 1025,
     "folderName": 1026,
     "subSpecialitySlug": 1027,
-    "modalitySlug": 1028
+    "modalitySlug": 1028,
+    "skipAutoTranscode": 1029
   },
   "LuaScripts": ["/etc/orthanc/notify-study.lua"],
   "Plugins": ["/usr/share/orthanc/plugins", "/usr/local/share/orthanc/plugins"],
