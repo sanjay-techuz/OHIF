@@ -40,7 +40,12 @@
         var JSON_ACCEPT = 'application/dicom+json';
         // Shared with prefetchManager.ts + the viewer (per-study "prefetched" flag).
         var FLAG_PREFIX = 'biedx-prefetched:';
+        var CACHE_NAME = 'biedx-dicom-prefetch';
         var CONCURRENCY = 6;
+        // Cap on distinct studies kept in the cache. Prefetching an 11th study
+        // (or opening one past the cap in the viewer) evicts the oldest-stored
+        // study's frames — a large cache hangs the browser (5-6+ studies).
+        var MAX_STUDIES = 10;
 
         var params = new URLSearchParams(location.search);
         // Only accept/reply to the LMS origin that embedded us.
@@ -55,20 +60,113 @@
           }
         }
 
-        // ---- flags -------------------------------------------------------------
-        function isPrefetched(uid) {
+        // ---- store-time flags (per study, value = ms epoch it was cached) -----
+        function flagTs(uid) {
           try {
-            return !!localStorage.getItem(FLAG_PREFIX + uid);
+            var v = localStorage.getItem(FLAG_PREFIX + uid);
+            return v ? parseInt(v, 10) || 0 : 0;
           } catch (e) {
-            return false;
+            return 0;
           }
         }
         function markPrefetched(uid) {
+          // (re)stamp store-time = now → marks this study most-recently used.
           try {
             localStorage.setItem(FLAG_PREFIX + uid, String(Date.now()));
           } catch (e) {
             /* ignore quota on the flag */
           }
+        }
+        function setFlagIfAbsent(uid) {
+          // First time we SEE a study in the cache that we didn't prefetch (it was
+          // cached by opening the case in the viewer) → record its store-time.
+          try {
+            if (!localStorage.getItem(FLAG_PREFIX + uid)) {
+              localStorage.setItem(FLAG_PREFIX + uid, String(Date.now()));
+            }
+          } catch (e) {}
+        }
+        function removeFlag(uid) {
+          try {
+            localStorage.removeItem(FLAG_PREFIX + uid);
+          } catch (e) {}
+        }
+
+        // ---- cache introspection + LRU cap ------------------------------------
+        // The StudyInstanceUID is embedded in every WADO-RS frame URL as
+        // /studies/{uid}/… so the cache itself is the source of truth for which
+        // studies are cached — whether via prefetch OR by opening a case in the
+        // viewer (both flow through the same service worker + cache).
+        function studyUidFromUrl(url) {
+          var m = /\/studies\/([^/?#]+)/.exec(url || '');
+          return m ? m[1] : null;
+        }
+        async function listCachedStudyUids() {
+          var set = new Set();
+          try {
+            var cache = await caches.open(CACHE_NAME);
+            var reqs = await cache.keys();
+            for (var i = 0; i < reqs.length; i++) {
+              var uid = studyUidFromUrl(reqs[i].url);
+              if (uid) {
+                set.add(uid);
+              }
+            }
+          } catch (e) {}
+          return set;
+        }
+        async function deleteStudyFromCache(uid) {
+          try {
+            var cache = await caches.open(CACHE_NAME);
+            var reqs = await cache.keys();
+            for (var i = 0; i < reqs.length; i++) {
+              if (studyUidFromUrl(reqs[i].url) === uid) {
+                await cache.delete(reqs[i]);
+              }
+            }
+          } catch (e) {}
+          removeFlag(uid);
+        }
+        // Reconcile the store-time flags with the REAL cache, then enforce the
+        // MAX_STUDIES cap by evicting the oldest-stored studies. Returns the Set
+        // of studies that remain cached AFTER any eviction. Runs on every STATUS
+        // and after each prefetch, so the cache never exceeds the cap no matter
+        // how a study got in (prefetch or viewer-open).
+        async function reconcileAndEnforceCap() {
+          var present = await listCachedStudyUids();
+          // Register any study cached outside prefetch (opened via View) so it
+          // gets a store-time and shows as "prefetched" in the curriculum.
+          present.forEach(function (uid) {
+            setFlagIfAbsent(uid);
+          });
+          // Drop stale flags for studies the browser itself evicted from cache.
+          try {
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+              var key = localStorage.key(i);
+              if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                var fUid = key.slice(FLAG_PREFIX.length);
+                if (!present.has(fUid)) {
+                  localStorage.removeItem(key);
+                }
+              }
+            }
+          } catch (e) {}
+          // Evict oldest-stored studies until we are within the cap.
+          if (present.size > MAX_STUDIES) {
+            var arr = [];
+            present.forEach(function (uid) {
+              arr.push({ uid: uid, ts: flagTs(uid) });
+            });
+            arr.sort(function (a, b) {
+              return a.ts - b.ts; // oldest first
+            });
+            var toEvict = present.size - MAX_STUDIES;
+            for (var k = 0; k < toEvict; k++) {
+              await deleteStudyFromCache(arr[k].uid);
+              present.delete(arr[k].uid);
+            }
+          }
+          return present;
         }
 
         // ---- QIDO/WADO helpers -------------------------------------------------
@@ -211,7 +309,13 @@
           });
 
           if (failed === 0 && total > 0) {
-            markPrefetched(studyUID); // case-level flag = whole case cached
+            // Stamp every study in the case (primary + priors) as most-recently
+            // stored, then enforce the cap — prefetching the 11th study evicts
+            // the oldest. Done AFTER caching so the fresh study is never evicted.
+            uids.forEach(function (u) {
+              markPrefetched(u);
+            });
+            await reconcileAndEnforceCap();
             postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: true });
           } else {
             postToParent({
@@ -228,25 +332,38 @@
         var busy = false;
         async function handleCommand(cmd) {
           if (cmd.type === 'STATUS') {
+            // Truth = the real cache contents (reconciled + capped), so a case
+            // opened via View shows as prefetched too, and the cap is enforced.
+            var presentStatus = await reconcileAndEnforceCap();
             var map = {};
             (cmd.studyUIDs || []).forEach(function (uid) {
-              map[uid] = isPrefetched(uid);
+              map[uid] = presentStatus.has(uid);
             });
             postToParent({ type: 'STATUS_RESULT', requestId: cmd.requestId, statusMap: map });
             return;
           }
           if (cmd.type === 'CLEAR') {
-            try {
-              caches.delete('biedx-dicom-prefetch');
-            } catch (e) {}
-            try {
-              for (var i = localStorage.length - 1; i >= 0; i--) {
-                var key = localStorage.key(i);
-                if (key && key.indexOf(FLAG_PREFIX) === 0) {
-                  localStorage.removeItem(key);
-                }
+            var clearUids = cmd.studyUIDs;
+            if (clearUids && clearUids.length) {
+              // Scoped clear: only the given studies (e.g. one module's cases).
+              // deleteStudyFromCache also removes each study's store-time flag.
+              for (var ci = 0; ci < clearUids.length; ci++) {
+                await deleteStudyFromCache(clearUids[ci]);
               }
-            } catch (e) {}
+            } else {
+              // Full clear: whole cache + all flags.
+              try {
+                await caches.delete(CACHE_NAME);
+              } catch (e) {}
+              try {
+                for (var i = localStorage.length - 1; i >= 0; i--) {
+                  var key = localStorage.key(i);
+                  if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                    localStorage.removeItem(key);
+                  }
+                }
+              } catch (e) {}
+            }
             postToParent({ type: 'DONE', requestId: cmd.requestId, studyUID: null, ok: true });
             return;
           }

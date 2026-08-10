@@ -22,10 +22,10 @@
   // Skip on local dev: the dev server's HMR and the SW caching dev chunks
   // fight each other. UAT/prod (any non-localhost host) register normally.
   var host = (typeof location !== 'undefined' && location.hostname) || '';
-  var isLocalDev = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
-  if (isLocalDev) {
-    return;
-  }
+  // var isLocalDev = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  // if (isLocalDev) {
+  //   return;
+  // }
 
   var swUrl = ((typeof window !== 'undefined' && window.PUBLIC_URL) || '/') + 'sw.js';
 
