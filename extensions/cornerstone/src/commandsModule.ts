@@ -263,6 +263,29 @@ function commandsModule({
     }, MAMMO_RESET_HOP_MS);
   };
 
+  // [CROSS-REF-POINT] current on-screen Cornerstone viewport elements (for
+  // attaching the scroll-follow listener). Non-cornerstone / unbuilt panes skipped.
+  const _getCrossRefViewportElements = (): HTMLElement[] => {
+    const els: HTMLElement[] = [];
+    try {
+      const { viewports } = viewportGridService.getState();
+      for (const vp of viewports.values()) {
+        const id = vp?.viewportOptions?.viewportId;
+        if (!id) {
+          continue;
+        }
+        const csVp = cornerstoneViewportService.getCornerstoneViewport(id);
+        const element = (csVp as unknown as { element?: HTMLElement })?.element;
+        if (element) {
+          els.push(element);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return els;
+  };
+
   const actions = {
     hydrateSecondaryDisplaySet: async ({ displaySet, viewportId }) => {
       if (!displaySet) {
@@ -2251,6 +2274,34 @@ function commandsModule({
 
       viewport.render();
     },
+    // [CROSS-REF-POINT] Place / clear the single draggable cross-plane reference
+    // point at the active viewport centre. Mode (passive/disabled) is toggled by the
+    // toolbar button via toolGroupService; these only manage the annotation itself.
+    crossReferencePointPlace: () => {
+      const viewportId = viewportGridService.getActiveViewportId?.();
+      if (!viewportId) {
+        return;
+      }
+      const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+      if (viewport) {
+        placeCrossReferencePoint(viewport as never);
+      }
+      // Enable scroll-follow (scrolling a pane carries the point to the new slice).
+      attachCrossReferenceScrollFollow(_getCrossRefViewportElements());
+    },
+    crossReferencePointClear: () => {
+      detachCrossReferenceScrollFollow();
+      const viewportId = viewportGridService.getActiveViewportId?.();
+      const viewport = viewportId
+        ? cornerstoneViewportService.getCornerstoneViewport(viewportId)
+        : null;
+      clearCrossReferencePoints((viewport as unknown as { element?: HTMLElement })?.element);
+    },
+    // Re-attach the scroll-follow listeners after the panes are rebuilt (e.g. a
+    // 2×3 → 2×4 stage switch). Idempotent — skips already-attached elements.
+    crossReferencePointReattach: () => {
+      attachCrossReferenceScrollFollow(_getCrossRefViewportElements());
+    },
     resetCrosshairs: ({ viewportId }) => {
       const crosshairInstances = [];
 
@@ -3091,6 +3142,16 @@ function commandsModule({
     },
     resetCrosshairs: {
       commandFn: actions.resetCrosshairs,
+    },
+    // [CROSS-REF-POINT]
+    crossReferencePointPlace: {
+      commandFn: actions.crossReferencePointPlace,
+    },
+    crossReferencePointClear: {
+      commandFn: actions.crossReferencePointClear,
+    },
+    crossReferencePointReattach: {
+      commandFn: actions.crossReferencePointReattach,
     },
     toggleSynchronizer: {
       commandFn: actions.toggleSynchronizer,

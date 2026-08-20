@@ -703,6 +703,49 @@ export const ToolCircle = (props: IconProps) => (
   </svg>
 );
 
+// [CROSS-REF-POINT] Hollow-centre crosshair for the Cross Reference Point tool: four
+// inward ticks at N/E/S/W with an empty centre (no ring, no centre dot). Same 28×28 /
+// currentColor / 1.5 stroke as the other tool icons, so it is visually distinct from
+// the plain ToolCircle (CircleROI).
+export const ToolCrossReferencePoint = (props: IconProps) => (
+  <svg
+    width="28px"
+    height="28px"
+    viewBox="0 0 28 28"
+    version="1.1"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <g
+      id="tool-cross-reference-point"
+      stroke="none"
+      strokeWidth="1"
+      fill="none"
+      fillRule="evenodd"
+    >
+      <rect
+        id="Rectangle"
+        x="0"
+        y="0"
+        width="28"
+        height="28"
+      ></rect>
+      <g
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      >
+        <line x1="14" y1="3.5" x2="14" y2="10.5" />
+        <line x1="14" y1="17.5" x2="14" y2="24.5" />
+        <line x1="3.5" y1="14" x2="10.5" y2="14" />
+        <line x1="17.5" y1="14" x2="24.5" y2="14" />
+      </g>
+    </g>
+  </svg>
+);
+
 export const ToolCobbAngle = (props: IconProps) => (
   <svg
     width="28px"

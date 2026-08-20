@@ -106,6 +106,9 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
       {
         toolName: toolNames.AdvancedMagnify,
       },
+      // [CROSS-REF-POINT] registered but inert until the MR toolbar toggle sets it
+      // passive; disabled = zero effect for every other study.
+      { toolName: toolNames.CrossReferencePoint },
     ],
   };
 
