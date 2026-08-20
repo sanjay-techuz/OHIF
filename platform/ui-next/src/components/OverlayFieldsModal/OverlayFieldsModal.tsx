@@ -34,6 +34,8 @@ const OverlayFieldsModal: React.FC<OverlayFieldsModalProps> = ({ open, onClose }
   const selectedFields = useOverlayFieldsStore(s => s.selectedFields);
   const toggleField = useOverlayFieldsStore(s => s.toggleField);
   const resetToDefaults = useOverlayFieldsStore(s => s.resetToDefaults);
+  const overlayHidden = useOverlayFieldsStore(s => s.overlayHidden);
+  const setOverlayHidden = useOverlayFieldsStore(s => s.setOverlayHidden);
 
   const [search, setSearch] = useState('');
 
@@ -75,8 +77,28 @@ const OverlayFieldsModal: React.FC<OverlayFieldsModalProps> = ({ open, onClose }
         </p>
       </div>
 
+      {/* Global show/hide for the whole info overlay */}
+      <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-[#4F4F4F] px-3 py-2.5">
+        <span className="text-sm text-white">
+          Show overlay on viewports
+          <span className="mt-0.5 block text-xs text-white/50">
+            Turn off to hide all overlay text (Age, View, WW/WL, Zoom, Instance) on every viewport.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          checked={!overlayHidden}
+          onChange={e => setOverlayHidden(!e.target.checked)}
+          className="h-5 w-5 shrink-0 cursor-pointer accent-[#FF2768]"
+        />
+      </label>
+
       {/* Search + counter row */}
-      <div className="mt-4 mb-3 flex items-center gap-3">
+      <div
+        className={`mt-4 mb-3 flex items-center gap-3 ${
+          overlayHidden ? 'pointer-events-none opacity-40' : ''
+        }`}
+      >
         <input
           type="text"
           placeholder="Search fields…"
@@ -114,7 +136,9 @@ const OverlayFieldsModal: React.FC<OverlayFieldsModalProps> = ({ open, onClose }
         always scrolls regardless of how the dialog lays out its children.
       */}
       <div
-        className="-mr-2 overflow-y-auto pr-2"
+        className={`-mr-2 overflow-y-auto pr-2 ${
+          overlayHidden ? 'pointer-events-none opacity-40' : ''
+        }`}
         style={{ maxHeight: '55vh' }}
       >
         {totalMatches === 0 ? (

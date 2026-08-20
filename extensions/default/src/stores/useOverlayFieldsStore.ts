@@ -188,10 +188,19 @@ interface OverlayFieldsState {
   /** Ordered list of currently visible fields. Order = insertion order (FIFO). */
   selectedFields: OverlayFieldId[];
   /**
+   * Global show/hide for the ENTIRE viewport info overlay (the top-left fields
+   * AND the corner WW/WL, Zoom and Instance-number readouts). When true the
+   * overlay text is hidden on every viewport (orientation markers are kept).
+   * Persisted, so the choice sticks across reloads.
+   */
+  overlayHidden: boolean;
+  /**
    * Bumped on every change so subscribers that only care about
    * "something changed" can depend on a single primitive value.
    */
   version: number;
+  /** Hide or show the whole info overlay on every viewport. */
+  setOverlayHidden: (hidden: boolean) => void;
   /**
    * Toggle a field. Adding a 4th evicts the oldest selection so the
    * count never exceeds MAX_OVERLAY_FIELDS.
@@ -211,7 +220,10 @@ export const useOverlayFieldsStore = create<OverlayFieldsState>()(
   persist(
     (set, get) => ({
       selectedFields: DEFAULT_OVERLAY_FIELDS,
+      overlayHidden: false,
       version: 0,
+      setOverlayHidden: hidden =>
+        set(state => ({ overlayHidden: !!hidden, version: state.version + 1 })),
       toggleField: id =>
         set(state => {
           const current = state.selectedFields;
@@ -245,8 +257,12 @@ export const useOverlayFieldsStore = create<OverlayFieldsState>()(
     }),
     {
       name: 'biedx-overlay-fields',
-      // Only persist the user's pick — `version` is in-memory only.
-      partialize: state => ({ selectedFields: state.selectedFields }),
+      // Persist the user's field pick + the global show/hide choice.
+      // `version` is in-memory only.
+      partialize: state => ({
+        selectedFields: state.selectedFields,
+        overlayHidden: state.overlayHidden,
+      }),
     }
   )
 );
