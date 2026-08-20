@@ -5,14 +5,14 @@ import type { InstanceMetadata } from '@ohif/core/src/types';
 import { ViewportOverlay } from '@ohif/ui-next';
 import { vec3 } from 'gl-matrix';
 import PropTypes from 'prop-types';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StackViewportData, VolumeViewportData } from '../../types/CornerstoneCacheService';
 import AnnotationTooltipsOverlay from './AnnotationTooltipsOverlay';
 import CustomLabelsOverlay from './CustomLabelsOverlay';
 import { formatDICOMDate, formatDICOMTime, formatNumberPrecision } from './utils';
 
 import { useViewportRendering } from '../../hooks';
-import { useOverlayFieldsStore } from '@ohif/extension-default';
+import { useOverlayFieldsStore, useUIStateStore } from '@ohif/extension-default';
 import './CustomizableViewportOverlay.css';
 
 const EPSILON = 1e-4;
@@ -82,6 +82,13 @@ function CustomizableViewportOverlay({
   // re-run those conditions when the store changes. Without this line,
   // "Done" updates the store but the viewport keeps showing the old picks.
   useOverlayFieldsStore(s => s.version);
+
+  // Same reasoning for the folder-name map: the `case_id` extractor reads it
+  // fresh via getState(), and it arrives asynchronously (ViewerLayout fetches it
+  // from the LMS by PatientID). Without this subscription the overlay would keep
+  // rendering the pre-fetch fallback until some unrelated re-render happened.
+  useUIStateStore(s => s.uiState.studyFolderNames);
+  useUIStateStore(s => s.uiState.studyOverlayLabels);
 
   // Historical usage defined the overlays as separate items due to lack of
   // append functionality.  This code enables the historical usage, but
@@ -440,12 +447,108 @@ function OverlayItem(props) {
  * Window Level / Center Overlay item
  * //
  */
-function VOIOverlayItem({ voi, customization }: OverlayItemProps) {
+function VOIOverlayItem({ voi, customization, viewportId, servicesManager }: OverlayItemProps) {
   const { windowWidth, windowCenter } = voi;
+  const { cornerstoneViewportService } = servicesManager?.services || {};
+
+  // Double-click the WW/WL value to type exact numbers. Two inputs (WW and WL).
+  // The typed values are applied when focus leaves the editor (click outside) or
+  // on Enter; Escape discards. Moving focus between the two inputs does NOT
+  // apply (so both fields can be edited), and the values are never mutated on
+  // their own.
+  const [editing, setEditing] = useState(false);
+  const [wwInput, setWwInput] = useState('');
+  const [wcInput, setWcInput] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Always show WW/WL, display "-- / --" when values are not available
   const displayWidth = typeof windowWidth === 'number' ? windowWidth.toFixed(0) : '--';
   const displayCenter = typeof windowCenter === 'number' ? windowCenter.toFixed(0) : '--';
+
+  const startEditing = useCallback(() => {
+    if (typeof windowWidth !== 'number' || typeof windowCenter !== 'number') {
+      return;
+    }
+    setWwInput(String(Math.round(windowWidth)));
+    setWcInput(String(Math.round(windowCenter)));
+    setEditing(true);
+  }, [windowWidth, windowCenter]);
+
+  const applyEditing = useCallback(() => {
+    const ww = parseFloat(wwInput);
+    const wc = parseFloat(wcInput);
+    if (Number.isFinite(ww) && Number.isFinite(wc) && ww >= 1 && cornerstoneViewportService) {
+      const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+      if (viewport?.setProperties) {
+        // Use the linear range formula (identical to what the overlay shows via
+        // toWindowLevel) so the applied VOI exactly matches the numbers typed,
+        // and so we never introduce the sigmoid logit inflation. The renderer
+        // still applies the image's own transfer curve over this range.
+        const lower = wc - 0.5 - (ww - 1) / 2;
+        const upper = wc - 0.5 + (ww - 1) / 2;
+        viewport.setProperties({ voiRange: { lower, upper } });
+        viewport.render();
+      }
+    }
+    setEditing(false);
+  }, [wwInput, wcInput, cornerstoneViewportService, viewportId]);
+
+  // Only apply when focus actually leaves the whole editor (not when tabbing /
+  // clicking between the WW and WL inputs).
+  const handleBlur = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+        applyEditing();
+      }
+    },
+    [applyEditing]
+  );
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyEditing();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditing(false);
+    }
+  };
+
+  const inputClass =
+    'pointer-events-auto w-14 rounded border border-white/40 bg-black/60 px-1 text-center text-inherit outline-none';
+
+  if (editing) {
+    return (
+      <div
+        ref={containerRef}
+        className="overlay-item flex flex-row items-center"
+        style={{ color: customization?.color }}
+        onBlur={handleBlur}
+      >
+        <span className="mr-0.5 shrink-0 opacity-[0.80]">WW/WL:</span>
+        <input
+          className={inputClass}
+          value={wwInput}
+          autoFocus
+          title="Window Width — press Enter or click outside to apply"
+          onChange={e => setWwInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onClick={e => e.stopPropagation()}
+          onDoubleClick={e => e.stopPropagation()}
+        />
+        <span className="mx-0.5 shrink-0">/</span>
+        <input
+          className={inputClass}
+          value={wcInput}
+          title="Window Level — press Enter or click outside to apply"
+          onChange={e => setWcInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onClick={e => e.stopPropagation()}
+          onDoubleClick={e => e.stopPropagation()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -453,7 +556,11 @@ function VOIOverlayItem({ voi, customization }: OverlayItemProps) {
       style={{ color: customization?.color }}
     >
       <span className="mr-0.5 shrink-0 opacity-[0.80]">WW/WL:</span>
-      <span className="mr-2.5 shrink-0">
+      <span
+        className="pointer-events-auto mr-2.5 shrink-0 cursor-text"
+        title="Double-click to edit window width / level"
+        onDoubleClick={startEditing}
+      >
         {displayWidth} / {displayCenter}
       </span>
       {/* <span className="mr-0.5 shrink-0 opacity-[0.80]">L:</span>

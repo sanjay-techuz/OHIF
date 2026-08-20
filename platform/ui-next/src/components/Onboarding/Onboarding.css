@@ -1,37 +1,116 @@
+/*
+ * Onboarding tour styling.
+ *
+ * Shepherd's defaults (light card, blue buttons, oversized type) don't match the
+ * app. This puts the tour on the SAME dark surface every other popover uses —
+ * #333333 on a #4F4F4F border with an 8px radius, matching Select/Dropdown
+ * content — with the BIEDX pink as the primary action colour.
+ */
+
+.shepherd-element {
+  @apply !max-w-[300px] !rounded-lg;
+  background: #333333 !important;
+  border: 1px solid #4f4f4f !important;
+  box-shadow:
+    0 12px 16px -4px rgba(10, 13, 18, 0.08),
+    0 4px 6px -2px rgba(10, 13, 18, 0.03) !important;
+}
+
 .shepherd-header {
-  @apply !bg-popover !w-[100%] !p-0;
+  @apply !w-[100%] !p-0;
+  background: transparent !important;
 }
 
 .shepherd-title {
-  @apply !text-highlight !w-[100%] !break-words !text-xl !leading-[1.5];
+  @apply !w-[100%] !break-words !font-sans !text-[14px] !font-bold !leading-[1.4];
+  color: #ffffff !important;
 }
 
 .shepherd-content {
-  @apply flex flex-col gap-[8px] p-[12px];
-}
-
-.shepherd-element {
-  @apply !bg-popover !max-w-[260px];
+  @apply flex flex-col gap-[8px] p-[14px];
 }
 
 .shepherd-text {
-  @apply text-foreground !w-[100%] p-0 text-lg leading-normal;
+  @apply !w-[100%] !p-0 !font-sans !text-[12px] !leading-[1.5];
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
+/*
+ * Footer reads as pagination:   ‹  10/12  ›            Skip all
+ *
+ * Shepherd renders the buttons in array order and `defaultShowHandler` appends
+ * the counter LAST, so the visual order is set with flex `order` rather than by
+ * reordering the DOM. Skip is pushed to the far right with margin-left:auto.
+ */
 .shepherd-footer {
-  @apply !w-[100%] p-0;
+  @apply !flex !w-[100%] !items-center !justify-start !gap-[4px] !p-0 !pt-[2px];
+}
+
+.shepherd-nav-prev {
+  order: 1;
+}
+
+.shepherd-progress {
+  order: 2;
+  @apply !select-none !font-sans !text-[12px] !leading-none;
+  /* Neutralise the inline absolute positioning the show handler used to need. */
+  position: static !important;
+  left: auto !important;
+  bottom: auto !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  min-width: 34px;
+  text-align: center;
+}
+
+.shepherd-nav-next {
+  order: 3;
+}
+
+.shepherd-skip-btn {
+  order: 4;
+  margin-left: auto;
 }
 
 .shepherd-button {
-  @apply !inline-flex !h-[36px] !min-w-[62px] !flex-row !items-center !justify-center !gap-[5px] !whitespace-nowrap !rounded !bg-[#348cfd] !px-[10px] !text-center !font-sans !text-[14px] !leading-[1.2] !text-white !outline-none !transition !duration-300 !ease-in-out focus:!outline-none;
+  @apply !inline-flex !h-[28px] !flex-row !items-center !justify-center !whitespace-nowrap !rounded-md !px-[10px] !font-sans !text-[12px] !font-semibold !leading-none !outline-none !transition-colors !duration-200 focus:!outline-none;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.7) !important;
 }
 
-.shepherd-button.shepherd-button-secondary {
-  @apply !bg-transparent !text-[#348cfd];
+.shepherd-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
 }
 
+/* Arrow buttons: compact, square, glyph a little larger than the label text. */
+.shepherd-nav-btn {
+  @apply !h-[26px] !w-[26px] !px-0 !text-[16px];
+}
+
+.shepherd-button:disabled,
+.shepherd-button[disabled] {
+  opacity: 0.3 !important;
+  cursor: default !important;
+  background: transparent !important;
+}
+
+/* "Skip all" in the BIEDX pink so the way out is unmistakable. */
+.shepherd-skip-btn,
+.shepherd-button.shepherd-skip-btn {
+  color: #ff2768 !important;
+  background: transparent !important;
+}
+
+.shepherd-skip-btn:hover,
+.shepherd-button.shepherd-skip-btn:hover {
+  background: rgba(255, 39, 104, 0.12) !important;
+  color: #ff2768 !important;
+}
+
+/* Arrow inherits the card surface so the bubble reads as one shape. */
 .shepherd-arrow::before {
-  @apply !bg-popover !h-[30px] !w-[30px];
+  background: #333333 !important;
+  @apply !h-[16px] !w-[16px];
 }
 
 .shepherd-element[data-popper-placement^='left'] > .shepherd-arrow {

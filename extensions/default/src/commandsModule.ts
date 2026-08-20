@@ -56,6 +56,43 @@ const commandsModule = ({
   // Define a context menu controller for use with any context menus
   const contextMenuController = new ContextMenuController(servicesManager, commandsManager);
 
+  // UID of the prior the USER explicitly chose to compare (null = no manual
+  // comparison). Reset View / Reset Image clear only a user-initiated
+  // comparison — a study loaded because the URL carried multiple
+  // StudyInstanceUIDs must NOT be dropped by a reset.
+  let activePriorComparisonUID: string | null = null;
+
+  function _getBreastProtocolInfo(currentStudyUID?: string) {
+    const active = displaySetService.getActiveDisplaySets?.() || [];
+    const currentDisplaySets = currentStudyUID
+      ? active.filter(ds => ds.StudyInstanceUID === currentStudyUID)
+      : active;
+
+    const isMammo = currentDisplaySets.some(ds => ds.Modality === 'MG');
+    if (!isMammo) {
+      return null;
+    }
+
+    const isCEM = currentDisplaySets.some(ds => {
+      const imageType = (ds as { ImageType?: unknown }).ImageType;
+      if (Array.isArray(imageType)) {
+        return imageType.some(v => typeof v === 'string' && v.toUpperCase() === 'RECOMBINED');
+      }
+      if (typeof imageType === 'string') {
+        return imageType.toUpperCase().includes('RECOMBINED');
+      }
+      return false;
+    });
+
+    return isCEM
+      ? { protocolId: '@ohif/hpCEM', priorStage: 7 as number | undefined, normalStage: 0 as number | undefined }
+      : {
+          protocolId: '@ohif/hpMammo',
+          priorStage: undefined as number | undefined,
+          normalStage: undefined as number | undefined,
+        };
+  }
+
   const actions = {
     /**
      * Adds a display set as a layer to the specified viewport
@@ -237,6 +274,130 @@ const commandsModule = ({
 
       const study = DicomMetadataStore.getStudy(StudyInstanceUID);
       hangingProtocolService.addStudy(study);
+    },
+
+    /**
+     * MANUAL prior comparison — the user picks a study from the sidebar to compare
+     * against the one they opened.
+     *
+     * The mammo/CEM protocols decide current-vs-prior purely from
+     * `studyInstanceUIDsIndex` (0 = current, 1 = prior — see
+     * mammoDisplaySetSelector / cemDisplaySetSelector). So this just has to load
+     * the picked study and hand `run()` the array in the right order:
+     *
+     *   [ the study the user OPENED , the study the user PICKED ]
+     *
+     * The opened study is ALWAYS the current/main (index 0) and the picked study
+     * is ALWAYS the prior (index 1). No StudyDate involved, no guessing which is
+     * "main" — which is exactly what makes this robust for anonymized studies
+     * with no dates, and for patients with 3+ studies.
+     *
+     * Only one prior at a time: `run()` replaces `this.studies` wholesale, so
+     * picking a different study swaps the prior out.
+     */
+    applyPriorComparison: async ({ priorStudyInstanceUID }) => {
+      const current = hangingProtocolService.studies?.[0];
+      if (!current || !priorStudyInstanceUID) {
+        return false;
+      }
+      if (priorStudyInstanceUID === current.StudyInstanceUID) {
+        return false;
+      }
+
+      try {
+        // Load the picked study's images on demand (nothing is fetched until the
+        // user actually asks to compare — no cost on a normal single-study open).
+        const alreadyLoaded = displaySetService.activeDisplaySets.some(
+          ds => ds.StudyInstanceUID === priorStudyInstanceUID
+        );
+        if (!alreadyLoaded) {
+          const [dataSource] = extensionManager.getActiveDataSource();
+          await requestDisplaySetCreationForStudy(
+            dataSource,
+            displaySetService,
+            priorStudyInstanceUID
+          );
+        }
+
+        const priorStudy = DicomMetadataStore.getStudy(priorStudyInstanceUID);
+        if (!priorStudy) {
+          return false;
+        }
+        hangingProtocolService.addStudy(priorStudy); // dedupes by UID
+
+        const info = _getBreastProtocolInfo(current.StudyInstanceUID);
+        if (!info) {
+          return false;
+        }
+
+        const displaySets = displaySetService.getActiveDisplaySets?.() || [];
+        // Hold the ViewerLayout loader over the viewport until the new panes paint.
+        window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+        hangingProtocolService.run(
+          { studies: [current, priorStudy], activeStudy: current, displaySets },
+          info.protocolId,
+          info.priorStage !== undefined ? { stageIndex: info.priorStage } : {}
+        );
+        activePriorComparisonUID = priorStudyInstanceUID;
+        // Tell the study browser which prior is active so its dropdown reflects
+        // reality no matter who triggered the change.
+        window.dispatchEvent(
+          new CustomEvent('viewer-prior-comparison-changed', {
+            detail: { priorStudyInstanceUID },
+          })
+        );
+        return true;
+      } catch (e) {
+        console.warn('applyPriorComparison failed', e);
+        return false;
+      }
+    },
+
+    /**
+     * Drop the prior comparison and go back to the normal single-study layout.
+     * Re-runs the protocol with ONLY the opened study, so hpMammo's gated prior
+     * stage stops matching and falls back to "All Current" (and hpCEM returns to
+     * its stage 0 "Paired"). The prior's display sets stay loaded (still visible
+     * in the sidebar) — only the hanging changes.
+     */
+    clearPriorComparison: () => {
+      // No-op unless the user actually started a comparison. This is what lets
+      // Reset View / Reset Image call it unconditionally without disturbing a
+      // multi-study URL load or a plain single-study case.
+      if (!activePriorComparisonUID) {
+        return false;
+      }
+      const current = hangingProtocolService.studies?.[0];
+      if (!current) {
+        return false;
+      }
+      try {
+        activePriorComparisonUID = null;
+        // Clear the study browser's dropdown as soon as the comparison is
+        // dropped (also covers Reset View / Reset Image, which call this
+        // command) so the selection can never desync from the flag.
+        window.dispatchEvent(
+          new CustomEvent('viewer-prior-comparison-changed', {
+            detail: { priorStudyInstanceUID: null },
+          })
+        );
+
+        const info = _getBreastProtocolInfo(current.StudyInstanceUID);
+        if (!info) {
+          return false;
+        }
+        const displaySets = displaySetService.getActiveDisplaySets?.() || [];
+        window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+        hangingProtocolService.run(
+          { studies: [current], activeStudy: current, displaySets },
+          info.protocolId,
+          info.normalStage !== undefined ? { stageIndex: info.normalStage } : {}
+        );
+        return true;
+      } catch (e) {
+        console.warn('clearPriorComparison failed', e);
+        return false;
+      }
     },
 
     /**
@@ -761,6 +922,8 @@ const commandsModule = ({
     multimonitor: actions.multimonitor,
     promptSaveReport: actions.promptSaveReport,
     loadStudy: actions.loadStudy,
+    applyPriorComparison: actions.applyPriorComparison,
+    clearPriorComparison: actions.clearPriorComparison,
     showContextMenu: actions.showContextMenu,
     closeContextMenu: actions.closeContextMenu,
     clearMeasurements: actions.clearMeasurements,

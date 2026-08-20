@@ -174,7 +174,7 @@ function modeFactory() {
         'Magnify',
         'RectangleROI',
         'CalibrationLine',
-        'TagBrowser',
+        // 'TagBrowser', // Dicom Tag Browser hidden for BIEDX (commented, not removed)
         'AdvancedMagnify',
         'UltrasoundDirectionalTool',
         'WindowLevelRegion',

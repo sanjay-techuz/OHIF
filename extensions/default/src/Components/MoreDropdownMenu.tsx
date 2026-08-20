@@ -80,7 +80,10 @@ export default function MoreDropdownMenu(bindProps) {
   const items = customizationService.getCustomization(menuItemsKey);
 
   if (!items?.length) {
-    return null;
+    // Return a no-op COMPONENT, not null: consumers (e.g. Thumbnail) render
+    // <ThumbnailMenuItems/> unconditionally, and <null/> throws
+    // "Element type is invalid ... got: null". () => null renders nothing.
+    return () => null;
   }
 
   function BoundMoreDropdownMenu(props) {

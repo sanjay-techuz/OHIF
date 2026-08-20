@@ -39,6 +39,7 @@ import { usePositionPresentationStore, useSegmentationPresentationStore } from '
 import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
 import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import reconcileInvertLut from './utils/reconcileInvertLut';
 import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
@@ -140,6 +141,94 @@ function commandsModule({
       segmentIndex: activeSegmentIndex,
     };
   }
+
+  // Re-assert LUT/flag consistency (see reconcileInvertLut) on every READY stack
+  // viewport, retrying until viewports have decoded image data — a reset can
+  // trigger an async hanging-protocol re-run whose viewports load a tick later.
+  // The load path (CornerstoneViewportService) reconciles reloaded viewports too;
+  // this is the backstop for the direct `resetProperties()` path.
+  const resyncInvertWhenReady = (attempt = 1, maxAttempts = 5) => {
+    let sawReady = false;
+    try {
+      getRenderingEngines().forEach(re => {
+        re.getViewports().forEach((viewport: any) => {
+          if (!(viewport instanceof StackViewport)) {
+            return;
+          }
+          const dims = viewport.getImageData?.()?.dimensions;
+          if (!(Array.isArray(dims) && dims[0] > 0 && dims[1] > 0)) {
+            return; // image not decoded yet — a later retry will catch it
+          }
+          sawReady = true;
+          reconcileInvertLut(viewport);
+        });
+      });
+    } catch {
+      /* rendering engines not ready yet */
+    }
+    if (!sawReady && attempt < maxAttempts) {
+      setTimeout(() => resyncInvertWhenReady(attempt + 1, maxAttempts), 200 * attempt);
+    }
+  };
+
+  // --- MG "wrong sequence" reset fix -----------------------------------------
+  // On rare loads the MG hanging protocol drops its four views into the wrong
+  // panes (a display-set→viewport match race while the images stream in). A
+  // plain Reset does NOT correct it: re-applying the SAME stage keeps the HP
+  // service's stale per-viewport assignment. What DOES correct it is switching
+  // to a DIFFERENT-structure stage and back — the layout change forces the
+  // matcher to rebuild every assignment from scratch, and by reset time all
+  // display sets are fully loaded so the fresh match is deterministic.
+  //
+  // Hop through an intermediate stage, then snap back to the target stage. The
+  // ViewerLayout loader gate RE-ARMS on every `viewer-hp-transition` and only
+  // lifts once the FINAL stage's panes paint, so the intermediate stage is never
+  // shown. Mammo-only; every other protocol resets in one step.
+  const MAMMO_RESET_INTERMEDIATE_STAGE = 21; // intermediate stage to hop through
+  const MAMMO_RESET_HOP_MS = 60; // long enough for the intermediate layout to apply
+
+  const applyMammoResetTwoHop = (
+    protocolId: string,
+    defaultStageIndex: number,
+    afterFinal?: () => void
+  ) => {
+    // Hop 1 — intermediate stage; forces the viewport→displaySet rematch. Sent
+    // with `hold: true` so the loader gate keeps the loader up and does NOT
+    // settle on this intermediate stage (it paints fast on cached images and
+    // would otherwise flash between the two hops).
+    window.dispatchEvent(new CustomEvent('viewer-hp-transition', { detail: { hold: true } }));
+    try {
+      hangingProtocolService.setProtocol(protocolId, {
+        stageIndex: MAMMO_RESET_INTERMEDIATE_STAGE,
+      });
+    } catch (e) {
+      console.warn('mammo reset: intermediate setProtocol failed', e);
+    }
+
+    // Hop 2 — back to the real default once the intermediate has applied. The
+    // second transition keeps the loader up through the final paint.
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+      try {
+        hangingProtocolService.setProtocol(protocolId, { stageIndex: defaultStageIndex });
+      } catch (e) {
+        console.warn('mammo reset: final setProtocol failed', e);
+      }
+      resyncInvertWhenReady();
+      try {
+        commandsManager.run('setMammographyZoomConditional', {});
+      } catch {
+        /* command may not exist in non-BIEDX modes */
+      }
+      if (afterFinal) {
+        try {
+          afterFinal();
+        } catch {
+          /* non-fatal */
+        }
+      }
+    }, MAMMO_RESET_HOP_MS);
+  };
 
   const actions = {
     hydrateSecondaryDisplaySet: async ({ displaySet, viewportId }) => {
@@ -1257,12 +1346,20 @@ function commandsModule({
         // Get current properties to check what needs to be reset
         const currentProperties = viewport.getProperties();
 
+        // Reset invert to the photometric-derived default, NOT a hardcoded false.
+        // Cornerstone auto-inverts MONOCHROME1 images (e.g. mammography), so their
+        // correct default is `invert: true`; forcing false here resets them to a
+        // white background. `initialInvert` is what setStack derived from
+        // PhotometricInterpretation (true for MONOCHROME1, false otherwise).
+        const defaultInvert =
+          (viewport as unknown as { initialInvert?: boolean }).initialInvert ?? false;
+
         // Create a safe reset properties object
         const resetProperties = {
           // Reset window/level to default
           voiRange: undefined,
-          // Reset invert to false
-          invert: false,
+          // Reset invert to the modality's correct default
+          invert: defaultInvert,
           // Reset rotation to 0
           rotation: 0,
         };
@@ -1290,10 +1387,12 @@ function commandsModule({
         try {
           viewport.resetCamera();
 
-          // Try to reset properties with null-safe colormap
+          // Try to reset properties with null-safe colormap. Same rule as above:
+          // reset invert to the photometric-derived default so MONOCHROME1 images
+          // don't reset to a white background.
           const safeProperties = {
             voiRange: undefined,
-            invert: false,
+            invert: (viewport as unknown as { initialInvert?: boolean }).initialInvert ?? false,
             rotation: 0,
             colormap: { name: 'Grayscale', opacity: 1 },
           };
@@ -1309,6 +1408,17 @@ function commandsModule({
       }
     },
     resetView: () => {
+      // Drop any manual prior comparison first, so Reset returns to the plain
+      // single-study hang AND the study browser's "Compare Studies" dropdown
+      // clears. The command self-guards: it no-ops unless the user actually
+      // started a comparison, so a normal reset (and a multi-study URL load) is
+      // completely untouched.
+      try {
+        commandsManager.run('clearPriorComparison', {});
+      } catch {
+        /* command may not exist in every mode; ignore */
+      }
+
       // NARROW Reset View — only the hanging protocol snaps back to its
       // default stage; everything else (W/L, zoom, pan, annotations) is
       // left as the user has it. For the full reset behaviour (clear
@@ -1332,10 +1442,35 @@ function commandsModule({
       // `_setProtocol` defaults to `options?.stageIndex || 0`. Direct
       // setProtocol respects the stageIndex.
       try {
+        // Prefer the INITIAL protocol captured on case load (HangingProtocolDropdown).
+        // It survives custom-layout switches that swap the ACTIVE protocol to a
+        // generic single-viewport grid — so Reset always restores the modality HP
+        // (MG → RCC/LCC/RMLO/LMLO, CEM/MR → their first default stage). Falls back
+        // to the active protocol when nothing was captured.
+        const initial =
+          (typeof window !== 'undefined' && (window as any).__initialHangingProtocol) || null;
         const active = hangingProtocolService.getActiveProtocol();
-        const protocolId = active?.protocol?.id;
+        const protocolId = initial?.protocolId || active?.protocol?.id;
         if (protocolId) {
-          const defaultStageIndex = protocolId === '@ohif/hpMammo' ? 2 : 0;
+          const defaultStageIndex =
+            protocolId === '@ohif/hpMammo'
+              ? // Reset MG to the clean "All Current" 4-up (stage 2). Reset already
+                // drops any prior comparison, so we must NOT restore a captured
+                // initial stage of 0 ("All Prior and Current", an 8-pane grid): on
+                // a study whose 4 prior panes have no image it leaves a half-blank
+                // grid AND the loader waits for panes that never paint (the 10-15s
+                // freeze). Always land on the single-study 4-up.
+                2
+              : initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+                ? initial.stageIndex
+                : 0;
+          if (protocolId === '@ohif/hpMammo') {
+            // Two-hop reset so a wrong-sequence MG layout actually corrects (a
+            // same-stage reset does not). The helper handles the invert resync +
+            // MG zoom after the final hop, so return early.
+            applyMammoResetTwoHop(protocolId, defaultStageIndex);
+            return;
+          }
           hangingProtocolService.setProtocol(protocolId, {
             stageIndex: defaultStageIndex,
           });
@@ -1343,6 +1478,12 @@ function commandsModule({
       } catch (e) {
         console.warn('resetView: HP setProtocol failed', e);
       }
+
+      // Re-sync each viewport's LUT to its invert flag. The HP re-run can reuse a
+      // viewport and rebuild its LUT non-inverted while the flag stays true — that
+      // desync is what flipped a MONOCHROME1 mammogram to white. The load path
+      // reconciles reloaded viewports; this backstops the current ones.
+      resyncInvertWhenReady();
 
       // Replay BIEDX MG-zoom step (no-op for non-MG).
       try {
@@ -1353,6 +1494,14 @@ function commandsModule({
     },
 
     clearView: () => {
+      // Drop any manual prior comparison first (same reasoning as resetView):
+      // a full Clear must also reset the "Compare Studies" dropdown.
+      try {
+        commandsManager.run('clearPriorComparison', {});
+      } catch {
+        /* command may not exist in every mode; ignore */
+      }
+
       // Toolbar Clear (full reset): bring viewports back to the
       // "fresh case-open" state WITHOUT reloading the page (DICOM cache
       // preserved so large cases don't re-download).
@@ -1425,14 +1574,29 @@ function commandsModule({
       let protocolId: string | undefined;
       let defaultStageIndex = 0;
       try {
+        // Prefer the INITIAL protocol captured on case load — a custom layout
+        // swaps the ACTIVE protocol to a generic grid, so re-running the active
+        // one would leave a single viewport instead of the modality HP.
+        const initial =
+          (typeof window !== 'undefined' && (window as any).__initialHangingProtocol) || null;
         const active = hangingProtocolService.getActiveProtocol();
-        protocolId = active?.protocol?.id;
+        const activeId = active?.protocol?.id;
+        protocolId = initial?.protocolId || activeId;
         const currentStageIndex = active?.stageIndex ?? 0;
         if (protocolId) {
-          if (protocolId === '@ohif/hpMammo') {
-            defaultStageIndex = 2;
-          }
-          if (currentStageIndex !== defaultStageIndex) {
+          defaultStageIndex =
+            protocolId === '@ohif/hpMammo'
+              ? // Reset MG to the clean "All Current" 4-up (stage 2), never the
+                // captured initial stage 0 ("All Prior and Current", 8 panes) — on a
+                // study with empty prior panes that leaves a half-blank grid and the
+                // loader waits for panes that never paint (the 10-15s freeze).
+                2
+              : initial?.protocolId === protocolId && typeof initial?.stageIndex === 'number'
+                ? initial.stageIndex
+                : 0;
+          // Re-run when the active protocol/stage/layout differs from the initial
+          // (covers custom-layout switch, non-default stage, or changed pane count).
+          if (activeId !== protocolId || currentStageIndex !== defaultStageIndex) {
             needsHpRerun = true;
           } else {
             const protocol = hangingProtocolService.getProtocolById(protocolId);
@@ -1447,7 +1611,24 @@ function commandsModule({
         console.warn('clearView: layout detection failed', e);
       }
 
-      // ---- 4. Re-run HP only when custom layout or non-default stage ----
+      // ---- 4. Restore the hanging protocol ----
+      // For MG, ALWAYS do the two-hop reset — even when already on the default
+      // stage (needsHpRerun would be false) — because a wrong-sequence layout
+      // must be corrected here too, and only a different-structure hop rebuilds
+      // the assignment. The helper runs the LUT resync + MG zoom AND reloads the
+      // saved annotations after the final hop, so return early.
+      if (protocolId === '@ohif/hpMammo') {
+        applyMammoResetTwoHop(protocolId, defaultStageIndex, () => {
+          try {
+            (window as any).__reloadSavedAnnotations?.();
+          } catch {
+            /* trigger not registered — viewer not mounted; safe to ignore */
+          }
+        });
+        return;
+      }
+
+      // Non-MG: re-run only when custom layout or non-default stage.
       if (needsHpRerun && protocolId) {
         try {
           hangingProtocolService.setProtocol(protocolId, {
@@ -1458,14 +1639,21 @@ function commandsModule({
         }
       }
 
-      // ---- 5. Replay BIEDX MG-zoom step ----
+      // ---- 5. Re-sync LUT to the invert flag ----
+      // `resetProperties()` (step 2) rebuilds the LUT non-inverted but leaves the
+      // invert flag true, so a MONOCHROME1 image renders white with invert===true.
+      // Flip the LUT back to match the flag (no-op when already correct; a step-4
+      // HP re-run is also reconciled by the load path).
+      resyncInvertWhenReady();
+
+      // ---- 6. Replay BIEDX MG-zoom step ----
       try {
         commandsManager.run('setMammographyZoomConditional', {});
       } catch {
         /* command may not exist in non-BIEDX modes */
       }
 
-      // ---- 6. Re-fetch DB-saved annotations ----
+      // ---- 7. Re-fetch DB-saved annotations ----
       try {
         (window as any).__reloadSavedAnnotations?.();
       } catch {

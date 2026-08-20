@@ -1,0 +1,427 @@
+<!doctype html>
+<!--
+  @author Sanjay Balai
+  Background DICOM prefetch bridge.
+
+  Purpose: let the LMS (biedx-react, a DIFFERENT origin) prefetch a case's DICOM
+  into the *viewer's* Cache Storage WITHOUT opening a visible tab. Cache Storage
+  is origin-partitioned, so the fetching MUST happen on the OHIF origin — this
+  tiny page is loaded by the LMS inside a HIDDEN IFRAME (OHIF origin) and driven
+  over postMessage. It reuses the same service worker + cache the viewer reads,
+  so a prefetched case opens instantly later.
+
+  Deliberately a plain static page (NOT the full OHIF bundle) so the hidden
+  iframe stays light. It mirrors prefetchManager.ts in vanilla JS.
+
+  ── Message protocol (channel: 'ohif-prefetch-bridge') ─────────────────────────
+  LMS  -> bridge:
+    { channel, type:'STATUS',   requestId, studyUIDs:[uid,…] }
+    { channel, type:'PREFETCH', requestId, studies:[{ studyUID, priorUIDs?:[…] }] }
+    { channel, type:'CLEAR' }
+  bridge -> LMS:
+    { channel, type:'READY',         controlling:boolean }
+    { channel, type:'STATUS_RESULT', requestId, statusMap:{ uid:boolean } }
+    { channel, type:'PROGRESS',      requestId, studyUID, done, total }
+    { channel, type:'DONE',          requestId, studyUID, ok, error? }
+  Security: the parent (LMS) origin is passed as ?parentOrigin=… ; only messages
+  from that origin are honoured and replies go ONLY to it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Prefetch bridge</title>
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <script>
+      (function () {
+        var CHANNEL = 'ohif-prefetch-bridge';
+        var FRAME_ACCEPT = 'multipart/related; type="application/octet-stream"; transfer-syntax=*';
+        var JSON_ACCEPT = 'application/dicom+json';
+        // Shared with prefetchManager.ts + the viewer (per-study "prefetched" flag).
+        var FLAG_PREFIX = 'biedx-prefetched:';
+        var CACHE_NAME = 'biedx-dicom-prefetch';
+        var CONCURRENCY = 6;
+        // Cap on distinct studies kept in the cache. Prefetching an 11th study
+        // (or opening one past the cap in the viewer) evicts the oldest-stored
+        // study's frames — a large cache hangs the browser (5-6+ studies).
+        var MAX_STUDIES = 10;
+
+        var params = new URLSearchParams(location.search);
+        // Only accept/reply to the LMS origin that embedded us.
+        var PARENT_ORIGIN = params.get('parentOrigin') || '';
+        // DICOMweb root; overridable so the LMS can pass the viewer's exact root.
+        var WADO_ROOT = (params.get('wadoRoot') || '/pacs/dicom-web').replace(/\/$/, '');
+
+        function postToParent(msg) {
+          msg.channel = CHANNEL;
+          if (window.parent && PARENT_ORIGIN) {
+            window.parent.postMessage(msg, PARENT_ORIGIN);
+          }
+        }
+
+        // ---- store-time flags (per study, value = ms epoch it was cached) -----
+        function flagTs(uid) {
+          try {
+            var v = localStorage.getItem(FLAG_PREFIX + uid);
+            return v ? parseInt(v, 10) || 0 : 0;
+          } catch (e) {
+            return 0;
+          }
+        }
+        function markPrefetched(uid) {
+          // (re)stamp store-time = now → marks this study most-recently used.
+          try {
+            localStorage.setItem(FLAG_PREFIX + uid, String(Date.now()));
+          } catch (e) {
+            /* ignore quota on the flag */
+          }
+        }
+        function setFlagIfAbsent(uid) {
+          // First time we SEE a study in the cache that we didn't prefetch (it was
+          // cached by opening the case in the viewer) → record its store-time.
+          try {
+            if (!localStorage.getItem(FLAG_PREFIX + uid)) {
+              localStorage.setItem(FLAG_PREFIX + uid, String(Date.now()));
+            }
+          } catch (e) {}
+        }
+        function removeFlag(uid) {
+          try {
+            localStorage.removeItem(FLAG_PREFIX + uid);
+          } catch (e) {}
+        }
+
+        // ---- cache introspection + LRU cap ------------------------------------
+        // The StudyInstanceUID is embedded in every WADO-RS frame URL as
+        // /studies/{uid}/… so the cache itself is the source of truth for which
+        // studies are cached — whether via prefetch OR by opening a case in the
+        // viewer (both flow through the same service worker + cache).
+        function studyUidFromUrl(url) {
+          var m = /\/studies\/([^/?#]+)/.exec(url || '');
+          return m ? m[1] : null;
+        }
+        async function listCachedStudyUids() {
+          var set = new Set();
+          try {
+            var cache = await caches.open(CACHE_NAME);
+            var reqs = await cache.keys();
+            for (var i = 0; i < reqs.length; i++) {
+              var uid = studyUidFromUrl(reqs[i].url);
+              if (uid) {
+                set.add(uid);
+              }
+            }
+          } catch (e) {}
+          return set;
+        }
+        async function deleteStudyFromCache(uid) {
+          try {
+            var cache = await caches.open(CACHE_NAME);
+            var reqs = await cache.keys();
+            for (var i = 0; i < reqs.length; i++) {
+              if (studyUidFromUrl(reqs[i].url) === uid) {
+                await cache.delete(reqs[i]);
+              }
+            }
+          } catch (e) {}
+          removeFlag(uid);
+        }
+        // Reconcile the store-time flags with the REAL cache, then enforce the
+        // MAX_STUDIES cap by evicting the oldest-stored studies. Returns the Set
+        // of studies that remain cached AFTER any eviction. Runs on every STATUS
+        // and after each prefetch, so the cache never exceeds the cap no matter
+        // how a study got in (prefetch or viewer-open).
+        async function reconcileAndEnforceCap() {
+          var present = await listCachedStudyUids();
+          // Register any study cached outside prefetch (opened via View) so it
+          // gets a store-time and shows as "prefetched" in the curriculum.
+          present.forEach(function (uid) {
+            setFlagIfAbsent(uid);
+          });
+          // Drop stale flags for studies the browser itself evicted from cache.
+          try {
+            for (var i = localStorage.length - 1; i >= 0; i--) {
+              var key = localStorage.key(i);
+              if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                var fUid = key.slice(FLAG_PREFIX.length);
+                if (!present.has(fUid)) {
+                  localStorage.removeItem(key);
+                }
+              }
+            }
+          } catch (e) {}
+          // Evict oldest-stored studies until we are within the cap.
+          if (present.size > MAX_STUDIES) {
+            var arr = [];
+            present.forEach(function (uid) {
+              arr.push({ uid: uid, ts: flagTs(uid) });
+            });
+            arr.sort(function (a, b) {
+              return a.ts - b.ts; // oldest first
+            });
+            var toEvict = present.size - MAX_STUDIES;
+            for (var k = 0; k < toEvict; k++) {
+              await deleteStudyFromCache(arr[k].uid);
+              present.delete(arr[k].uid);
+            }
+          }
+          return present;
+        }
+
+        // ---- QIDO/WADO helpers -------------------------------------------------
+        function dicomJsonValue(obj, tag) {
+          var v = obj && obj[tag] && obj[tag].Value && obj[tag].Value[0];
+          return v === undefined || v === null ? undefined : String(v);
+        }
+
+        // Every per-frame WADO-RS URL for a study (series -> instances -> frames).
+        async function enumerateFrameUrls(studyUid) {
+          var urls = [];
+          var seriesRes = await fetch(WADO_ROOT + '/studies/' + studyUid + '/series', {
+            headers: { Accept: JSON_ACCEPT },
+            credentials: 'same-origin',
+          });
+          if (!seriesRes.ok) {
+            throw new Error('series query failed (' + seriesRes.status + ')');
+          }
+          var seriesList = await seriesRes.json();
+          for (var i = 0; i < (seriesList || []).length; i++) {
+            var seriesUid = dicomJsonValue(seriesList[i], '0020000E');
+            if (!seriesUid) {
+              continue;
+            }
+            var instRes = await fetch(
+              WADO_ROOT + '/studies/' + studyUid + '/series/' + seriesUid + '/instances',
+              { headers: { Accept: JSON_ACCEPT }, credentials: 'same-origin' }
+            );
+            if (!instRes.ok) {
+              continue;
+            }
+            var instances = await instRes.json();
+            for (var j = 0; j < (instances || []).length; j++) {
+              var sopUid = dicomJsonValue(instances[j], '00080018');
+              if (!sopUid) {
+                continue;
+              }
+              var numFrames = parseInt(dicomJsonValue(instances[j], '00280008') || '1', 10) || 1;
+              var base =
+                WADO_ROOT + '/studies/' + studyUid + '/series/' + seriesUid + '/instances/' + sopUid + '/frames/';
+              for (var f = 1; f <= numFrames; f++) {
+                urls.push(base + f);
+              }
+            }
+          }
+          return urls;
+        }
+
+        // Fetch one frame (through the SW -> cached), retrying transient failures.
+        async function fetchFrameWithRetry(url, attempts) {
+          attempts = attempts || 3;
+          for (var i = 0; i < attempts; i++) {
+            try {
+              var res = await fetch(url, { headers: { Accept: FRAME_ACCEPT }, credentials: 'same-origin' });
+              if (res.ok) {
+                await res.arrayBuffer(); // drain so the SW's cache.put completes
+                return true;
+              }
+            } catch (e) {
+              /* network blip — retry */
+            }
+            if (i < attempts - 1) {
+              await new Promise(function (r) {
+                setTimeout(r, 300 * (i + 1));
+              });
+            }
+          }
+          return false;
+        }
+
+        async function runWithConcurrency(items, limit, worker) {
+          var cursor = 0;
+          var runners = [];
+          var n = Math.min(limit, items.length);
+          for (var k = 0; k < n; k++) {
+            runners.push(
+              (async function () {
+                while (cursor < items.length) {
+                  var idx = cursor++;
+                  await worker(items[idx]);
+                }
+              })()
+            );
+          }
+          await Promise.all(runners);
+        }
+
+        // ---- service worker ----------------------------------------------------
+        async function ensureController() {
+          if (!('serviceWorker' in navigator)) {
+            return false;
+          }
+          try {
+            await navigator.serviceWorker.ready;
+            if (navigator.serviceWorker.controller) {
+              return true;
+            }
+            await new Promise(function (resolve) {
+              var timer = setTimeout(resolve, 3000);
+              navigator.serviceWorker.addEventListener(
+                'controllerchange',
+                function () {
+                  clearTimeout(timer);
+                  resolve();
+                },
+                { once: true }
+              );
+            });
+            return !!navigator.serviceWorker.controller;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        // ---- prefetch one CASE (primary study + priors) ------------------------
+        async function prefetchCase(requestId, studyUID, priorUIDs) {
+          var uids = [studyUID].concat(priorUIDs || []).filter(Boolean);
+          var allUrls = [];
+          try {
+            for (var i = 0; i < uids.length; i++) {
+              var urls = await enumerateFrameUrls(uids[i]);
+              allUrls = allUrls.concat(urls);
+            }
+          } catch (e) {
+            postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: false, error: (e && e.message) || 'enumerate failed' });
+            return;
+          }
+          var total = allUrls.length;
+          var done = 0;
+          var failed = 0;
+          postToParent({ type: 'PROGRESS', requestId: requestId, studyUID: studyUID, done: 0, total: total });
+
+          await runWithConcurrency(allUrls, CONCURRENCY, async function (url) {
+            var ok = await fetchFrameWithRetry(url);
+            if (!ok) {
+              failed++;
+            }
+            done++;
+            postToParent({ type: 'PROGRESS', requestId: requestId, studyUID: studyUID, done: done, total: total });
+          });
+
+          if (failed === 0 && total > 0) {
+            // Stamp every study in the case (primary + priors) as most-recently
+            // stored, then enforce the cap — prefetching the 11th study evicts
+            // the oldest. Done AFTER caching so the fresh study is never evicted.
+            uids.forEach(function (u) {
+              markPrefetched(u);
+            });
+            await reconcileAndEnforceCap();
+            postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: true });
+          } else {
+            postToParent({
+              type: 'DONE',
+              requestId: requestId,
+              studyUID: studyUID,
+              ok: false,
+              error: total === 0 ? 'no frames found' : failed + '/' + total + ' frame(s) failed',
+            });
+          }
+        }
+
+        // ---- command handling --------------------------------------------------
+        var busy = false;
+        async function handleCommand(cmd) {
+          if (cmd.type === 'STATUS') {
+            // Truth = the real cache contents (reconciled + capped), so a case
+            // opened via View shows as prefetched too, and the cap is enforced.
+            var presentStatus = await reconcileAndEnforceCap();
+            var map = {};
+            (cmd.studyUIDs || []).forEach(function (uid) {
+              map[uid] = presentStatus.has(uid);
+            });
+            postToParent({ type: 'STATUS_RESULT', requestId: cmd.requestId, statusMap: map });
+            return;
+          }
+          if (cmd.type === 'CLEAR') {
+            var clearUids = cmd.studyUIDs;
+            if (clearUids && clearUids.length) {
+              // Scoped clear: only the given studies (e.g. one module's cases).
+              // deleteStudyFromCache also removes each study's store-time flag.
+              for (var ci = 0; ci < clearUids.length; ci++) {
+                await deleteStudyFromCache(clearUids[ci]);
+              }
+            } else {
+              // Full clear: whole cache + all flags.
+              try {
+                await caches.delete(CACHE_NAME);
+              } catch (e) {}
+              try {
+                for (var i = localStorage.length - 1; i >= 0; i--) {
+                  var key = localStorage.key(i);
+                  if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                    localStorage.removeItem(key);
+                  }
+                }
+              } catch (e) {}
+            }
+            postToParent({ type: 'DONE', requestId: cmd.requestId, studyUID: null, ok: true });
+            return;
+          }
+          if (cmd.type === 'PREFETCH') {
+            // Serialize prefetch runs so concurrent clicks don't thrash the network.
+            while (busy) {
+              await new Promise(function (r) {
+                setTimeout(r, 150);
+              });
+            }
+            busy = true;
+            try {
+              var controlling = await ensureController();
+              if (!controlling) {
+                // No controlling SW -> fetches won't cache. Report failure so the
+                // LMS doesn't show a false "Prefetched".
+                (cmd.studies || []).forEach(function (s) {
+                  postToParent({ type: 'DONE', requestId: cmd.requestId, studyUID: s.studyUID, ok: false, error: 'service worker not controlling' });
+                });
+                return;
+              }
+              var studies = cmd.studies || [];
+              for (var s = 0; s < studies.length; s++) {
+                await prefetchCase(cmd.requestId, studies[s].studyUID, studies[s].priorUIDs);
+              }
+            } finally {
+              busy = false;
+            }
+          }
+        }
+
+        window.addEventListener('message', function (e) {
+          if (PARENT_ORIGIN && e.origin !== PARENT_ORIGIN) {
+            return; // only the LMS origin may command the bridge
+          }
+          var data = e.data || {};
+          if (data.channel !== CHANNEL) {
+            return;
+          }
+          if (data.type === 'STATUS' || data.type === 'PREFETCH' || data.type === 'CLEAR') {
+            handleCommand(data);
+          }
+        });
+
+        // Register the viewer's SW (same origin) then announce readiness.
+        (async function boot() {
+          var controlling = false;
+          try {
+            if ('serviceWorker' in navigator) {
+              await navigator.serviceWorker.register('/sw.js');
+              controlling = await ensureController();
+            }
+          } catch (e) {
+            /* ignore — READY will report controlling:false */
+          }
+          postToParent({ type: 'READY', controlling: controlling });
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -50,6 +50,24 @@ const standardViewBonusRule = {
   },
 };
 
+// Primary view discriminator — the exact clinical view (RCC/LCC/RMLO/LMLO)
+// resolved by the SAME logic the overlay uses (ViewPosition + ImageLaterality +
+// fallbacks; see mammoView.ts / getViewLabel.ts). The old rules told CC from MLO
+// only via `ViewCode` (ViewCodeSequence), which is absent on many anonymized
+// teaching cases — so the matcher fell back to laterality + SeriesDescription
+// and could drop e.g. RMLO into the RCC pane (the rare "wrong sequence" bug).
+//
+// Weight is set ABOVE the sum of every other rule for a pane (laterality 25 +
+// SeriesDescription 20 + standard-view bonus 15 = 60) so the correct view always
+// wins its own pane. `required: false` so it never EXCLUDES a display set: if the
+// view can't be derived it simply degrades to the weighted rules below.
+const mammoViewRule = (view: string) => ({
+  weight: 100,
+  attribute: 'MammoView',
+  required: false,
+  constraint: { equals: view },
+});
+
 // A single DBT acquisition emits several display sets that ALL share the Breast
 // Tomosynthesis SOP Class (1.2.840.10008.5.1.4.1.1.13.1.3): the real
 // reconstructed volume (ImageType ...\TOMOSYNTHESIS\NONE, multi-frame), MIP
@@ -85,6 +103,7 @@ const tomoVolumeBonusRules = [
 ];
 
 const LCCSeriesMatchingRules = [
+  mammoViewRule('LCC'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -120,6 +139,7 @@ const LCCSeriesMatchingRules = [
 ];
 
 const RCCSeriesMatchingRules = [
+  mammoViewRule('RCC'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -161,6 +181,7 @@ const RCCSeriesMatchingRules = [
 ];
 
 const LMLOSeriesMatchingRules = [
+  mammoViewRule('LMLO'),
   {
     weight: 10,
     attribute: 'ViewCode',
@@ -203,6 +224,7 @@ const LMLOSeriesMatchingRules = [
 ];
 
 const RMLOSeriesMatchingRules = [
+  mammoViewRule('RMLO'),
   {
     weight: 10,
     attribute: 'ViewCode',

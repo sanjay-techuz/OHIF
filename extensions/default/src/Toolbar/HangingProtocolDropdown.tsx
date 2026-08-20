@@ -1,6 +1,6 @@
 import { CommandsManager, ServicesManager } from '@ohif/core';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@ohif/ui-next';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUIStateStore } from '../stores/useUIStateStore';
 import HPALL from '../../assets/images/HP-ALL.png';
 import LCCLMLO from '../../assets/images/LCC-LMLO.png';
@@ -27,6 +27,15 @@ import HPRLMOMBOTTOM from '../../assets/images/RL-MLO-BOTTOM.png';
 import HPRLMOMCENTER from '../../assets/images/RL-MLO-CENTER.png';
 import HPRLMLOTOP from '../../assets/images/RL-MLO-TOP.png';
 
+// CEM (Contrast-Enhanced Mammography) hanging-protocol icons.
+import HP_CEM_ALL from '../../assets/images/HP-CEM-ALL.png';
+import HP_CEM_LE_ALL from '../../assets/images/HP-CEM-LE-ALL.png';
+import HP_CEM_ALL_RE from '../../assets/images/HP-CEM-ALL-RE.png';
+import HP_CEM_RCC from '../../assets/images/HP-CEM-RCC-LE-RE.png';
+import HP_CEM_LCC from '../../assets/images/HP-CEM-LCC-LE-RE.png';
+import HP_CEM_RMLO from '../../assets/images/HP-CEM-RMLO-LE-RE.png';
+import HP_CEM_LMLO from '../../assets/images/HP-CEM-LMLO-LE-RE.png';
+
 interface HangingProtocolDropdownProps {
   id: string;
   options: {
@@ -45,13 +54,18 @@ interface HangingProtocolDropdownProps {
 // pure-cosmetic upgrade and can be swapped in without touching this
 // stage mapping.
 const CEM_HANGING_PROTOCOLS = [
-  { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HPALL },
-  { label: 'All Low-Energy', stageIndex: 1, icon: HPALL },
-  { label: 'All Recombined', stageIndex: 2, icon: HPALL },
-  { label: 'R CC: LE vs Recombined', stageIndex: 3, icon: RLCC },
-  { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: RLCC },
-  { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: RLMLO },
-  { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: RLMLO },
+  // Prior/Current recombined comparison (stage 7 in hpCEM). Listed FIRST so that
+  // when a prior is present it becomes the default selected entry (mirrors MG's
+  // 'All Prior and Current' being first). Filtered out entirely when there's no
+  // prior (requiresPrior), so no-prior CEM falls back to 'Paired' as the default.
+  { label: 'Prior/Current Recombined', stageIndex: 7, icon: HP_CEM_ALL_RE, requiresPrior: true },
+  { label: 'Paired LE/Recombined (All)', stageIndex: 0, icon: HP_CEM_ALL },
+  { label: 'All Low-Energy', stageIndex: 1, icon: HP_CEM_LE_ALL },
+  { label: 'All Recombined', stageIndex: 2, icon: HP_CEM_ALL_RE },
+  { label: 'R CC: LE vs Recombined', stageIndex: 3, icon: HP_CEM_RCC },
+  { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: HP_CEM_LCC },
+  { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: HP_CEM_RMLO },
+  { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: HP_CEM_LMLO },
 ];
 
 // Unified array with ALL hanging protocols (used for both dropdown and navigation)
@@ -98,6 +112,15 @@ const runHangingProtocol = (
   commandsManager.run({ commandName: 'setHangingProtocol', commandOptions });
 };
 
+// Settle window for the MG auto-apply: the protocol is applied only after no
+// new/changed display set has arrived for this long, so the study's display-set
+// stream has quiesced (every view exists) before the matcher runs. All four MG
+// views live in ONE series that OHIF splits into per-image display sets as the
+// instances stream in — if the matcher runs mid-stream, a not-yet-created view
+// (e.g. RCC) is missing and its pane grabs the next-best same-laterality series
+// (RMLO), which is the rare/random "wrong sequence" you can hit on some loads.
+const MAMMO_HP_SETTLE_MS = 750;
+
 const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   commandsManager,
   servicesManager,
@@ -125,15 +148,16 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const modalitySlug = useUIStateStore(s => s.uiState.modalitySlug as string | null | undefined);
   const isCEM = useMemo(() => {
     if ((modalitySlug || '').toUpperCase() === 'CEM') return true;
+    // Vendor-agnostic CEM contrast tag: RECOMBINED (Hologic) / SUBTRACTION (GE "DES") / IODINE / CESM.
+    const CEM_TOKENS = ['RECOMBINED', 'SUBTRACTION', 'IODINE', 'CESM'];
     return activeDisplaySets.some(ds => {
       const imageType = (ds as { ImageType?: unknown }).ImageType;
-      if (Array.isArray(imageType)) {
-        return imageType.some(v => typeof v === 'string' && v.toUpperCase() === 'RECOMBINED');
-      }
-      if (typeof imageType === 'string') {
-        return imageType.toUpperCase().includes('RECOMBINED');
-      }
-      return false;
+      const flat = Array.isArray(imageType)
+        ? imageType.join('|').toUpperCase()
+        : typeof imageType === 'string'
+          ? imageType.toUpperCase()
+          : '';
+      return CEM_TOKENS.some(t => flat.includes(t));
     });
   }, [modalitySlug, activeDisplaySets]);
 
@@ -229,8 +253,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   // Unified array for both dropdown and navigation - filter based on prior/DBT availability
   const allHangingProtocols = useMemo(() => {
     if (isCEM) {
-      // CEM has no prior or DBT stages — return its fixed 7-stage list.
-      return CEM_HANGING_PROTOCOLS;
+      // CEM: 7 base stages + an optional Prior/Current stage that only shows
+      // when the user has picked a study to compare.
+      return CEM_HANGING_PROTOCOLS.filter(protocol => !(protocol.requiresPrior && !hasPrior));
     }
     return ALL_HANGING_PROTOCOLS.filter(protocol => {
       // Filter out prior-only stages if no prior exists
@@ -247,26 +272,126 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const [selected, setSelected] = useState(allHangingProtocols[0]?.stageIndex ?? 2);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
+  // One-shot guard for the MG auto-apply. It MUST be a ref (not a closure
+  // local or state) so it survives the effect re-running: the auto-apply
+  // effect below re-runs whenever prior-detection or DBT-detection changes,
+  // and a closure-local flag would reset to false each time — re-applying the
+  // protocol mid-session and clobbering the user's manual layout/drag. A ref
+  // keeps "apply exactly once per mounted study" truly once.
+  const mammoHpAppliedRef = useRef(false);
+
   // Auto-apply mammography hanging protocol — guarded by !isCEM because
   // CEM display sets ALSO have Modality === 'MG' but need their own
   // protocol (see CEM auto-apply below).
+  //
+  // The protocol matches views to panes by a weighted score. If it runs while
+  // only SOME views' display sets have been created, a same-laterality
+  // wrong-view series can out-score an absent view and win its pane (e.g. RMLO
+  // landing in the RCC pane). The previous fixed 250ms timer gave no guarantee
+  // all four views existed by then, and — because its `applied` flag was a
+  // closure local — the effect re-ran whenever prior/DBT detection changed
+  // `allHangingProtocols`, resetting the flag and RE-APPLYING the protocol
+  // mid-session: that both re-triggered the match race and clobbered a user's
+  // manual drag ("RCC viewport shows LMLO; dragging RCC in doesn't stick").
+  // Reloading the case (warm cache, everything settles at once) made it look
+  // fixed — the classic timing-bug signature.
+  //
+  // Fix, two parts working together:
+  //   1) Deterministic matching — the `MammoView` custom attribute (weight 100,
+  //      derived from the SAME ViewPosition/laterality source as the overlay)
+  //      pins each standard view to its own pane regardless of load order.
+  //   2) Debounce + a REF-backed one-shot guard here: apply exactly once, only
+  //      after the DISPLAY_SETS_ADDED stream has been quiet for the settle
+  //      window (all views present). The ref survives effect re-runs, so
+  //      prior/DBT detection can no longer retrigger a second apply, and later
+  //      user interactions (stage change, drag-drop) are never disturbed.
+  // `allHangingProtocols` is intentionally NOT a dependency — its identity
+  // churns as prior/DBT are detected, which is exactly what used to re-fire
+  // this effect. The default stage is the canonical "All Current" 4-up (2).
   useEffect(() => {
-    if (isMammo && !isCEM) {
-      setTimeout(() => {
-        runHangingProtocol(commandsManager, {
-          protocolId: '@ohif/hpMammo',
-          stageIndex: allHangingProtocols[0]?.stageIndex ?? 2,
-        });
-        // Apply zoom immediately after hanging protocol change
-        setTimeout(() => {
-          commandsManager.run({
-            commandName: 'setMammographyZoomConditional',
-            commandOptions: {},
-          });
-        }, 100);
-      }, 250);
+    if (!isMammo || isCEM || mammoHpAppliedRef.current) {
+      return;
     }
-  }, [isMammo, isCEM, allHangingProtocols, commandsManager]);
+
+    let settleTimer: ReturnType<typeof setTimeout>;
+
+    const applyMammoProtocol = () => {
+      if (mammoHpAppliedRef.current) {
+        return;
+      }
+      // Don't apply until there is at least one MG display set to hang. If the
+      // settle timer fired before any MG series materialised, bail WITHOUT
+      // marking applied — the next DISPLAY_SETS event reschedules us.
+      const active = displaySetService.getActiveDisplaySets?.() || [];
+      if (!active.some((ds: any) => ds.Modality === 'MG')) {
+        return;
+      }
+      mammoHpAppliedRef.current = true;
+
+      // Apply on a STABLE, COMPLETE load via reset:true. This makes the
+      // setHangingProtocol command:
+      //   1. re-fetch getActiveDisplaySets() NOW, so the matcher sees every
+      //      view that has been created (fixes the mid-stream race where a
+      //      not-yet-created RCC left its pane to a wrong same-laterality view),
+      //   2. bypass the cached viewportGridState, so a layout that was cached
+      //      from an earlier partial/among-attempts load is never restored
+      //      (this is why it looked fine 2-3 times then wrong the 4th), and
+      //   3. run with NO explicit stage, so the gated stageActivation in
+      //      hpMammo.ts chooses the correct default — stage 2 "All Current"
+      //      when there is no prior, stage 0 when a prior exists.
+      window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+      commandsManager.run({
+        commandName: 'setHangingProtocol',
+        commandOptions: { protocolId: '@ohif/hpMammo', reset: true },
+      });
+
+      // Record the stage the gate actually chose so Reset/Clear can snap back
+      // to it, then apply the mammography zoom.
+      setTimeout(() => {
+        const stageIndex = hangingProtocolService?.getState?.()?.stageIndex ?? 2;
+        (window as any).__initialHangingProtocol = {
+          protocolId: '@ohif/hpMammo',
+          stageIndex,
+        };
+        commandsManager.run({
+          commandName: 'setMammographyZoomConditional',
+          commandOptions: {},
+        });
+      }, 100);
+    };
+
+    const scheduleApply = () => {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(applyMammoProtocol, MAMMO_HP_SETTLE_MS);
+    };
+
+    scheduleApply();
+    // Re-arm the settle timer on BOTH added and changed events: the per-image
+    // MG display sets can arrive (added) or be re-sorted/updated (changed) in
+    // several bursts, and we want to wait until that stream goes quiet.
+    const addedSub = displaySetService.subscribe(
+      displaySetService.EVENTS.DISPLAY_SETS_ADDED,
+      () => {
+        if (!mammoHpAppliedRef.current) {
+          scheduleApply();
+        }
+      }
+    );
+    const changedSub = displaySetService.subscribe(
+      displaySetService.EVENTS.DISPLAY_SETS_CHANGED,
+      () => {
+        if (!mammoHpAppliedRef.current) {
+          scheduleApply();
+        }
+      }
+    );
+
+    return () => {
+      clearTimeout(settleTimer);
+      addedSub.unsubscribe();
+      changedSub.unsubscribe();
+    };
+  }, [isMammo, isCEM, commandsManager, displaySetService, hangingProtocolService]);
 
   // Auto-apply CEM hanging protocol when the study is CEM (slug-tagged
   // or contains a RECOMBINED display set). Same 1s delay precedent as
@@ -281,6 +406,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       return;
     }
     const timeoutId = setTimeout(() => {
+      (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpCEM', stageIndex: 0 };
       runHangingProtocol(commandsManager, {
         protocolId: '@ohif/hpCEM',
         stageIndex: 0,
@@ -293,7 +419,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
           commandOptions: {},
         });
       }, 100);
-    }, 250);
+    }, 2000);
     return () => clearTimeout(timeoutId);
   }, [isCEM, commandsManager, hangingProtocolService]);
 
@@ -311,6 +437,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
 
     // Apply MRI hanging protocol when MR display sets are detected
     const timeoutId = setTimeout(() => {
+      (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpMR', stageIndex: 0 };
       runHangingProtocol(commandsManager, {
         protocolId: '@ohif/hpMR',
         stageIndex: 0, // Default stage (2x3 grid)
@@ -345,6 +472,12 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     const { unsubscribe } = hangingProtocolService.subscribe(
       hangingProtocolService.EVENTS.PROTOCOL_CHANGED,
       (payload: any) => {
+        // A manual prior comparison (applied/cleared from the study browser)
+        // re-runs the protocol with 2 studies / 1 study. This is the canonical
+        // signal that the prior-aware stages should appear or disappear from the
+        // dropdown — the mount-time `checkForPrior` can't see a later comparison.
+        setHasPrior((hangingProtocolService.studies?.length || 0) > 1);
+
         const stageIdx = payload?.stageIdx;
         if (typeof stageIdx !== 'number') {
           return;

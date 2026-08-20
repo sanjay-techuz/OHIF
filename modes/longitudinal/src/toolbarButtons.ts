@@ -187,7 +187,7 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-reset',
-      label: 'Reset View',
+      label: 'Restore View',
       tooltip: 'Reset hanging protocol to default stage',
       commands: 'resetView',
       evaluate: 'evaluate.action',
@@ -198,8 +198,8 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-seg-eraser',
-      label: 'Clear',
-      tooltip: 'Clear annotations + reset everything (full reset)',
+      label: 'Reset Image',
+      tooltip: 'Restores the image to its default display settings and removes all user edits',
       commands: 'clearView',
       evaluate: 'evaluate.action',
     },
@@ -229,6 +229,23 @@ const toolbarButtons: Button[] = [
       label: 'Flip Horizontal',
       tooltip: 'Flip Horizontally',
       commands: 'flipViewportHorizontal',
+      evaluate: [
+        'evaluate.viewportProperties.toggle',
+        {
+          name: 'evaluate.viewport.supported',
+          unsupportedViewportTypes: ['video', 'volume3d'],
+        },
+      ],
+    },
+  },
+  {
+    id: 'flipVertical',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-flip-vertical',
+      label: 'Flip Vertical',
+      tooltip: 'Flip Vertically',
+      commands: 'flipViewportVertical',
       evaluate: [
         'evaluate.viewportProperties.toggle',
         {
@@ -386,9 +403,9 @@ const toolbarButtons: Button[] = [
     id: 'Magnify',
     uiType: 'ohif.toolButton',
     props: {
-      icon: 'tool-magnify',
-      label: 'Zoom-in',
-      tooltip: 'Zoom-in',
+      icon: 'icon-tool-loupe',
+      label: 'Magnify Probe',
+      tooltip: 'Magnify Probe',
       commands: setToolActiveToolbar,
       evaluate: [
         'evaluate.cornerstoneTool',
@@ -482,8 +499,8 @@ const toolbarButtons: Button[] = [
     uiType: 'ohif.toolButton',
     props: {
       icon: 'tool-length',
-      label: 'Length',
-      tooltip: 'Length Tool',
+      label: 'Measurement',
+      tooltip: 'Measurement Tool',
       commands: setToolActiveToolbar,
       evaluate: 'evaluate.cornerstoneTool',
     },

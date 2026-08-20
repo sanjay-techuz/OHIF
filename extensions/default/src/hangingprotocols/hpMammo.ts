@@ -121,6 +121,21 @@ const hpMammography = {
     // New: All Prior and Current (2x4 grid) stage-0
     {
       name: 'All Prior and Current',
+      // Only make this the auto-selected default when a PRIOR study is actually
+      // present. Without this gate, `_updateStageStatus` marks the stage
+      // "enabled" as soon as the 4 CURRENT viewports match (a no-prior study),
+      // and `_findStageIndex` returns the first enabled stage — so every MG
+      // study opened here (8-viewport grid with 4 empty prior panes) instead of
+      // the 4-up "All Current" (stage 2). The 8 viewports are 4 current + 4
+      // prior, so requiring >4 matches means "at least one prior view exists".
+      // When no prior, the stage becomes 'passive' (still manually selectable
+      // from the dropdown) and OHIF falls through to stage 2. Mirrors the
+      // stageActivation pattern used by hpCompare.ts.
+      stageActivation: {
+        enabled: {
+          minViewportsMatched: 5,
+        },
+      },
       viewportStructure: {
         type: 'grid',
         layoutType: 'grid',
@@ -192,6 +207,15 @@ const hpMammography = {
     // Compare CC current/prior top/bottom stage-1
     {
       name: 'CC compare',
+      // Same prior gate as stage 0. This stage is 4 viewports (2 current CC + 2
+      // prior CC); require >2 matches so it only auto-selects when a prior CC
+      // exists. Otherwise it would become the default for no-prior studies
+      // (stage 1 precedes stage 2 in the first-enabled search).
+      stageActivation: {
+        enabled: {
+          minViewportsMatched: 3,
+        },
+      },
       viewportStructure: {
         type: 'grid',
         layoutType: 'grid',

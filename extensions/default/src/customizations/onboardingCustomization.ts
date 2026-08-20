@@ -107,34 +107,6 @@ export default {
           beforeShowPromise: () => waitForElement('.viewport-element'),
         },
         {
-          id: 'trackMeasurement',
-          title: 'Tracking Measurements in the Panel',
-          text: 'Click yes to track the measurements in the measurement panel.',
-          attachTo: {
-            element: '[data-cy="prompt-begin-tracking-yes-btn"]',
-            on: 'bottom',
-          },
-          advanceOn: {
-            selector: '[data-cy="prompt-begin-tracking-yes-btn"]',
-            event: 'click',
-          },
-          beforeShowPromise: () => waitForElement('[data-cy="prompt-begin-tracking-yes-btn"]'),
-        },
-        {
-          id: 'openMeasurementPanel',
-          title: 'Opening the Measurements Panel',
-          text: 'Click the measurements button to open the measurements panel.',
-          attachTo: {
-            element: '#trackedMeasurements-btn',
-            on: 'left-start',
-          },
-          advanceOn: {
-            selector: '#trackedMeasurements-btn',
-            event: 'click',
-          },
-          beforeShowPromise: () => waitForElement('#trackedMeasurements-btn'),
-        },
-        {
           id: 'scrollAwayFromMeasurement',
           title: 'Scrolling Away from a Measurement',
           text: 'Scroll the images using the mouse wheel away from the measurement.',
@@ -147,20 +119,6 @@ export default {
             event: 'CORNERSTONE_TOOLS_MOUSE_WHEEL',
           },
           beforeShowPromise: () => waitForElement('.viewport-element'),
-        },
-        {
-          id: 'jumpToMeasurement',
-          title: 'Jumping to Measurements in the Panel',
-          text: 'Click the measurement in the measurement panel to jump to it.',
-          attachTo: {
-            element: '[data-cy="data-row"]',
-            on: 'left-start',
-          },
-          advanceOn: {
-            selector: '[data-cy="data-row"]',
-            event: 'click',
-          },
-          beforeShowPromise: () => waitForElement('[data-cy="data-row"]'),
         },
         {
           id: 'changeLayout',
@@ -194,9 +152,41 @@ export default {
       tourOptions: {
         useModalOverlay: true,
         defaultStepOptions: {
+          // Every step keeps its `advanceOn` action (performing the gesture
+          // still moves the tour along), but Back/Next make the tour READABLE
+          // without forcing the user to perform every gesture in order.
+          // `this` is the Tour instance inside a button action.
+          // Footer reads as pagination:  ‹  10/12  ›            Skip all
+          // The arrows and the step counter are grouped left (ordering is done
+          // in Onboarding.css, since Shepherd appends the counter last), and
+          // "Skip all" sits on the right in pink. All three are `secondary` so
+          // none of them picks up the default filled-button style; the skip
+          // button is coloured via its own class.
           buttons: [
             {
+              text: '‹',
+              classes: 'shepherd-nav-btn shepherd-nav-prev',
+              action() {
+                // Shepherd's back() on the first step would try to show step -1.
+                const index = this.steps.indexOf(this.getCurrentStep());
+                if (index > 0) {
+                  this.back();
+                }
+              },
+              secondary: true,
+            },
+            {
+              text: '›',
+              classes: 'shepherd-nav-btn shepherd-nav-next',
+              action() {
+                // next() completes the tour when called on the last step.
+                this.next();
+              },
+              secondary: true,
+            },
+            {
               text: 'Skip all',
+              classes: 'shepherd-skip-btn',
               action() {
                 this.complete();
               },

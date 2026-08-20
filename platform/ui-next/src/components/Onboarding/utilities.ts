@@ -37,17 +37,36 @@ const markTourAsShown = (tourId: string) => {
  */
 const defaultShowHandler = (Shepherd: ShepherdBase) => {
   const currentStep = Shepherd.activeTour?.getCurrentStep();
-  if (currentStep) {
-    const progress = document.createElement('span');
-    progress.className = 'shepherd-progress text-lg text-muted-foreground';
-    progress.innerText = `${Shepherd.activeTour?.steps.indexOf(currentStep) + 1}/${Shepherd.activeTour?.steps.length}`;
-    progress.style.position = 'absolute';
-    progress.style.left = '13px';
-    progress.style.bottom = '20px';
-    progress.style.zIndex = '1';
+  if (!currentStep) {
+    return;
+  }
 
-    const footer = currentStep?.getElement()?.querySelector('.shepherd-footer');
-    footer?.appendChild(progress);
+  const steps = Shepherd.activeTour?.steps || [];
+  const index = steps.indexOf(currentStep);
+  const element = currentStep.getElement();
+  const footer = element?.querySelector('.shepherd-footer');
+
+  if (footer) {
+    // A step can be shown MORE THAN ONCE now that the tour has a Back arrow, so
+    // drop any counter left over from a previous visit before appending —
+    // otherwise the footer accumulates "10/12 10/12 ...".
+    footer.querySelectorAll('.shepherd-progress').forEach(node => node.remove());
+
+    const progress = document.createElement('span');
+    progress.className = 'shepherd-progress';
+    progress.innerText = `${index + 1}/${steps.length}`;
+    footer.appendChild(progress);
+  }
+
+  // Dead-end the arrows at the ends of the tour. These selectors only match the
+  // tours that opt into arrow pagination; others are unaffected.
+  const prev = element?.querySelector('.shepherd-nav-prev') as HTMLButtonElement | null;
+  const next = element?.querySelector('.shepherd-nav-next') as HTMLButtonElement | null;
+  if (prev) {
+    prev.disabled = index === 0;
+  }
+  if (next) {
+    next.disabled = index === steps.length - 1;
   }
 };
 

@@ -20,6 +20,12 @@ export function getViewLabel(instance: any): string | null {
   if (!instance) {
     return null;
   }
+  // AI overlays (e.g. Lunit) are wrapped as Secondary Capture (Modality 'MG',
+  // no ImageLaterality). Label them explicitly as "AI Image" rather than a
+  // derived view (RCC/MLO/…), which would be meaningless for an overlay.
+  if (instance.SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
+    return 'AI Image';
+  }
   try {
     const modality = String(instance.Modality || '').toUpperCase();
     if (modality === 'MG') {
@@ -54,15 +60,25 @@ function getMammoViewLabel(instance: any): string | null {
   // 2) View: ViewPosition tag (CC, MLO, ML, LM, LMO, FB, AT, XCCL, XCCM).
   let view = String(instance.ViewPosition || '').toUpperCase();
 
-  // ViewCodeSequence (SCT codes) — same constants as mammoDisplaySetSelector.ts.
+  // ViewCodeSequence — CC codes: SNOMED 399162004, SRT R-10242. MLO codes:
+  // SNOMED 399368009, SRT R-102D2 AND R-10226 (some vendors — e.g. this GE CEM —
+  // emit R-10226 for MLO, which was unrecognised and left CC/MLO indistinguishable
+  // when ViewPosition + SeriesDescription were also absent). CodeMeaning is used
+  // as a vendor-agnostic fallback so any future code variant still resolves.
   if (!view && instance.ViewCodeSequence) {
     const seq = Array.isArray(instance.ViewCodeSequence)
       ? instance.ViewCodeSequence[0]
       : instance.ViewCodeSequence;
     const code = String(seq?.CodeValue || '').trim();
-    if (code === '399162004' || code === 'R-10242') {
+    const meaning = String(seq?.CodeMeaning || '').toUpperCase();
+    if (code === '399162004' || code === 'R-10242' || /CRANIO|\bCC\b/.test(meaning)) {
       view = 'CC';
-    } else if (code === '399368009' || code === 'R-102D2') {
+    } else if (
+      code === '399368009' ||
+      code === 'R-102D2' ||
+      code === 'R-10226' ||
+      /OBLIQUE|\bMLO\b/.test(meaning)
+    ) {
       view = 'MLO';
     }
   }
@@ -114,10 +130,16 @@ function getMammoViewLabel(instance: any): string | null {
     /\b(TOMO|TOMOSYNTHESIS|3D|DBT)\b/.test(desc) ||
     matchesImageType(instance.ImageType, ['TOMO', 'TOMOSYNTHESIS']);
 
-  // CEM (Contrast-Enhanced Mammography) — "recombined" image type.
+  // CEM (Contrast-Enhanced Mammography) — the contrast image type varies by
+  // vendor: RECOMBINED (Hologic) / SUBTRACTION (GE "DES") / IODINE / CESM.
   const isCEM =
-    matchesImageType(instance.ImageType, ['RECOMBINED', 'SUBTRACTED', 'CEM']) ||
-    /\b(CEM|CESM|RECOMBINED)\b/.test(desc);
+    matchesImageType(instance.ImageType, [
+      'RECOMBINED',
+      'SUBTRACTION',
+      'SUBTRACTED',
+      'IODINE',
+      'CESM',
+    ]) || /\b(CEM|CESM|RECOMBINED|DES)\b/.test(desc);
 
   let label = '';
   if (lat && view) {

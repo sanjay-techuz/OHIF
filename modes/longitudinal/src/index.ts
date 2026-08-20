@@ -96,11 +96,13 @@ function modeFactory({ modeConfiguration }) {
       toolbarService.updateSection(toolbarService.sections.primary, [
         'Clear',
         'MeasurementTools',
+        'Length',
         'Undo',
         'Redo',
         'Zoom',
         'Pan',
-        'invert',
+        'flipHorizontal',
+        'flipVertical',
         'WindowLevel',
         'Capture',
         'Layout',
@@ -137,7 +139,7 @@ function modeFactory({ modeConfiguration }) {
 
       toolbarService.updateSection('MeasurementTools', [
         'CircleROI',
-        'Length',
+        // 'Length', // Measurement hidden from dropdown; accessible via header button
         'Bidirectional',
         'ArrowAnnotate',
         'EllipticalROI',
@@ -151,7 +153,8 @@ function modeFactory({ modeConfiguration }) {
       toolbarService.updateSection('MoreTools', [
         'Reset',
         'rotate-right',
-        'flipHorizontal',
+        // 'flipHorizontal', // moved to header toolbar (commented, not removed)
+        // 'flipVertical', // moved to header toolbar (commented, not removed)
         'ImageSliceSync',
         'ReferenceLines',
         'ImageOverlayViewer',
@@ -164,10 +167,11 @@ function modeFactory({ modeConfiguration }) {
         'CobbAngle',
         'Magnify',
         'CalibrationLine',
-        'TagBrowser',
-        'AdvancedMagnify',
+        // 'TagBrowser', // Dicom Tag Browser hidden for BIEDX (commented, not removed)
+        // 'AdvancedMagnify', // persistent loupe replaced by transient Magnify (press-drag-release)
         'UltrasoundDirectionalTool',
         'WindowLevelRegion',
+        'invert', // moved here from the header toolbar
       ]);
 
       customizationService.setCustomizations({

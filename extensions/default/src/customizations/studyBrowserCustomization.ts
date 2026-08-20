@@ -4,23 +4,18 @@ const { formatDate } = utils;
 export default {
   'studyBrowser.studyMenuItems': [],
   'studyBrowser.thumbnailMenuItems': [
-    {
-      id: 'tagBrowser',
-      label: 'Tag Browser',
-      iconName: 'DicomTagBrowser',
-      onClick: ({ commandsManager, displaySetInstanceUID }: withAppTypes) => {
-        commandsManager.runCommand('openDICOMTagViewer', {
-          displaySetInstanceUID,
-        });
-      },
-    },
-    // "Add as Layer" — HIDDEN for BIEDX. This stock-OHIF action overlays a
-    // series as a fusion/volume layer (PET/CT-style workflows) which BIEDX does
-    // not use. Adding an incompatible display set (e.g. an OT secondary-capture
-    // "AI image" or a plain 2D mammogram stack) builds a vtk.js volume actor
-    // with a null mapper and crashes in setMapperShaderParameters
-    // (`Cannot read properties of null (reading 'isAttributeUsed')`), blanking
-    // the viewport. Uncomment to restore.
+    // Tag Browser thumbnail menu item hidden for BIEDX (commented, not removed).
+    // {
+    //   id: 'tagBrowser',
+    //   label: 'Tag Browser',
+    //   iconName: 'DicomTagBrowser',
+    //   onClick: ({ commandsManager, displaySetInstanceUID }: withAppTypes) => {
+    //     commandsManager.runCommand('openDICOMTagViewer', {
+    //       displaySetInstanceUID,
+    //     });
+    //   },
+    // },
+    // Add as Layer thumbnail menu item hidden for BIEDX (commented, not removed).
     // {
     //   id: 'addAsLayer',
     //   label: 'Add as Layer',

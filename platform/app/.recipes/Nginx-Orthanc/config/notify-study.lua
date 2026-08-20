@@ -60,6 +60,26 @@ local function shouldTranscode(sid)
 end
 
 
+-- Returns true if the study carries the durable "skip auto-transcode" flag
+-- (UserMetadata 1029 = skipAutoTranscode), set by the merge-on-upload pipeline.
+--
+-- Why this exists: the merge-on-upload flow uploads several studies, then merges
+-- them into one and DELETES the sources. If auto-transcode fires on a source
+-- study, its (async) transcode job races the merge: the job re-materialises the
+-- just-deleted study, which re-stabilises, re-transcodes, and so on — a runaway
+-- transcode↔merge loop that saturates the single-writer index and wedges Orthanc.
+-- The backend sets 1029=true on every study of a merge upload BEFORE it can
+-- stabilise, so those studies never auto-transcode here. The backend itself
+-- transcodes the single surviving merged study exactly once, after the merge.
+-- Read by numeric key so it works whether or not the alias is registered.
+local function isTranscodeSuppressed(sid)
+    local ok, val = pcall(function()
+        return RestApiGet('/studies/' .. sid .. '/metadata/1029')
+    end)
+    return ok and val == 'true'
+end
+
+
 -- ====================================
 --  Function: Handle study auto-anonymization
 -- ====================================
@@ -318,7 +338,7 @@ function OnStableStudy(studyId, tags, metadata)
     --
     --    Failure handling: pcall catches errors; on failure we clear the
     --    in-process flag so a subsequent OnStableStudy can retry.
-    if not studiesTranscodeSubmitted[studyId] and shouldTranscode(studyId) then
+    if not studiesTranscodeSubmitted[studyId] and not isTranscodeSuppressed(studyId) and shouldTranscode(studyId) then
         studiesTranscodeSubmitted[studyId] = true
         local transcodeRequest = {
             Transcode = "1.2.840.10008.1.2.4.90",

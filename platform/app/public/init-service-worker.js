@@ -1,62 +1,51 @@
-navigator.serviceWorker.getRegistrations().then(function (registrations) {
-  for (let registration of registrations) {
-    registration.unregister();
+/**
+ * @author Sanjay Balai
+ * @description Registers the BIEDX/OHIF service worker (sw.js).
+ *
+ * IMPORTANT: the previous implementation gated the whole registration behind
+ *   `if ('function' === typeof importScripts) { ... }`
+ * but `importScripts` only exists inside WORKER scopes — in this page/module
+ * context it is always `undefined`, so the service worker was NEVER registered
+ * and nothing was ever cached (no DICOM prefetch, no app-shell cache). This
+ * uses the standard `navigator.serviceWorker.register()` API instead.
+ *
+ * The SW (sw.js) does `skipWaiting()` + `clientsClaim()`, so once it activates
+ * it takes control of this already-open page without a reload — the /prefetch
+ * page's fetches and the viewer's frame requests are then intercepted and
+ * served from the `biedx-dicom-prefetch` Cache Storage.
+ */
+(function registerBiedxServiceWorker() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return;
   }
-});
 
-// https://developers.google.com/web/tools/workbox/modules/workbox-window
-// All major browsers that support service worker also support native JavaScript
-// modules, so it's perfectly fine to serve this code to any browsers
-// (older browsers will just ignore it)
-//
-//import { Workbox } from './workbox-window.prod.mjs';
-// proper initialization
-if ('function' === typeof importScripts) {
-  importScripts(
-    'https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-window.prod.mjs'
-  );
+  // Skip on local dev: the dev server's HMR and the SW caching dev chunks
+  // fight each other. UAT/prod (any non-localhost host) register normally.
+  var host = (typeof location !== 'undefined' && location.hostname) || '';
+  // var isLocalDev = host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  // if (isLocalDev) {
+  //   return;
+  // }
 
-  var supportsServiceWorker = 'serviceWorker' in navigator;
-  var isNotLocalDevelopment = ['localhost', '127'].indexOf(location.hostname) === -1;
+  var swUrl = ((typeof window !== 'undefined' && window.PUBLIC_URL) || '/') + 'sw.js';
 
-  if (supportsServiceWorker && isNotLocalDevelopment) {
-    const swFileLocation = (window.PUBLIC_URL || '/') + 'sw.js';
-    const wb = new Workbox(swFileLocation);
-
-    // Add an event listener to detect when the registered
-    // service worker has installed but is waiting to activate.
-    wb.addEventListener('waiting', event => {
-      // customize the UI prompt accordingly.
-      const isFirstTimeUpdatedServiceWorkerIsWaiting = event.wasWaitingBeforeRegister === false;
-      console.log(
-        'isFirstTimeUpdatedServiceWorkerIsWaiting',
-        isFirstTimeUpdatedServiceWorkerIsWaiting
-      );
-
-      // Assumes your app has some sort of prompt UI element
-      // that a user can either accept or reject.
-      // const prompt = createUIPrompt({
-      //  onAccept: async () => {
-      // Assuming the user accepted the update, set up a listener
-      // that will reload the page as soon as the previously waiting
-      // service worker has taken control.
-      wb.addEventListener('controlling', event => {
-        window.location.reload();
+  function doRegister() {
+    navigator.serviceWorker
+      .register(swUrl)
+      .then(function (registration) {
+        // eslint-disable-next-line no-console
+        console.log('[BIEDX] Service worker registered, scope:', registration.scope);
+      })
+      .catch(function (err) {
+        // eslint-disable-next-line no-console
+        console.error('[BIEDX] Service worker registration failed:', err);
       });
-
-      // Send a message telling the service worker to skip waiting.
-      // This will trigger the `controlling` event handler above.
-      // Note: for this to work, you have to add a message
-      // listener in your service worker. See below.
-      wb.messageSW({ type: 'SKIP_WAITING' });
-      // },
-
-      // onReject: () => {
-      //   prompt.dismiss();
-      // },
-      // });
-    });
-
-    wb.register();
   }
-}
+
+  // Module scripts are deferred, so `load` may or may not have fired yet.
+  if (typeof document !== 'undefined' && document.readyState === 'complete') {
+    doRegister();
+  } else {
+    window.addEventListener('load', doRegister);
+  }
+})();

@@ -41,9 +41,13 @@ services:
     container_name: orthancPACS
     environment:
       # Override sensitive values from .env (do not store secrets in orthanc.json).
-      ORTHANC__REGISTERED_USERS: '{"${ORTHANC_ADMIN_USERNAME:-admin}":"${ORTHANC_ADMIN_PASSWORD:?set ORTHANC_ADMIN_PASSWORD in .env}"}'
-      ORTHANC__AZURE_BLOB_STORAGE__CONNECTION_STRING: ${ORTHANC_AZURE_CONNECTION_STRING:?set ORTHANC_AZURE_CONNECTION_STRING in .env}
-      ORTHANC__AZURE_BLOB_STORAGE__CONTAINER_NAME: ${ORTHANC_AZURE_CONTAINER_NAME:?set ORTHANC_AZURE_CONTAINER_NAME in .env}
+      ORTHANC__REGISTERED_USERS:
+        '{"${ORTHANC_ADMIN_USERNAME:-admin}":"${ORTHANC_ADMIN_PASSWORD:?set ORTHANC_ADMIN_PASSWORD
+        in .env}"}'
+      ORTHANC__AZURE_BLOB_STORAGE__CONNECTION_STRING:
+        ${ORTHANC_AZURE_CONNECTION_STRING:?set ORTHANC_AZURE_CONNECTION_STRING in .env}
+      ORTHANC__AZURE_BLOB_STORAGE__CONTAINER_NAME:
+        ${ORTHANC_AZURE_CONTAINER_NAME:?set ORTHANC_AZURE_CONTAINER_NAME in .env}
       # Webhook URL passed to Lua script via os.getenv("WEBHOOK_URL")
       WEBHOOK_URL: ${WEBHOOK_URL:-https://uatapi.biedx.com/api/admin/cases/orthanc-webhook}
     volumes:
