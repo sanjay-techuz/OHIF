@@ -25,6 +25,10 @@ export default function init({ servicesManager, commandsManager }: withAppTypes)
   // we need to recalculate the SUV Scaling Factors
   DicomMetadataStore.subscribe(DicomMetadataStore.EVENTS.SERIES_UPDATED, handleScalingModules);
 
+  // [MR-FOR-SYNC] Unify FrameOfReferenceUID across each MR study so slice-scroll
+  // sync and reference lines connect ALL panes (see handler below).
+  DicomMetadataStore.subscribe(DicomMetadataStore.EVENTS.INSTANCES_ADDED, normalizeMRFrameOfReference);
+
   // Adds extra custom attributes for use by hanging protocols
   registerHangingProtocolAttributes({ servicesManager });
 
@@ -67,6 +71,48 @@ export default function init({ servicesManager, commandsManager }: withAppTypes)
     }
   });
 }
+
+/**
+ * @author Sanjay Balai
+ * [MR-FOR-SYNC] Breast-MRI slice-sync + reference-lines fix.
+ *
+ * Cornerstone3D's stack image-slice sync (imageSliceSyncCallback) and the
+ * ReferenceLines tool only connect viewports that share the SAME
+ * FrameOfReferenceUID (0020,0052). GE breast-MRI exams assign a FRESH
+ * FrameOfReferenceUID PER ACQUISITION even though every series is scanned at the
+ * same patient position — their ImagePositionPatient/ImageOrientationPatient are
+ * already in ONE consistent patient coordinate frame. Result: only the random
+ * subset of series that happen to share a FoR scroll/reference together (e.g.
+ * "sometimes only T1+STIR, sometimes T1+STIR+ADC").
+ *
+ * Fix: give every MR series in a study ONE synthetic per-study FrameOfReferenceUID.
+ * This ONLY relabels the frame of reference — pixel data, IOP and IPP are untouched,
+ * so the geometry stays exact — and it lets the UNCHANGED native imageSliceSync +
+ * ReferenceLines tools link ALL panes: all axial panes scroll together, and the
+ * reference line for the active pane draws into every other pane (axial/coronal/
+ * sagittal). MR only; other modalities are left untouched. Both features remain
+ * manual toolbar toggles.
+ *
+ * REVERT: delete this handler and its DicomMetadataStore.subscribe line above.
+ */
+const normalizeMRFrameOfReference = ({ SeriesInstanceUID, StudyInstanceUID }) => {
+  const series = DicomMetadataStore.getSeries(StudyInstanceUID, SeriesInstanceUID);
+  const instances = series?.instances;
+  if (!instances?.length) {
+    return;
+  }
+  if (String(instances[0].Modality || '').toUpperCase() !== 'MR') {
+    return;
+  }
+  // One deterministic frame of reference for the whole study, so all its MR series
+  // (including subtractions that carry no FoR) are treated as spatially
+  // co-registered by the sync + reference-line tools. It is an opaque grouping key
+  // (equality-compared only), so a per-study string is all that's required.
+  const unifiedFoR = `${StudyInstanceUID}.1`;
+  instances.forEach(instance => {
+    instance.FrameOfReferenceUID = unifiedFoR;
+  });
+};
 
 const handleScalingModules = ({ SeriesInstanceUID, StudyInstanceUID }) => {
   const { instances } = DicomMetadataStore.getSeries(StudyInstanceUID, SeriesInstanceUID);

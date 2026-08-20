@@ -6,6 +6,7 @@ import {
   utilities as csUtils,
   eventTarget as csEventTarget,
   getEnabledElement,
+  getEnabledElements,
   getRenderingEngines,
   metaData,
   StackViewport,
@@ -40,6 +41,16 @@ import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownload
 import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
 import reconcileInvertLut from './utils/reconcileInvertLut';
+// [MR-AUTO-ORIENT] revert: remove this import, scheduleMROrientation(), and its
+// call sites in resetView + resetViewport.
+import { applyRadiologicalOrientationMR } from './utils/mrAutoOrient';
+// [CROSS-REF-POINT]
+import {
+  placeCrossReferencePoint,
+  clearCrossReferencePoints,
+  attachCrossReferenceScrollFollow,
+  detachCrossReferenceScrollFollow,
+} from './tools/CrossReferencePointTool';
 import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
@@ -47,6 +58,27 @@ import toggleVOISliceSync from './utils/toggleVOISliceSync';
 import { updateSegmentBidirectionalStats } from './utils/updateSegmentationStats';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
+
+// [MR-AUTO-ORIENT] Re-apply the standard radiological MR orientation to every
+// enabled viewport. Called after a reset: Reset View re-runs the hanging protocol
+// and Reset Image resets the camera — both clear the orientation flip, and both
+// settle ASYNCHRONOUSLY, so we re-apply now and again on the next couple of ticks
+// so the flip holds. No-op for non-MR / oblique viewports (the helper self-gates).
+function scheduleMROrientation(): void {
+  const run = () => {
+    try {
+      getEnabledElements().forEach(({ viewport }) => {
+        applyRadiologicalOrientationMR(viewport as never);
+      });
+    } catch {
+      /* best-effort — never break reset over auto-orient */
+    }
+  };
+  run();
+  setTimeout(run, 150);
+  setTimeout(run, 400);
+}
+
 const toggleSyncFunctions = {
   imageSlice: toggleImageSliceSync,
   voi: toggleVOISliceSync,
@@ -1400,6 +1432,9 @@ function commandsModule({
           viewport.render();
         }
       }
+      // [MR-AUTO-ORIENT] Reset Image clears the camera flip — snap MR panes back to
+      // the standard radiological orientation (A-top/R-left). No-op for non-MR.
+      scheduleMROrientation();
     },
     resetView: () => {
       // Drop any manual prior comparison first, so Reset returns to the plain
@@ -1485,6 +1520,10 @@ function commandsModule({
       } catch {
         /* command may not exist in non-BIEDX modes */
       }
+
+      // [MR-AUTO-ORIENT] The HP re-run above resets each MR pane's camera — snap it
+      // back to the standard radiological orientation (A-top/R-left). No-op non-MR.
+      scheduleMROrientation();
     },
 
     clearView: () => {
@@ -1653,6 +1692,11 @@ function commandsModule({
       } catch {
         /* trigger not registered — viewer not mounted; safe to ignore */
       }
+
+      // [MR-AUTO-ORIENT] Reset Image (Clear) does a per-viewport resetCamera above,
+      // which clears the flip — snap MR panes back to the standard radiological
+      // orientation (A-top/R-left). Multi-shot to survive the async HP re-run.
+      scheduleMROrientation();
     },
     scaleViewport: ({ direction }) => {
       const enabledElement = _getActiveViewportEnabledElement();

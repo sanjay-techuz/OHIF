@@ -7,6 +7,9 @@ import { ProgressDropdownWithService } from './Components/ProgressDropdownWithSe
 
 // new
 import HangingProtocolDropdown from './Toolbar/HangingProtocolDropdown';
+import ImageSliceSyncButton from './Toolbar/ImageSliceSyncButton';
+import ReferenceLinesButton from './Toolbar/ReferenceLinesButton';
+import CrossReferencePointButton from './Toolbar/CrossReferencePointButton'; // [CROSS-REF-POINT]
 import { ToolBoxButtonGroupWrapper, ToolBoxButtonWrapper } from './Toolbar/ToolBoxWrapper';
 import ToolButtonListWrapper from './Toolbar/ToolButtonListWrapper';
 import { ToolButtonWrapper } from './Toolbar/ToolButtonWrapper';
@@ -20,6 +23,24 @@ export default function getToolbarModule({ commandsManager, servicesManager }: w
       name: 'ohif.hangingProtocolDropdown',
       defaultComponent: props =>
         HangingProtocolDropdown({ ...props, commandsManager, servicesManager }),
+    },
+    {
+      // MRI-only Image Slice Sync toggle (renders null on non-MR studies).
+      name: 'ohif.imageSliceSyncButton',
+      defaultComponent: props =>
+        ImageSliceSyncButton({ ...props, commandsManager, servicesManager }),
+    },
+    {
+      // MRI-only Reference Lines toggle (renders null on non-MR studies).
+      name: 'ohif.referenceLinesButton',
+      defaultComponent: props =>
+        ReferenceLinesButton({ ...props, commandsManager, servicesManager }),
+    },
+    {
+      // [CROSS-REF-POINT] MRI-only Cross Reference Point toggle (null on non-MR).
+      name: 'ohif.crossReferencePointButton',
+      defaultComponent: props =>
+        CrossReferencePointButton({ ...props, commandsManager, servicesManager }),
     },
     {
       name: 'ohif.toolButton',
