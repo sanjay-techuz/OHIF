@@ -32,6 +32,7 @@ import {
   multiLabelDialog,
   createReportAsync,
   useUIStateStore,
+  useOverlayFieldsStore,
 } from '@ohif/extension-default';
 import i18n from '@ohif/i18n';
 import { mat4, vec3 } from 'gl-matrix';
@@ -1527,6 +1528,15 @@ function commandsModule({
     },
 
     clearView: () => {
+      // Reset Image restores the DEFAULT view state — so if the user had hidden
+      // the viewport info overlay text, bring it back to visible here (only on
+      // Reset Image / clearView, NOT on Reset View / resetView).
+      try {
+        useOverlayFieldsStore.getState().setOverlayHidden(false);
+      } catch {
+        /* overlay store optional; ignore */
+      }
+
       // Drop any manual prior comparison first (same reasoning as resetView):
       // a full Clear must also reset the "Compare Studies" dropdown.
       try {
