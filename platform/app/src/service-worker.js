@@ -123,6 +123,30 @@ const studyCapPlugin = {
   },
 };
 
+// Shared plugins — one instance set, used by BOTH routes below so a single
+// ExpirationPlugin manages the cache (Workbox tracks by cacheName) and both the
+// count-cap and age-cap apply uniformly to frames AND metadata/series entries.
+const cacheableResponsePlugin = new workbox.cacheableResponse.CacheableResponsePlugin({
+  statuses: [0, 200],
+});
+// Remove a cached entry 2 days after it was written.
+//
+// purgeOnQuotaError is deliberately DISABLED: with it enabled a single write
+// that trips the storage quota wipes the ENTIRE prefetch cache, so a fully-cached
+// study would suddenly refetch on the next reload. Growth is already bounded by
+// the 2-day age cap and the MAX_STUDIES count cap, and requesting persistent
+// storage (see init-service-worker.js) makes quota errors unlikely — so a stray
+// quota error should fail just that one write, not destroy every cached study.
+const expirationPlugin = new workbox.expiration.ExpirationPlugin({
+  maxAgeSeconds: CACHE_MAX_AGE_SECONDS,
+  purgeOnQuotaError: false,
+});
+const dicomPlugins = [cacheableResponsePlugin, expirationPlugin, studyCapPlugin];
+
+// Route 1 — per-instance bytes (frames + per-instance metadata + bulkdata).
+// Matches `/studies/{S}/series/{Se}/instances/{I}/...`. Registered FIRST so it
+// claims every instance-level request; ignoreSearch is needed because the viewer
+// appends `?...` retrieve arguments a prefetched (plain-URL) frame lacks.
 workbox.routing.registerRoute(
   ({ url }) =>
     /^\/pacs\/dicom-web\/studies\/[^/]+\/series\/[^/]+\/instances\/[^/]+/.test(url.pathname),
@@ -133,19 +157,36 @@ workbox.routing.registerRoute(
     // ignoreVary:  ignore Accept/transfer-syntax differences between the
     //   prefetch fetch and cornerstone's request.
     matchOptions: { ignoreSearch: true, ignoreVary: true },
-    plugins: [
-      new workbox.cacheableResponse.CacheableResponsePlugin({
-        statuses: [0, 200],
-      }),
-      // Remove a prefetched instance 2 days after it was cached; also purge the
-      // cache if a write ever hits the browser storage quota.
-      new workbox.expiration.ExpirationPlugin({
-        maxAgeSeconds: CACHE_MAX_AGE_SECONDS,
-        purgeOnQuotaError: true,
-      }),
-      // Keep at most MAX_STUDIES distinct studies (evict the oldest on the 11th).
-      studyCapPlugin,
-    ],
+    plugins: dicomPlugins,
+  })
+);
+
+// Route 2 — study/series metadata + series/instance LISTS (QIDO). These are the
+// slow `/series/{Se}/metadata` call and friends. Immutable after upload (same as
+// the pixel data), so we serve them from cache too and skip the network wait.
+// Matches ONLY study-scoped list/metadata endpoints:
+//   /studies/{S}/metadata
+//   /studies/{S}/series            (series list)
+//   /studies/{S}/series/{Se}/metadata
+//   /studies/{S}/series/{Se}/instances   (instance list)
+// The top-level worklist SEARCH `/studies?...` is NOT matched (needs a UID after
+// `/studies/`), so the study list stays live and new uploads still appear.
+// Instance-level requests are already claimed by Route 1 above (first match wins).
+//
+// ignoreSearch is FALSE here (unlike frames): a QIDO query string is meaningful,
+// so responses are keyed by exact URL+query and different queries never collide.
+// NOTE ON STALENESS: if a study is modified AFTER it was cached (re-upload,
+// transcode, merge-on-upload, change-PatientID, add/remove series), this serves
+// the old lists until the 2-day age cap / study-cap evicts them or the user hits
+// "Clear cache". Metadata shares this cache with the frames, so both evict in
+// lockstep and never drift into a frames-new/metadata-old mismatch.
+workbox.routing.registerRoute(
+  ({ url }) =>
+    /^\/pacs\/dicom-web\/studies\/[^/?#]+\/(metadata|series)(\/|\?|$)/.test(url.pathname + url.search),
+  new workbox.strategies.CacheFirst({
+    cacheName: DICOM_CACHE,
+    matchOptions: { ignoreSearch: false, ignoreVary: true },
+    plugins: dicomPlugins,
   })
 );
 
