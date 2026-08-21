@@ -29,7 +29,37 @@
 
   var swUrl = ((typeof window !== 'undefined' && window.PUBLIC_URL) || '/') + 'sw.js';
 
+  // Ask the browser to make Cache Storage PERSISTENT (not "best-effort").
+  //
+  // Without this the prefetched `biedx-dicom-prefetch` cache is evictable: under
+  // disk/quota pressure the browser can silently drop a SUBSET of the cached
+  // frames, so a fully-prefetched study still refetches "some instances" from the
+  // server on the next (normal) reload — exactly the symptom seen on UAT. A
+  // persistent bucket is only cleared by the user explicitly, so the study stays
+  // fully cached across reopens. Safe/no-op where unsupported or already granted;
+  // it never blocks registration.
+  function requestPersistentStorage() {
+    try {
+      if (navigator.storage && typeof navigator.storage.persist === 'function') {
+        navigator.storage.persisted().then(function (already) {
+          if (already) {
+            // eslint-disable-next-line no-console
+            console.log('[BIEDX] Storage already persistent');
+            return;
+          }
+          navigator.storage.persist().then(function (granted) {
+            // eslint-disable-next-line no-console
+            console.log('[BIEDX] Persistent storage', granted ? 'granted' : 'denied');
+          });
+        });
+      }
+    } catch (e) {
+      /* best-effort — never break registration */
+    }
+  }
+
   function doRegister() {
+    requestPersistentStorage();
     navigator.serviceWorker
       .register(swUrl)
       .then(function (registration) {
