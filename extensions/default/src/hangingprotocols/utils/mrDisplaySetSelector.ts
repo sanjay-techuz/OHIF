@@ -1,6 +1,40 @@
 // Breast MRI Hanging Protocol Display Set Selectors
-// Defines series matching rules for common breast MRI sequences
-// Based on standard protocols (e.g., ACR BI-RADS, RSNA guidelines)
+//
+// @author Sanjay Balai
+//
+// Eleven anchored view selectors driving FOUR faculty-specified stages (see
+// hpMR.ts):
+//
+//   Stage 0 "1×2 MIP":   MIP SI | MIP RL
+//   Stage 1 "2×3":       T1 | STIR | Sag R  /  Ph2 | Ph5 | Sag L
+//   Stage 2 "2×4":       T1 | STIR | COR | Sag R  /  DWI | ADC | Ph2 | Sag L
+//   Stage 3 "2×2":       T1 | STIR  /  Ph2 | Ph5
+//
+// HOW MATCHING WORKS (rebuilt to be tag-based, not SeriesDescription text):
+//   Every view is chosen by ONE required rule on the custom `MRViewType`
+//   attribute, which classifies a series from its DICOM ACQUISITION TAGS
+//   (ImageType / ScanningSequence / InversionTime / DiffusionBValue /
+//   TemporalPositionIdentifier / ImageOrientationPatient / ImagePositionPatient)
+//   in `utils/mrViewClassifier.ts`. That is the SINGLE SOURCE OF TRUTH — the same
+//   classifier drives the dropdown's stage-greying (`utils/mrViewAvailability.ts`),
+//   so pane matching, labels, and availability can never diverge.
+//
+//   Why not SeriesDescription? On GE (our data = SIGNA Explorer, VIBRANT-Flex) the
+//   text conflates unrelated series — e.g. VIBRANT "WATER: Ph2/Ax Vibrant-Flex"
+//   (ImageType DIXON\WATER) vs SUBTRACTION "SUB 2"/"PHASE 2" (ImageType COMBINED) —
+//   so a text matcher put the wrong series in the Vibrant panes. The tag rules are
+//   unambiguous. See mrViewClassifier.ts for the exact per-view mapping.
+//
+//   `required: true` on the MRViewType rule means a viewport takes ONLY a series of
+//   its own view and stays EMPTY otherwise (HPMatcher zeroes the score on a failed
+//   required rule). `allowUnmatchedView: true` still lets a user manually drag any
+//   series onto any viewport (read only by the drop validator, not the matcher).
+//
+// DUPLICATE SERIES: if a case has two of the same view (a scan repeated after
+//   patient motion / breath-hold), the graduated `MRInstanceCount` bonus rules
+//   below bias the score toward the series with MORE images (the complete run),
+//   because OHIF's native tie-break is lowest SeriesNumber. The bonus only reorders
+//   series that already match the same view, so it can never pull in a wrong one.
 
 // Study matching rules
 const priorStudyMatchingRules = [
@@ -25,324 +59,50 @@ const currentStudyMatchingRules = [
   },
 ];
 
-// Common constraints for all breast MRI series
-const breastMRCommonRules = [
-  {
-    weight: 20,
-    attribute: 'Modality',
-    constraint: {
-      equals: 'MR',
-    },
-  },
-  {
-    weight: 15,
-    attribute: 'BodyPartExamined',
-    required: false,
-    constraint: {
-      contains: ['BREAST', 'BILATERAL BREAST', 'CHEST', 'MAMMA'],
-    },
-  },
+// Graduated instance-count bonus — more images ⇒ higher score, so the complete
+// acquisition wins over an aborted/repeat run of the SAME view. Spread into every
+// selector. Each passing threshold adds its weight (max +5).
+const instanceCountBonus = [
+  { weight: 1, attribute: 'MRInstanceCount', required: false, constraint: { greaterThan: 20 } },
+  { weight: 1, attribute: 'MRInstanceCount', required: false, constraint: { greaterThan: 40 } },
+  { weight: 1, attribute: 'MRInstanceCount', required: false, constraint: { greaterThan: 80 } },
+  { weight: 1, attribute: 'MRInstanceCount', required: false, constraint: { greaterThan: 120 } },
+  { weight: 1, attribute: 'MRInstanceCount', required: false, constraint: { greaterThan: 160 } },
 ];
 
-// T1-Weighted Series Matching Rules
-const T1SeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'EchoTime',
-    constraint: { lessThan: 20 }, // T1 has short TE
-  },
-  {
-    weight: 25,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'T1',
-        'PRE',
-        'BASELINE',
-        'NON-FS',
-        'T1W',
-        'T1 WEIGHTED',
-        'T1WI',
-        'T1 PRE',
-        'T1 FS',
-        'T1 FAT SAT',
-        'AX T1',
-        'T1 AX',
-        'Ax T1 FSE',
-        'T1 FS PRE',
-        'T1 FAT SAT PRE',
-        'PRE CONTRAST',
-        't1_pre',
-        'T1 BASELINE',
-        'AX T1 PRE',
-      ],
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'SequenceName',
-    required: false,
-    constraint: {
-      contains: ['T1', 'GRE', 'VIBE', 'TSE'],
-    },
-  },
-  {
-    weight: 5,
-    attribute: 'PatientOrientation',
-    required: false,
-    constraint: {
-      contains: ['H', 'F'], // Head-feet orientation for axial
-    },
-  },
+// One required rule per view on the tag-based classifier, plus the tie-break bonus.
+const viewRules = (viewKey: string) => [
+  { weight: 5, attribute: 'MRViewType', required: true, constraint: { equals: viewKey } },
+  ...instanceCountBonus,
 ];
 
-// T2-Weighted Series Matching Rules
-const T2SeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'EchoTime',
-    constraint: { greaterThan: 60 }, // T2 has long TE
-  },
-  {
-    weight: 25,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'T2',
-        'STIR',
-        'SPAIR',
-        'FAT SAT',
-        'T2W',
-        'T2 WEIGHTED',
-        'T2WI',
-        'T2 FS',
-        'T2 FAT SAT',
-        'AX T2',
-        'T2 AX',
-        'T2 SAG',
-        'SAG T2',
-      ],
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'SequenceName',
-    required: false,
-    constraint: {
-      contains: ['T2', 'TSE', 'HASTE', 'FSE'],
-    },
-  },
-  {
-    weight: 5,
-    attribute: 'PatientOrientation',
-    required: false,
-    constraint: {
-      contains: ['H', 'F'], // Head-feet orientation for axial
-    },
-  },
-];
+const T1SeriesMatchingRules = viewRules('T1');
+const STIRSeriesMatchingRules = viewRules('STIR');
+const MIPSISeriesMatchingRules = viewRules('MIP_SI');
+const MIPRLSeriesMatchingRules = viewRules('MIP_RL');
+const Vibrant2SeriesMatchingRules = viewRules('VIBRANT2');
+const Vibrant5SeriesMatchingRules = viewRules('VIBRANT5');
+const CoronalSeriesMatchingRules = viewRules('CORONAL');
+const SagittalRSeriesMatchingRules = viewRules('SAG_R');
+const SagittalLSeriesMatchingRules = viewRules('SAG_L');
+const DWISeriesMatchingRules = viewRules('DWI');
+const ADCSeriesMatchingRules = viewRules('ADC');
 
-// Sagittal Series Matching Rules
-const SagittalSeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'SAG',
-        'SAGITTAL',
-        'SAG T1',
-        'SAG T2',
-        'T1 SAG',
-        'T2 SAG',
-        'SAGITTAL T1',
-        'SAGITTAL T2',
-      ],
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'PatientOrientation',
-    required: false,
-    constraint: {
-      contains: ['S', 'I'], // Superior-inferior orientation for sagittal
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'ImageOrientationPatient',
-    constraint: {
-      // Sagittal Vector Check
-      range: { value: [0, 1, 0, 0, 0, -1], tolerance: 0.2 },
-    },
-  },
-];
+// `allowUnmatchedView: true` — allow manual drag-drop of any series onto any
+// viewport (read only by the drop validator, not the auto-matcher).
+const T1 = { allowUnmatchedView: true, seriesMatchingRules: T1SeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const STIR = { allowUnmatchedView: true, seriesMatchingRules: STIRSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const MIPSI = { allowUnmatchedView: true, seriesMatchingRules: MIPSISeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const MIPRL = { allowUnmatchedView: true, seriesMatchingRules: MIPRLSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const Vibrant2 = { allowUnmatchedView: true, seriesMatchingRules: Vibrant2SeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const Vibrant5 = { allowUnmatchedView: true, seriesMatchingRules: Vibrant5SeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const Coronal = { allowUnmatchedView: true, seriesMatchingRules: CoronalSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const SagittalR = { allowUnmatchedView: true, seriesMatchingRules: SagittalRSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const SagittalL = { allowUnmatchedView: true, seriesMatchingRules: SagittalLSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const DWI = { allowUnmatchedView: true, seriesMatchingRules: DWISeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
+const ADC = { allowUnmatchedView: true, seriesMatchingRules: ADCSeriesMatchingRules, studyMatchingRules: currentStudyMatchingRules };
 
-// Post-Contrast Series Matching Rules
-const PostContrastSeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'SUB',
-        'DYNAMIC',
-        'GD',
-        'DELAYED',
-        '1ST PASS',
-        'POST',
-        'POST CONTRAST',
-        'POST-CONTRAST',
-        'POST1',
-        'POST2',
-        'DCE POST',
-        'T1 POST',
-        'T1 FS POST',
-        'POST CONTRAST 1',
-        'POST CONTRAST 2',
-        'AX POST',
-        'POST AX',
-      ],
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'SequenceName',
-    required: false,
-    constraint: {
-      contains: ['T1', 'DCE', 'VIBE', 'POST'],
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'ImageType',
-    constraint: {
-      contains: ['SUBTRACTION'],
-    },
-  },
-  {
-    weight: 5,
-    attribute: 'PatientOrientation',
-    required: false,
-    constraint: {
-      contains: ['H', 'F'], // Head-feet orientation for axial
-    },
-  },
-];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _priorStudyMatchingRules = priorStudyMatchingRules;
 
-// MIP (Maximum Intensity Projection) Series Matching Rules
-const MIPSeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'MIP',
-        'MAX INTENSITY',
-        'MAXIMUM INTENSITY',
-        'MIP AX',
-        'MIP SAG',
-        'MIP COR',
-        'POST MIP',
-        'MIP POST',
-        'MIP AXIAL',
-        'MIP SAGITTAL',
-        'MIP CORONAL',
-        'MIP RL',
-        'MIP SI',
-        'MIP AP',
-        '3D MIP',
-      ],
-    },
-  },
-  {
-    weight: 30,
-    attribute: 'ImageType',
-    constraint: {
-      contains: ['MIP', 'DERIVED', 'SECONDARY'],
-    },
-  },
-];
-
-// Coronal Series Matching Rules
-const CoronalSeriesMatchingRules = [
-  ...breastMRCommonRules,
-  {
-    weight: 40,
-    attribute: 'SeriesDescription',
-    constraint: {
-      contains: [
-        'COR',
-        'CORONAL',
-        'COR T1',
-        'COR T2',
-        'T1 COR',
-        'T2 COR',
-        'CORONAL T1',
-        'CORONAL T2',
-      ],
-    },
-  },
-  {
-    weight: 20,
-    attribute: 'ImageOrientationPatient',
-    constraint: {
-      // Coronal Vector Check
-      range: { value: [1, 0, 0, 0, 0, -1], tolerance: 0.2 },
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'PatientOrientation',
-    required: false,
-    constraint: {
-      contains: ['A', 'P'], // Anterior-posterior orientation for coronal
-    },
-  },
-  {
-    weight: 10,
-    attribute: 'ImageOrientationPatient',
-    required: false,
-    constraint: {
-      contains: ['COR'],
-    },
-  },
-];
-
-// Display Set Objects for Current Study
-const T1 = {
-  seriesMatchingRules: T1SeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-const T2 = {
-  seriesMatchingRules: T2SeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-const Sagittal = {
-  seriesMatchingRules: SagittalSeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-const PostContrast = {
-  seriesMatchingRules: PostContrastSeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-const MIP = {
-  seriesMatchingRules: MIPSeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-const Coronal = {
-  seriesMatchingRules: CoronalSeriesMatchingRules,
-  studyMatchingRules: currentStudyMatchingRules,
-};
-
-export { Coronal, MIP, PostContrast, Sagittal, T1, T2 };
+export { ADC, Coronal, DWI, MIPRL, MIPSI, SagittalL, SagittalR, STIR, T1, Vibrant2, Vibrant5 };

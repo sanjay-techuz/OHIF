@@ -1,38 +1,48 @@
+import {
+  classifyMRDisplaySet,
+  mrVibrantPhase,
+  mrSubtractionPhase,
+  isVibrantWater,
+  type MRViewKey,
+} from '../hangingprotocols/utils/mrViewClassifier';
+
 /**
  * Per-instance clinical view-label detector.
  *
- * Returns a short clinical view label (e.g. "RCC", "LMLO", "Axial T1",
- * "Sagittal Post", "MIP", "Coronal", "R LONG") derived from DICOM tags.
+ * Returns a short clinical view label (e.g. "RCC", "LMLO", "T1", "STIR",
+ * "Vibrant 2", "MIP SI", "Coronal", "Sag R") derived from DICOM tags.
  * Tolerant to missing tags — falls through to `null` if it cannot decide,
  * so a detection miss never produces a misleading label.
  *
- * This is the same view-label logic the per-viewport overlay uses (see
- * extensions/cornerstone/src/customizations/viewportOverlayCustomization.tsx).
- * It's duplicated here so that PanelStudyBrowser can show consistent view
- * labels on sidebar cards without needing extension-default to depend on
- * extension-cornerstone (which would risk circular deps in this monorepo).
+ * Used by BOTH the per-viewport overlay (via `@ohif/extension-default`) and the
+ * PanelStudyBrowser sidebar cards, so labels stay consistent everywhere.
  *
- * Source priority mirrors the hanging-protocol display-set selectors in
- * `hangingprotocols/utils/{mammo,mr}DisplaySetSelector.ts`, so the labels
- * stay consistent with how the protocols pick viewports.
+ * For breast MR the label comes from the SAME tag-based classifier the hanging
+ * protocol uses to place series (`hangingprotocols/utils/mrViewClassifier.ts`),
+ * so a viewport's label always matches the faculty view it was filled with.
  */
 export function getViewLabel(instance: any): string | null {
   if (!instance) {
     return null;
   }
-  // AI overlays (e.g. Lunit) are wrapped as Secondary Capture (Modality 'MG',
-  // no ImageLaterality). Label them explicitly as "AI Image" rather than a
-  // derived view (RCC/MLO/…), which would be meaningless for an overlay.
-  if (instance.SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
-    return 'AI Image';
-  }
   try {
     const modality = String(instance.Modality || '').toUpperCase();
-    if (modality === 'MG') {
-      return getMammoViewLabel(instance);
-    }
+    // MR FIRST — GE stores derived breast-MR series (subtractions, MIPs, reformats)
+    // as Secondary Capture SOP Class (…1.1.7), the SAME SOP Class the mammography AI
+    // overlays use. So the "AI Image" rule below MUST NOT see MR, or every GE MR
+    // subtraction stack gets mislabelled "AI Image". MR is classified purely from
+    // its acquisition tags instead.
     if (modality === 'MR' || modality === 'MRI') {
       return getMRViewLabel(instance);
+    }
+    // AI overlays (e.g. Lunit) are wrapped as Secondary Capture (Modality 'MG' /
+    // 'XC' / 'OT', no ImageLaterality). Label them explicitly as "AI Image" rather
+    // than a derived view (RCC/MLO/…), which would be meaningless for an overlay.
+    if (instance.SOPClassUID === '1.2.840.10008.5.1.4.1.1.7') {
+      return 'AI Image';
+    }
+    if (modality === 'MG') {
+      return getMammoViewLabel(instance);
     }
     if (modality === 'US') {
       return getUSViewLabel(instance);
@@ -212,21 +222,84 @@ function getViewModifierSuffix(instance: any): string {
   return uniq.length ? ` ${uniq.join(' ')}` : '';
 }
 
-/** MRI / Breast MR — plane (from IOP) + sequence (from desc/TE/ImageType). */
-function getMRViewLabel(instance: any): string | null {
-  const plane = getPlaneFromIOP(instance.ImageOrientationPatient);
-  const sequence = getMRSequence(instance);
+// Human labels for the breast-MRI faculty views (the hanging-protocol panes).
+const MR_VIEW_LABEL: Record<MRViewKey, string> = {
+  T1: 'T1',
+  STIR: 'STIR',
+  MIP_SI: 'MIP SI',
+  MIP_RL: 'MIP RL',
+  VIBRANT2: 'Vibrant 2',
+  VIBRANT5: 'Vibrant 5',
+  CORONAL: 'Coronal',
+  SAG_R: 'Sag R',
+  SAG_L: 'Sag L',
+  DWI: 'DWI',
+  ADC: 'ADC',
+};
 
-  if (plane && sequence) {
-    return `${plane} ${sequence}`;
+/** MRI / Breast MR — faculty view from the tag-based classifier (same source as
+ *  the hanging protocol), falling back to plane + sequence for series that are
+ *  not one of the panes (T2, priors, intermediate dynamic phases, …). */
+function getMRViewLabel(instance: any): string | null {
+  // The exact view key the hanging protocol would place this series in, so a
+  // viewport's label can never disagree with the pane it fills. (T1/STIR/DWI/ADC/
+  // MIP_*/CORONAL/SAG_R/SAG_L — or null for non-pane series.)
+  const viewKey = classifyMRDisplaySet(instance);
+  // Dynamic phase of a GE VIBRANT (post-contrast Dixon WATER) series, and of a
+  // post-contrast SUBTRACTION series — used to number the "Vibrant N" / "SUB N"
+  // labels exactly.
+  const vibrantPhase = mrVibrantPhase(instance);
+  const subPhase = mrSubtractionPhase(instance);
+
+  let smart: string | null = null;
+
+  // 1) Unambiguous derived types read straight from the classifier.
+  if (viewKey === 'ADC' || viewKey === 'DWI' || viewKey === 'MIP_SI' || viewKey === 'MIP_RL') {
+    smart = MR_VIEW_LABEL[viewKey];
   }
-  if (sequence) {
-    return sequence;
+  // 2) Post-contrast subtraction — prefix the reformat plane/side (from the same
+  //    classifier) so faculty see "Coronal SUB 2", "Sag R SUB 2", or "Axial SUB 1".
+  else if (subPhase != null) {
+    const n = typeof subPhase === 'number' ? ` ${subPhase}` : '';
+    if (viewKey === 'CORONAL') {
+      smart = `Coronal SUB${n}`;
+    } else if (viewKey === 'SAG_R') {
+      smart = `Sag R SUB${n}`;
+    } else if (viewKey === 'SAG_L') {
+      smart = `Sag L SUB${n}`;
+    } else {
+      smart = `Axial SUB${n}`;
+    }
   }
-  if (plane) {
-    return plane;
+  // 3) VIBRANT dynamic — Ph1→"Vibrant 1" … Ph5→"Vibrant 5"; the pre-contrast /
+  //    all-phase water container (no phase tag) reads plain "Vibrant".
+  else if (vibrantPhase != null) {
+    smart = `Vibrant ${vibrantPhase}`;
+  } else if (isVibrantWater(instance)) {
+    smart = 'Vibrant';
   }
-  return null;
+  // 4) Remaining pane views (T1 / STIR / CORONAL / SAG_R / SAG_L for non-subtraction).
+  else if (viewKey) {
+    smart = MR_VIEW_LABEL[viewKey];
+  }
+  // 5) Fallback for anything else (T2 FSE, priors): plane (from IOP) + coarse sequence.
+  else {
+    const plane = getPlaneFromIOP(instance.ImageOrientationPatient);
+    const sequence = getMRSequence(instance);
+    smart = plane && sequence ? `${plane} ${sequence}` : sequence || plane;
+  }
+
+  // ALWAYS surface the ORIGINAL SeriesDescription alongside the derived label, so
+  // every series reads "<view> - <original description>" — e.g.
+  // "Vibrant 5 - WATER: Ph5/Ax Vibrant-Flex …", "Axial SUB 5 - (10037/805/…)-(…/800/…)",
+  // "STIR - Ax T2 STIR". Faculty asked for both on every series (the derived view to
+  // identify it, the raw description to cross-check). Only skipped when it would just
+  // duplicate the label (e.g. desc already "T1").
+  const desc = String(instance.SeriesDescription || '').trim();
+  if (smart && desc && desc.toUpperCase() !== smart.toUpperCase()) {
+    return `${smart} - ${desc}`;
+  }
+  return smart || desc || null;
 }
 
 function getMRSequence(instance: any): string | null {
@@ -263,8 +336,12 @@ function getMRSequence(instance: any): string | null {
     }
     return 'T1';
   }
-  // TE-based fallback when SeriesDescription is empty/dummy.
-  if (!isNaN(te)) {
+  // TE-based fallback when SeriesDescription is empty/dummy — ONLY for ORIGINAL
+  // (acquired) images. Derived series (subtraction, water, reformats) carry a tiny
+  // gradient-echo TE that would otherwise be misread as "T1"; they are handled by
+  // the subtraction / vibrant branches upstream, so here they must return null
+  // rather than guess a weighting they don't have.
+  if (!isNaN(te) && matchesImageType(instance.ImageType, ['ORIGINAL'])) {
     if (te < 20) {
       return 'T1';
     }
