@@ -3,6 +3,7 @@ import laterality from './laterality';
 import viewModifier from './viewModifier';
 import tomoType from './tomoType';
 import mammoView from './mammoView';
+import cemEnergy from './cemEnergy';
 import mrPlane from './mrPlane';
 import mrViewType from './mrViewType';
 import mrInstanceCount from './mrInstanceCount';
@@ -28,6 +29,14 @@ export default function registerHangingProtocolAttributes({ servicesManager }) {
     'DBT volume vs synthetic-2D vs MIP (from ImageType)',
     tomoType
   );
+  // CEM energy (LE vs Recombined) from ImageType, read via images[0] — a raw
+  // `ImageType` rule does NOT resolve on a display set at match time, which is
+  // why the CEM LE/Recombined panes used to collapse to the same image.
+  hangingProtocolService.addCustomAttribute(
+    'CemEnergy',
+    'CEM Low-Energy vs Recombined (from ImageType)',
+    cemEnergy
+   );
   // Reliable MR acquisition plane (AXIAL/SAGITTAL/CORONAL) from
   // ImageOrientationPatient — lets the Breast-MRI selectors require an exact
   // plane instead of guessing from "SAG"/"COR" description substrings.
