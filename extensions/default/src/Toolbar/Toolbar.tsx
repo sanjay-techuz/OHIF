@@ -60,7 +60,17 @@ export function Toolbar({ buttonSection = 'primary', viewportId, location }: Too
           />
         );
 
-        return <div key={id}>{tool}</div>;
+        // `display:contents` so a button that renders null (e.g. the MR-only
+        // toggles on a non-MR study) leaves no empty flex item — otherwise the
+        // parent `gap-4` reserves blank space for each hidden button.
+        return (
+          <div
+            key={id}
+            className="contents"
+          >
+            {tool}
+          </div>
+        );
       })}
     </>
   );

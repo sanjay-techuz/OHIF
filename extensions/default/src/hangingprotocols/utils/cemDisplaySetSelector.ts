@@ -75,6 +75,14 @@ const CEM_LE_DESC = ['LE', 'LOW ENERGY', 'LOW-ENERGY', 'LOWENERGY'];
 
 const cemLECommonRules = [
   { weight: 30, attribute: 'Modality', constraint: { equals: 'MG' } },
+  // PRIMARY LE/Recombined discriminator. `CemEnergy` is a CUSTOM attribute that
+  // reads ImageType via images[0] — the reliable path. The raw `ImageType` rules
+  // below do NOT resolve on a display set at match time (ImageType is not copied
+  // onto the display set by makeDisplaySet), so without this the LE and Recombined
+  // selectors for a view tied and the sort order filled BOTH panes with the same
+  // image. Weight 60 dominates the energy decision; view/laterality still come from
+  // MammoView + the view rules. See cemEnergy.ts.
+  { weight: 60, attribute: 'CemEnergy', required: false, constraint: { equals: 'LE' } },
   { weight: 25, attribute: 'ImageType', constraint: { contains: 'LOW_ENERGY' } },
   // Keep LE OFF the contrast image so the LE pane never grabs the recombined one.
   {
@@ -88,6 +96,11 @@ const cemLECommonRules = [
 
 const cemRecombinedCommonRules = [
   { weight: 30, attribute: 'Modality', constraint: { equals: 'MG' } },
+  // PRIMARY LE/Recombined discriminator — see cemLECommonRules / cemEnergy.ts.
+  // Reads ImageType reliably via images[0]; the raw `ImageType` rules below don't
+  // resolve at match time. Weight 60 so the recombined pane always beats the LE
+  // image (and vice-versa) on the energy axis.
+  { weight: 60, attribute: 'CemEnergy', required: false, constraint: { equals: 'RECOMBINED' } },
   // The load-bearing CEM contrast tag — RECOMBINED / SUBTRACTION / IODINE / CESM.
   { weight: 25, attribute: 'ImageType', constraint: { contains: CEM_CONTRAST_IMAGETYPE } },
   // Keep recombined OFF the LE image so the two panes never collapse to the same view.
@@ -180,7 +193,15 @@ const RMLOViewRules = [
     weight: 10,
     attribute: 'ViewCode',
     required: false,
-    constraint: { contains: ['SCT:399368009', 'R-102D2'] },
+    // MLO ViewCodeSequence CodeValues: SNOMED 399368009 / SRT R-102D2, AND
+    // R-10226 — the SRT MLO code some vendors (this Hologic CEM) emit. R-10226
+    // was missing here, so on anonymized studies (SeriesDescription
+    // 'DummySeriesDesc!' matches CC and MLO equally) the ONLY CC-vs-MLO signal
+    // besides MammoView was this ViewCode rule — and it scored 0 for MLO, so an
+    // RCC image TIED an RMLO image for the RMLO pane and whichever sorted first
+    // won (why some CEM cases loaded right, some didn't). getViewLabel.ts already
+    // treats R-10226 as MLO; this keeps the selector consistent with it.
+    constraint: { contains: ['SCT:399368009', 'R-102D2', 'R-10226'] },
   },
   {
     weight: 20,
@@ -203,7 +224,9 @@ const LMLOViewRules = [
     weight: 10,
     attribute: 'ViewCode',
     required: false,
-    constraint: { contains: ['SCT:399368009', 'R-102D2'] },
+    // See RMLOViewRules above: R-10226 is the SRT MLO code this Hologic CEM emits;
+    // without it, LCC and LMLO tied for the LMLO pane on anonymized studies.
+    constraint: { contains: ['SCT:399368009', 'R-102D2', 'R-10226'] },
   },
   {
     weight: 20,

@@ -15,6 +15,8 @@ import getCustomizationModule from './getCustomizationModule';
 import getHangingProtocolModule from './getHangingProtocolModule';
 import getToolbarModule from './getToolbarModule';
 import init from './init';
+// [MR-AUTO-ORIENT] reliable orient trigger (see onModeEnter subscription below).
+import { scheduleRadiologicalOrientationMR } from './utils/mrAutoOrient';
 import ColorbarService from './services/ColorbarService';
 import CornerstoneCacheService from './services/CornerstoneCacheService';
 import SegmentationService from './services/SegmentationService';
@@ -93,7 +95,7 @@ const cornerstoneExtension: Types.Extensions.Extension = {
   id,
 
   onModeEnter: ({ servicesManager, commandsManager }: withAppTypes): void => {
-    const { cornerstoneViewportService, toolbarService, segmentationService } =
+    const { cornerstoneViewportService, toolbarService, segmentationService, hangingProtocolService } =
       servicesManager.services;
 
     const { unsubscriptions: segmentationUnsubscriptions } = setUpSegmentationEventHandlers({
@@ -105,6 +107,55 @@ const cornerstoneExtension: Types.Extensions.Extension = {
     toolbarService.registerEventForToolbarUpdate(cornerstoneViewportService, [
       cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
     ]);
+
+    // [MR-AUTO-ORIENT] Reliable per-viewport orient trigger. The setStack().then()
+    // call site in CornerstoneViewportService is SKIPPED whenever a viewport is
+    // disabled/recreated mid-load (the `isViewportAlive()` race that fires during
+    // concurrent pane loads / HP layout swaps) — that's why e.g. the T1 pane was
+    // randomly left un-oriented. VIEWPORT_DATA_CHANGED fires AFTER the viewport
+    // data is valid, and we re-fetch the LIVE viewport by id (in case it was
+    // recreated), so no MR stack pane is ever missed. Self-gates to MR / correct
+    // plane and is idempotent, so it never touches non-MR viewports.
+    const mrOrientSub = cornerstoneViewportService.subscribe(
+      cornerstoneViewportService.EVENTS.VIEWPORT_DATA_CHANGED,
+      ({ viewportId }: { viewportId?: string }) => {
+        try {
+          const vp = viewportId
+            ? cornerstoneViewportService.getCornerstoneViewport(viewportId)
+            : null;
+          // Stack viewports have setStack(); volume/other viewports don't.
+          if (vp && typeof (vp as { setStack?: unknown }).setStack === 'function') {
+            scheduleRadiologicalOrientationMR(vp as never);
+          }
+        } catch {
+          /* never break the viewer over auto-orient */
+        }
+      }
+    );
+    unsubscriptions.push(mrOrientSub.unsubscribe ?? mrOrientSub);
+
+    // [MR-AUTO-ORIENT] Re-orient on HANGING-PROTOCOL change too. A protocol/stage
+    // switch RESETS viewport cameras but does NOT re-stack a pane whose displaySet
+    // stays at the SAME grid position (e.g. T1 at position 0 across 2×3/2×4) — that
+    // pane fires no VIEWPORT_DATA_CHANGED, so the per-viewport hook above misses it
+    // and it loses its flip. On PROTOCOL_CHANGED we re-assert the orientation on
+    // EVERY live MR stack viewport, so the un-restacked pane (T1) is covered.
+    const orientAllMrViewports = () => {
+      try {
+        cornerstone.getEnabledElements().forEach(({ viewport }) => {
+          if (viewport && typeof (viewport as { setStack?: unknown }).setStack === 'function') {
+            scheduleRadiologicalOrientationMR(viewport as never);
+          }
+        });
+      } catch {
+        /* never break the viewer over auto-orient */
+      }
+    };
+    const hpChangeSub = hangingProtocolService.subscribe(
+      hangingProtocolService.EVENTS.PROTOCOL_CHANGED,
+      orientAllMrViewports
+    );
+    unsubscriptions.push(hpChangeSub.unsubscribe ?? hpChangeSub);
 
     toolbarService.registerEventForToolbarUpdate(segmentationService, [
       segmentationService.EVENTS.SEGMENTATION_REMOVED,

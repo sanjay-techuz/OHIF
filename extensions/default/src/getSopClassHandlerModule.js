@@ -41,10 +41,25 @@ const isMultiFrame = instance => {
 
 function getDisplaySetInfo(instances) {
   const dynamicVolumeInfo = getDynamicVolumeInfo(instances);
-  const { isDynamicVolume, timePoints } = dynamicVolumeInfo;
+  let { isDynamicVolume } = dynamicVolumeInfo;
+  const { timePoints } = dynamicVolumeInfo;
   let displaySetInfo;
 
   const { appConfig } = appContext;
+
+  // A multi-b-value DWI (the same slice acquired at several b-values, e.g.
+  // b50/b500/b800) is a perfectly regular grid, so Cornerstone's 4D detector
+  // (`splitImageIdsBy4DTags`) classifies it as a DYNAMIC VOLUME and splits it into
+  // one "time point" per b-value. Our breast-MR hanging protocol shows DWI in a
+  // plain STACK pane, where a dynamic-volume display set renders blank (it shows a
+  // single time point — e.g. 65 of 195 images). A b-value split is NOT a real time
+  // series, so treat it as an ordinary stack instead (matches stock OHIF, which
+  // shows the full DWI stack). Real temporal 4D (splittingTag
+  // 'TemporalPositionIdentifier', TriggerTime, …) is left untouched.
+  if (isDynamicVolume && dynamicVolumeInfo.splittingTag === 'DiffusionBValue') {
+    isDynamicVolume = false;
+    dynamicVolumeInfo.isDynamicVolume = false;
+  }
 
   if (isDynamicVolume) {
     const timePoint = timePoints[0];

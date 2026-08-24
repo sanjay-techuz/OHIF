@@ -1,6 +1,7 @@
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import { useSystem, utils } from '@ohif/core';
 import {
+  Checkbox,
   Select,
   SelectContent,
   SelectItem,
@@ -105,6 +106,11 @@ function PanelStudyBrowser({
   // the picked one the prior (index 1) — no StudyDate logic, no auto-loading.
   const [comparePriorUID, setComparePriorUID] = useState<string | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  // Remember the last prior the user compared against, so the "Compare"
+  // checkbox can re-enable comparison (re-check) without forcing them to pick
+  // the study again from the dropdown. Survives an uncheck (which only clears
+  // the ACTIVE comparison, not the remembered choice).
+  const lastPriorUIDRef = useRef<string | null>(null);
 
   const [viewPresets, setViewPresets] = useState(
     customizationService.getCustomization('studyBrowser.viewPresets')
@@ -836,6 +842,7 @@ function PanelStudyBrowser({
         });
         if (applied) {
           setComparePriorUID(value);
+          lastPriorUIDRef.current = value;
         }
         // NOTE: deliberately do NOT touch `expandedStudyInstanceUIDs` here.
         // `_handleStudyClick` is a pure toggle over that array AND it only calls
@@ -848,6 +855,27 @@ function PanelStudyBrowser({
       }
     },
     [commandsManager]
+  );
+
+  // Checkbox next to "Compare Studies": checked = comparison ON. Checking it
+  // enables comparison (re-applies the remembered prior, or the first available
+  // one if none was picked yet); unchecking is treated as Clear — the current
+  // study is re-applied automatically via handleCompareChange('none').
+  const handleCompareToggle = useCallback(
+    (checked: boolean | 'indeterminate') => {
+      if (isComparing) {
+        return;
+      }
+      if (checked === true) {
+        const uid = lastPriorUIDRef.current || comparableStudies[0]?.studyInstanceUid;
+        if (uid) {
+          handleCompareChange(uid);
+        }
+      } else {
+        handleCompareChange('none');
+      }
+    },
+    [isComparing, comparableStudies, handleCompareChange]
   );
 
   const getCompareStudyLabel = useCallback(
@@ -893,16 +921,16 @@ function PanelStudyBrowser({
         <div className="bg-popover mb-3 rounded-md px-3 py-2.5">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span className="text-[13px] font-bold text-white">Compare Studies</span>
-            {comparePriorUID && (
-              <button
-                type="button"
-                onClick={() => handleCompareChange('none')}
+            {/* Checkbox replaces the old "Clear" button: checked = comparison ON.
+                Unchecking clears the comparison (current study auto-applies). */}
+            <label className="flex shrink-0 cursor-pointer items-center text-[11px] text-white/70">
+              <Checkbox
+                checked={!!comparePriorUID}
+                onCheckedChange={handleCompareToggle}
                 disabled={isComparing}
-                className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-white/70 underline transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
-              >
-                Clear
-              </button>
-            )}
+                aria-label="Toggle prior-study comparison"
+              />
+            </label>
           </div>
 
           <p className="mb-2 text-[11px] leading-snug text-white/50">
