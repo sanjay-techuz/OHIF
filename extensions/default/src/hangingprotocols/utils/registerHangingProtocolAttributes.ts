@@ -3,6 +3,7 @@ import laterality from './laterality';
 import viewModifier from './viewModifier';
 import tomoType from './tomoType';
 import mammoView from './mammoView';
+import cemEnergy from './cemEnergy';
 
 export default function registerHangingProtocolAttributes({ servicesManager }) {
   const { hangingProtocolService } = servicesManager.services;
@@ -24,5 +25,13 @@ export default function registerHangingProtocolAttributes({ servicesManager }) {
     'TomoType',
     'DBT volume vs synthetic-2D vs MIP (from ImageType)',
     tomoType
+  );
+  // CEM energy (LE vs Recombined) from ImageType, read via images[0] — a raw
+  // `ImageType` rule does NOT resolve on a display set at match time, which is
+  // why the CEM LE/Recombined panes used to collapse to the same image.
+  hangingProtocolService.addCustomAttribute(
+    'CemEnergy',
+    'CEM Low-Energy vs Recombined (from ImageType)',
+    cemEnergy
   );
 }

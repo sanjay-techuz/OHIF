@@ -405,6 +405,19 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     if (currentProtocol?.id === '@ohif/hpCEM') {
       return;
     }
+    // HOLD the ViewerLayout loader over the default protocol until hpCEM paints.
+    // CEM auto-apply is deliberately delayed 2000ms (initial-load viewport-crash
+    // guard) — that is LONGER than the loader gate's GRACE window, so without a
+    // hold the loader settles on the intermediate default layout (1x4) and the
+    // swap to hpCEM (2x4) visibly flickers. A `{ hold: true }` transition keeps
+    // the loader up and makes the gate ignore the default PROTOCOL_CHANGED; the
+    // non-hold transition dispatched by `runHangingProtocol` below then lets it
+    // settle on the CEM panes once they render. Deferred a tick so the parent
+    // ViewerLayout's listener is attached first (child effects run before the
+    // parent's on mount).
+    const holdId = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('viewer-hp-transition', { detail: { hold: true } }));
+    }, 0);
     const timeoutId = setTimeout(() => {
       (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpCEM', stageIndex: 0 };
       runHangingProtocol(commandsManager, {
@@ -420,7 +433,10 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         });
       }, 100);
     }, 2000);
-    return () => clearTimeout(timeoutId);
+    return () => {
+      clearTimeout(holdId);
+      clearTimeout(timeoutId);
+    };
   }, [isCEM, commandsManager, hangingProtocolService]);
 
   // Auto-apply MRI hanging protocol (no dropdown, just apply automatically)
