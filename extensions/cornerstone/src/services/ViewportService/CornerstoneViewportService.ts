@@ -37,6 +37,8 @@ import { useSegmentationPresentationStore } from '../../stores/useSegmentationPr
 import { useSynchronizersStore } from '../../stores/useSynchronizersStore';
 import JumpPresets from '../../utils/JumpPresets';
 import reconcileInvertLut from '../../utils/reconcileInvertLut';
+// [MR-AUTO-ORIENT] revert: remove this import + the tagged call site below + utils/mrAutoOrient.ts
+import { scheduleRadiologicalOrientationMR } from '../../utils/mrAutoOrient';
 
 const EVENTS = {
   VIEWPORT_DATA_CHANGED: 'event::cornerstoneViewportService:viewportDataChanged',
@@ -726,6 +728,19 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
       } catch (err) {
         console.warn('[CornerstoneViewportService] post-setStack apply skipped:', err);
       }
+
+      // [MR-AUTO-ORIENT] BEGIN — force the standard radiological orientation on MR
+      // panes (per acquisition plane, from ImageOrientationPatient). Display-only
+      // + metadata-driven, so it never corrupts pixels or annotations. Kept
+      // OUTSIDE the try above so an earlier setDisplayArea/setPresentations failure
+      // can't skip it. MR-only; oblique/90°-rotated series are left untouched.
+      // REVERT: delete this block, the import at the top, and utils/mrAutoOrient.ts.
+      // Multi-shot (0/150/400ms): the initial camera settles asynchronously, so a
+      // single apply here was intermittent — re-applying makes the flip stick.
+      if (isViewportAlive()) {
+        scheduleRadiologicalOrientationMR(viewport);
+      }
+      // [MR-AUTO-ORIENT] END
     });
   }
 

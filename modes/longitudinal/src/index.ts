@@ -106,6 +106,9 @@ function modeFactory({ modeConfiguration }) {
         'WindowLevel',
         'Capture',
         'Layout',
+        'ImageSliceSyncMR',
+        'ReferenceLinesMR',
+        'CrossReferencePointMR',
         'MoreTools',
         'HangingProtocol',
       ]);

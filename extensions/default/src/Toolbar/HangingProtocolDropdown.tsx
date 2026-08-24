@@ -2,6 +2,11 @@ import { CommandsManager, ServicesManager } from '@ohif/core';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@ohif/ui-next';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUIStateStore } from '../stores/useUIStateStore';
+import {
+  getAvailableMRViews,
+  isStageAvailable,
+  type MRViewKey,
+} from '../hangingprotocols/utils/mrViewAvailability';
 import HPALL from '../../assets/images/HP-ALL.png';
 import LCCLMLO from '../../assets/images/LCC-LMLO.png';
 import RCCRMLO from '../../assets/images/RCC-RMLO.png';
@@ -36,6 +41,12 @@ import HP_CEM_LCC from '../../assets/images/HP-CEM-LCC-LE-RE.png';
 import HP_CEM_RMLO from '../../assets/images/HP-CEM-RMLO-LE-RE.png';
 import HP_CEM_LMLO from '../../assets/images/HP-CEM-LMLO-LE-RE.png';
 
+// Breast-MRI hanging-protocol thumbnails (layout diagrams for each stage).
+import MR_HP_1 from '../../assets/images/MR-HP/Protocol-1.png';
+import MR_HP_2 from '../../assets/images/MR-HP/Protocol-2.png';
+import MR_HP_3 from '../../assets/images/MR-HP/Protocol-3.png';
+import MR_HP_4 from '../../assets/images/MR-HP/Protocol-4.png';
+
 interface HangingProtocolDropdownProps {
   id: string;
   options: {
@@ -66,6 +77,23 @@ const CEM_HANGING_PROTOCOLS = [
   { label: 'L CC: LE vs Recombined', stageIndex: 4, icon: HP_CEM_LCC },
   { label: 'R MLO: LE vs Recombined', stageIndex: 5, icon: HP_CEM_RMLO },
   { label: 'L MLO: LE vs Recombined', stageIndex: 6, icon: HP_CEM_LMLO },
+];
+
+// Breast-MRI hanging protocol stages — mirrors the two stages defined in
+// `hangingprotocols/hpMR.ts`. Each stage shows a layout-diagram thumbnail
+// (Protocol-1..4) in the dropdown, like MG/CEM.
+// `viewKeys` lists the view types a stage uses; a stage is DISABLED (greyed) in
+// the dropdown when NONE of its views exist in the study.
+const MR_HANGING_PROTOCOLS: {
+  label: string;
+  stageIndex: number;
+  viewKeys: MRViewKey[];
+  icon: string;
+}[] = [
+  { label: '1×2 MIP', stageIndex: 0, viewKeys: ['MIP_SI', 'MIP_RL'], icon: MR_HP_1 },
+  { label: '2×3', stageIndex: 1, viewKeys: ['T1', 'STIR', 'SAG_R', 'VIBRANT2', 'VIBRANT5', 'SAG_L'], icon: MR_HP_2 },
+  { label: '2×4', stageIndex: 2, viewKeys: ['T1', 'STIR', 'CORONAL', 'SAG_R', 'DWI', 'ADC', 'VIBRANT2', 'SAG_L'], icon: MR_HP_3 },
+  { label: '2×2', stageIndex: 3, viewKeys: ['T1', 'STIR', 'VIBRANT2', 'VIBRANT5'], icon: MR_HP_4 },
 ];
 
 // Unified array with ALL hanging protocols (used for both dropdown and navigation)
@@ -132,6 +160,12 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   const isMammo = activeDisplaySets.some(ds => ds.Modality === 'MG');
   // Check if any active display set is MRI (MR)
   const isMR = activeDisplaySets.some(ds => ds.Modality === 'MR');
+
+  // Which breast-MRI view types this study actually has — used to grey out any
+  // MR stage whose views are all missing (e.g. no MIP → the 1×2 MIP stage).
+  const availableMRViews = isMR
+    ? getAvailableMRViews(activeDisplaySets as unknown as Record<string, unknown>[])
+    : new Set<MRViewKey>();
 
   // CEM detection. Two signals (per user spec):
   //   1) Admin-tagged via case data: `modalitySlug === 'CEM'`. Trusted first
@@ -248,10 +282,14 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   // effect below from having to branch on `isCEM` for the protocolId
   // and the stage array — they just consume `activeProtocolId` and
   // `allHangingProtocols`.
-  const activeProtocolId = isCEM ? '@ohif/hpCEM' : '@ohif/hpMammo';
+  const activeProtocolId = isMR ? '@ohif/hpMR' : isCEM ? '@ohif/hpCEM' : '@ohif/hpMammo';
 
   // Unified array for both dropdown and navigation - filter based on prior/DBT availability
   const allHangingProtocols = useMemo(() => {
+    if (isMR) {
+      // MRI: two fixed stages (Standard 2×3, With Sagittal 2×4). No prior/DBT filtering.
+      return MR_HANGING_PROTOCOLS;
+    }
     if (isCEM) {
       // CEM: 7 base stages + an optional Prior/Current stage that only shows
       // when the user has picked a study to compare.
@@ -268,7 +306,7 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       }
       return true;
     });
-  }, [hasPrior, isDBT, isCEM]);
+  }, [hasPrior, isDBT, isCEM, isMR]);
   const [selected, setSelected] = useState(allHangingProtocols[0]?.stageIndex ?? 2);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
@@ -279,6 +317,11 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
   // protocol mid-session and clobbering the user's manual layout/drag. A ref
   // keeps "apply exactly once per mounted study" truly once.
   const mammoHpAppliedRef = useRef(false);
+
+  // One-shot guard for the MRI auto-apply (same rationale as the MG ref: survive
+  // effect re-runs so we apply exactly once per mounted study and never clobber
+  // the user's manual stage/drag choice).
+  const mrHpAppliedRef = useRef(false);
 
   // Auto-apply mammography hanging protocol — guarded by !isCEM because
   // CEM display sets ALSO have Modality === 'MG' but need their own
@@ -439,31 +482,87 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     };
   }, [isCEM, commandsManager, hangingProtocolService]);
 
-  // Auto-apply MRI hanging protocol (no dropdown, just apply automatically)
+  // Auto-apply the MRI hanging protocol (default stage 0, the 2×3 layout). The
+  // dropdown lets the user switch to stage 1 (2×4 with sagittals) afterwards.
+  //
+  // Uses the SAME settle-debounce as the MG auto-apply: a breast-MRI exam
+  // streams ~30 separate series (T1, STIR, dynamic phases, subtractions, MIPs)
+  // as independent display sets. If the protocol runs before the subtraction /
+  // MIP / sagittal series have arrived, those required-gated panes match nothing
+  // and stay BLANK permanently (the matcher does not re-run on later arrivals).
+  // So we wait until DISPLAY_SETS_ADDED/CHANGED has been quiet for the settle
+  // window (every series present), then apply exactly once via a ref guard.
   useEffect(() => {
-    if (!isMR) {
+    if (!isMR || mrHpAppliedRef.current) {
       return;
     }
 
-    // Check if MRI protocol is already applied to avoid re-applying
-    const currentProtocol = hangingProtocolService?.protocol;
-    if (currentProtocol?.id === '@ohif/hpMR') {
-      return;
-    }
+    let settleTimer: ReturnType<typeof setTimeout>;
 
-    // Apply MRI hanging protocol when MR display sets are detected
-    const timeoutId = setTimeout(() => {
-      (window as any).__initialHangingProtocol = { protocolId: '@ohif/hpMR', stageIndex: 0 };
-      runHangingProtocol(commandsManager, {
+    const applyMrProtocol = () => {
+      if (mrHpAppliedRef.current) {
+        return;
+      }
+      const active = displaySetService.getActiveDisplaySets?.() || [];
+      if (!active.some((ds: any) => ds.Modality === 'MR')) {
+        // Settle fired before any MR series materialised — bail WITHOUT marking
+        // applied; the next DISPLAY_SETS event reschedules us.
+        return;
+      }
+      mrHpAppliedRef.current = true;
+
+      // Default stage = first stage whose views actually exist in this study.
+      // Prefer "1×2 MIP" (stage 0) when a MIP is present; otherwise fall through
+      // to the first available stage (2×3 → 2×4 → 2×2), else stage 0.
+      const available = getAvailableMRViews(
+        active as unknown as Record<string, unknown>[]
+      );
+      const defaultStage =
+        MR_HANGING_PROTOCOLS.find(p => isStageAvailable(p.viewKeys, available))?.stageIndex ?? 0;
+
+      (window as any).__initialHangingProtocol = {
         protocolId: '@ohif/hpMR',
-        stageIndex: 0, // Default stage (2x3 grid)
+        stageIndex: defaultStage,
+      };
+      // reset:true so the matcher re-reads getActiveDisplaySets() NOW (sees every
+      // streamed series) and bypasses any cached partial-load viewport layout.
+      window.dispatchEvent(new CustomEvent('viewer-hp-transition'));
+      commandsManager.run({
+        commandName: 'setHangingProtocol',
+        commandOptions: { protocolId: '@ohif/hpMR', stageIndex: defaultStage, reset: true },
       });
-    }, 250);
+      setSelected(defaultStage);
+      // Keep the keyboard-nav cursor in sync with the applied stage (MR stageIndex
+      // === its index in MR_HANGING_PROTOCOLS), so ArrowRight/Left step from here.
+      setCurrentStageIndex(defaultStage);
+    };
+
+    const scheduleApply = () => {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(applyMrProtocol, MAMMO_HP_SETTLE_MS);
+    };
+
+    scheduleApply();
+    const addedSub = displaySetService.subscribe(displaySetService.EVENTS.DISPLAY_SETS_ADDED, () => {
+      if (!mrHpAppliedRef.current) {
+        scheduleApply();
+      }
+    });
+    const changedSub = displaySetService.subscribe(
+      displaySetService.EVENTS.DISPLAY_SETS_CHANGED,
+      () => {
+        if (!mrHpAppliedRef.current) {
+          scheduleApply();
+        }
+      }
+    );
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(settleTimer);
+      addedSub.unsubscribe();
+      changedSub.unsubscribe();
     };
-  }, [isMR, commandsManager, activeDisplaySets, hangingProtocolService]);
+  }, [isMR, commandsManager, displaySetService, hangingProtocolService]);
 
   // Reset currentStageIndex when case type or prior status changes
   useEffect(() => {
@@ -522,96 +621,65 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
         stageIndex,
       });
 
-      // Apply zoom immediately after hanging protocol change
-      setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setMammographyZoomConditional',
-          commandOptions: {},
-        });
-      }, 100);
+      // Apply zoom immediately after hanging protocol change (MG/CEM only —
+      // the mammography zoom is meaningless for MR and must not run there).
+      if (!isMR) {
+        setTimeout(() => {
+          commandsManager.run({
+            commandName: 'setMammographyZoomConditional',
+            commandOptions: {},
+          });
+        }, 100);
+      }
     },
-    [commandsManager, allHangingProtocols, activeProtocolId]
+    [commandsManager, allHangingProtocols, activeProtocolId, isMR]
   );
 
   // Keyboard navigation handlers
-  const handleNextStage = useCallback(() => {
-    const nextIndex = currentStageIndex + 1;
-    if (nextIndex < allHangingProtocols.length) {
-      setCurrentStageIndex(nextIndex);
-      const protocol = allHangingProtocols[nextIndex];
-      setSelected(protocol.stageIndex);
+  // Step to the next (dir=1) / previous (dir=-1) stage, wrapping around. Shared by
+  // the ArrowRight/ArrowLeft shortcuts for MG/CEM AND MR. For MR it SKIPS stages
+  // whose views are all missing (the greyed-out ones) so keyboard nav never lands
+  // on an all-blank layout, and it never runs the mammography-only zoom.
+  const stepStage = useCallback(
+    (dir: 1 | -1) => {
+      const n = allHangingProtocols.length;
+      if (n === 0) {
+        return;
+      }
+      const isDisabled = (protocol: { viewKeys?: MRViewKey[] }) =>
+        isMR && !!protocol.viewKeys && !isStageAvailable(protocol.viewKeys, availableMRViews);
 
-      runHangingProtocol(commandsManager, {
-        protocolId: activeProtocolId,
-        stageIndex: protocol.stageIndex,
-      });
-
-      // Apply zoom immediately after hanging protocol change
-      setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setMammographyZoomConditional',
-          commandOptions: {},
+      // Walk in `dir`, wrapping, to the next ENABLED stage (at most n steps).
+      let idx = currentStageIndex;
+      for (let i = 0; i < n; i++) {
+        idx = (idx + dir + n) % n;
+        const protocol = allHangingProtocols[idx];
+        if (isDisabled(protocol as { viewKeys?: MRViewKey[] })) {
+          continue;
+        }
+        setCurrentStageIndex(idx);
+        setSelected(protocol.stageIndex);
+        runHangingProtocol(commandsManager, {
+          protocolId: activeProtocolId,
+          stageIndex: protocol.stageIndex,
         });
-      }, 100);
-    } else {
-      // Loop back to first stage
-      setCurrentStageIndex(0);
-      const protocol = allHangingProtocols[0];
-      setSelected(protocol.stageIndex);
-      runHangingProtocol(commandsManager, {
-        protocolId: activeProtocolId,
-        stageIndex: protocol.stageIndex,
-      });
+        // Mammography-only zoom — meaningless for MR and must not run there.
+        if (!isMR) {
+          setTimeout(() => {
+            commandsManager.run({
+              commandName: 'setMammographyZoomConditional',
+              commandOptions: {},
+            });
+          }, 100);
+        }
+        return;
+      }
+    },
+    [currentStageIndex, allHangingProtocols, commandsManager, activeProtocolId, isMR, availableMRViews]
+  );
 
-      // Apply zoom immediately after hanging protocol change
-      setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setMammographyZoomConditional',
-          commandOptions: {},
-        });
-      }, 100);
-    }
-  }, [currentStageIndex, commandsManager, allHangingProtocols, activeProtocolId]);
-
-  const handlePreviousStage = useCallback(() => {
-    const prevIndex = currentStageIndex - 1;
-    if (prevIndex >= 0) {
-      setCurrentStageIndex(prevIndex);
-      const protocol = allHangingProtocols[prevIndex];
-      setSelected(protocol.stageIndex);
-
-      runHangingProtocol(commandsManager, {
-        protocolId: activeProtocolId,
-        stageIndex: protocol.stageIndex,
-      });
-
-      // Apply zoom immediately after hanging protocol change
-      setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setMammographyZoomConditional',
-          commandOptions: {},
-        });
-      }, 100);
-    } else {
-      // Loop to last stage
-      const lastIndex = allHangingProtocols.length - 1;
-      setCurrentStageIndex(lastIndex);
-      const protocol = allHangingProtocols[lastIndex];
-      setSelected(protocol.stageIndex);
-      runHangingProtocol(commandsManager, {
-        protocolId: activeProtocolId,
-        stageIndex: protocol.stageIndex,
-      });
-
-      // Apply zoom immediately after hanging protocol change
-      setTimeout(() => {
-        commandsManager.run({
-          commandName: 'setMammographyZoomConditional',
-          commandOptions: {},
-        });
-      }, 100);
-    }
-  }, [currentStageIndex, commandsManager, allHangingProtocols, activeProtocolId]);
+  const handleNextStage = useCallback(() => stepStage(1), [stepStage]);
+  const handlePreviousStage = useCallback(() => stepStage(-1), [stepStage]);
 
   // Re-apply current hanging protocol when sidebar opens/closes to fix viewport blank space
   useEffect(() => {
@@ -643,9 +711,9 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
     return () => window.removeEventListener('ohif-sidebar-toggle', handleSidebarToggle);
   }, [isMammo, currentStageIndex, allHangingProtocols, commandsManager]);
 
-  // Keyboard shortcuts for stage navigation (only for mammography)
+  // Keyboard shortcuts for stage navigation (mammography + breast MRI).
   useEffect(() => {
-    if (!isMammo) {
+    if (!isMammo && !isMR) {
       return;
     }
 
@@ -701,23 +769,35 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isMammo, handleNextStage, handlePreviousStage]);
+  }, [isMammo, isMR, handleNextStage, handlePreviousStage]);
 
-  // Hide the dropdown if not a mammography study
-  // MRI protocol applies automatically (no dropdown needed)
-  if (!isMammo) {
+  // Show the dropdown for MG/CEM (icon thumbnails) and MR (two text-labelled
+  // stages). Hide for anything else.
+  if (!isMammo && !isMR) {
     return null;
   }
 
-  const defaultOption = selected => {
+  const defaultOption = selectedIndex => {
+    const proto = allHangingProtocols.find(protocol => protocol.stageIndex === selectedIndex) as
+      | { label: string; stageIndex: number; icon?: string }
+      | undefined;
+    // No thumbnail available → show the protocol name.
+    if (!proto?.icon) {
+      return (
+        <div className="flex items-center truncate whitespace-nowrap px-1 text-sm">
+          {proto?.label ?? ''}
+        </div>
+      );
+    }
+    // All thumbnails are wide layout diagrams (~231×134); use `object-contain` +
+    // `w-auto` so the whole diagram shows without cropping (MG/CEM were previously
+    // `object-cover` at w-15 and got cut off).
     return (
       <div className="flex items-center">
         <img
-          src={
-            allHangingProtocols.find(protocol => protocol.stageIndex === selected)?.icon || HPALL
-          }
-          alt="Selected Hanging Protocol"
-          className="w-15 h-10 object-cover"
+          src={proto.icon}
+          alt={proto.label ?? 'Selected Hanging Protocol'}
+          className="h-10 w-auto object-contain"
         />
       </div>
     );
@@ -728,20 +808,27 @@ const HangingProtocolDropdown: React.FC<HangingProtocolDropdownProps> = ({
       onValueChange={handleChange}
       value={`${selected}`}
     >
-      <SelectTrigger className="h-10 w-20 py-0">
+      <SelectTrigger className="h-10 w-24 py-0">
         {selected !== undefined && selected !== null
           ? defaultOption(selected)
           : 'Select Hanging Protocol'}
       </SelectTrigger>
       <SelectContent>
-        {allHangingProtocols.map(protocol => (
-          <SelectItem
-            key={protocol.stageIndex}
-            value={`${protocol.stageIndex}`}
-          >
-            {defaultOption(protocol.stageIndex)}
-          </SelectItem>
-        ))}
+        {allHangingProtocols.map(protocol => {
+          // Grey out an MR stage when NONE of its views exist in the study
+          // (e.g. no MIP at all → disable the "1×2 MIP" stage).
+          const viewKeys = (protocol as { viewKeys?: MRViewKey[] }).viewKeys;
+          const disabled = isMR && !!viewKeys && !isStageAvailable(viewKeys, availableMRViews);
+          return (
+            <SelectItem
+              key={protocol.stageIndex}
+              value={`${protocol.stageIndex}`}
+              disabled={disabled}
+            >
+              {defaultOption(protocol.stageIndex)}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

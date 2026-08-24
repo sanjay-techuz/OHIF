@@ -6,6 +6,7 @@ import {
   utilities as csUtils,
   eventTarget as csEventTarget,
   getEnabledElement,
+  getEnabledElements,
   getRenderingEngines,
   metaData,
   StackViewport,
@@ -31,6 +32,7 @@ import {
   multiLabelDialog,
   createReportAsync,
   useUIStateStore,
+  useOverlayFieldsStore,
 } from '@ohif/extension-default';
 import i18n from '@ohif/i18n';
 import { mat4, vec3 } from 'gl-matrix';
@@ -40,6 +42,16 @@ import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownload
 import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
 import reconcileInvertLut from './utils/reconcileInvertLut';
+// [MR-AUTO-ORIENT] revert: remove this import, scheduleMROrientation(), and its
+// call sites in resetView + resetViewport.
+import { applyRadiologicalOrientationMR } from './utils/mrAutoOrient';
+// [CROSS-REF-POINT]
+import {
+  placeCrossReferencePoint,
+  clearCrossReferencePoints,
+  attachCrossReferenceScrollFollow,
+  detachCrossReferenceScrollFollow,
+} from './tools/CrossReferencePointTool';
 import { getUpdatedViewportsForSegmentation } from './utils/hydrationUtils';
 import toggleImageSliceSync from './utils/imageSliceSync/toggleImageSliceSync';
 import { getFirstAnnotationSelected } from './utils/measurementServiceMappings/utils/selection';
@@ -47,6 +59,27 @@ import toggleVOISliceSync from './utils/toggleVOISliceSync';
 import { updateSegmentBidirectionalStats } from './utils/updateSegmentationStats';
 
 const { DefaultHistoryMemo } = csUtils.HistoryMemo;
+
+// [MR-AUTO-ORIENT] Re-apply the standard radiological MR orientation to every
+// enabled viewport. Called after a reset: Reset View re-runs the hanging protocol
+// and Reset Image resets the camera — both clear the orientation flip, and both
+// settle ASYNCHRONOUSLY, so we re-apply now and again on the next couple of ticks
+// so the flip holds. No-op for non-MR / oblique viewports (the helper self-gates).
+function scheduleMROrientation(): void {
+  const run = () => {
+    try {
+      getEnabledElements().forEach(({ viewport }) => {
+        applyRadiologicalOrientationMR(viewport as never);
+      });
+    } catch {
+      /* best-effort — never break reset over auto-orient */
+    }
+  };
+  run();
+  setTimeout(run, 150);
+  setTimeout(run, 400);
+}
+
 const toggleSyncFunctions = {
   imageSlice: toggleImageSliceSync,
   voi: toggleVOISliceSync,
@@ -228,6 +261,29 @@ function commandsModule({
         }
       }
     }, MAMMO_RESET_HOP_MS);
+  };
+
+  // [CROSS-REF-POINT] current on-screen Cornerstone viewport elements (for
+  // attaching the scroll-follow listener). Non-cornerstone / unbuilt panes skipped.
+  const _getCrossRefViewportElements = (): HTMLElement[] => {
+    const els: HTMLElement[] = [];
+    try {
+      const { viewports } = viewportGridService.getState();
+      for (const vp of viewports.values()) {
+        const id = vp?.viewportOptions?.viewportId;
+        if (!id) {
+          continue;
+        }
+        const csVp = cornerstoneViewportService.getCornerstoneViewport(id);
+        const element = (csVp as unknown as { element?: HTMLElement })?.element;
+        if (element) {
+          els.push(element);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return els;
   };
 
   const actions = {
@@ -1406,6 +1462,9 @@ function commandsModule({
           viewport.render();
         }
       }
+      // [MR-AUTO-ORIENT] Reset Image clears the camera flip — snap MR panes back to
+      // the standard radiological orientation (A-top/R-left). No-op for non-MR.
+      scheduleMROrientation();
     },
     resetView: () => {
       // Drop any manual prior comparison first, so Reset returns to the plain
@@ -1491,9 +1550,22 @@ function commandsModule({
       } catch {
         /* command may not exist in non-BIEDX modes */
       }
+
+      // [MR-AUTO-ORIENT] The HP re-run above resets each MR pane's camera — snap it
+      // back to the standard radiological orientation (A-top/R-left). No-op non-MR.
+      scheduleMROrientation();
     },
 
     clearView: () => {
+      // Reset Image restores the DEFAULT view state — so if the user had hidden
+      // the viewport info overlay text, bring it back to visible here (only on
+      // Reset Image / clearView, NOT on Reset View / resetView).
+      try {
+        useOverlayFieldsStore.getState().setOverlayHidden(false);
+      } catch {
+        /* overlay store optional; ignore */
+      }
+
       // Drop any manual prior comparison first (same reasoning as resetView):
       // a full Clear must also reset the "Compare Studies" dropdown.
       try {
@@ -1659,6 +1731,11 @@ function commandsModule({
       } catch {
         /* trigger not registered — viewer not mounted; safe to ignore */
       }
+
+      // [MR-AUTO-ORIENT] Reset Image (Clear) does a per-viewport resetCamera above,
+      // which clears the flip — snap MR panes back to the standard radiological
+      // orientation (A-top/R-left). Multi-shot to survive the async HP re-run.
+      scheduleMROrientation();
     },
     scaleViewport: ({ direction }) => {
       const enabledElement = _getActiveViewportEnabledElement();
@@ -2202,6 +2279,34 @@ function commandsModule({
       }
 
       viewport.render();
+    },
+    // [CROSS-REF-POINT] Place / clear the single draggable cross-plane reference
+    // point at the active viewport centre. Mode (passive/disabled) is toggled by the
+    // toolbar button via toolGroupService; these only manage the annotation itself.
+    crossReferencePointPlace: () => {
+      const viewportId = viewportGridService.getActiveViewportId?.();
+      if (!viewportId) {
+        return;
+      }
+      const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+      if (viewport) {
+        placeCrossReferencePoint(viewport as never);
+      }
+      // Enable scroll-follow (scrolling a pane carries the point to the new slice).
+      attachCrossReferenceScrollFollow(_getCrossRefViewportElements());
+    },
+    crossReferencePointClear: () => {
+      detachCrossReferenceScrollFollow();
+      const viewportId = viewportGridService.getActiveViewportId?.();
+      const viewport = viewportId
+        ? cornerstoneViewportService.getCornerstoneViewport(viewportId)
+        : null;
+      clearCrossReferencePoints((viewport as unknown as { element?: HTMLElement })?.element);
+    },
+    // Re-attach the scroll-follow listeners after the panes are rebuilt (e.g. a
+    // 2×3 → 2×4 stage switch). Idempotent — skips already-attached elements.
+    crossReferencePointReattach: () => {
+      attachCrossReferenceScrollFollow(_getCrossRefViewportElements());
     },
     resetCrosshairs: ({ viewportId }) => {
       const crosshairInstances = [];
@@ -3043,6 +3148,16 @@ function commandsModule({
     },
     resetCrosshairs: {
       commandFn: actions.resetCrosshairs,
+    },
+    // [CROSS-REF-POINT]
+    crossReferencePointPlace: {
+      commandFn: actions.crossReferencePointPlace,
+    },
+    crossReferencePointClear: {
+      commandFn: actions.crossReferencePointClear,
+    },
+    crossReferencePointReattach: {
+      commandFn: actions.crossReferencePointReattach,
     },
     toggleSynchronizer: {
       commandFn: actions.toggleSynchronizer,

@@ -95,6 +95,7 @@ import {
   ToolCobbAngle,
   ToolCreateThreshold,
   ToolCrosshair,
+  ToolCrossReferencePoint, // [CROSS-REF-POINT]
   ToolDicomTagBrowser,
   ToolFlipHorizontal,
   ToolFlipVertical,
@@ -407,6 +408,7 @@ export const Icons = {
   ToolCobbAngle,
   ToolCreateThreshold,
   ToolCrosshair,
+  ToolCrossReferencePoint, // [CROSS-REF-POINT]
   ToolDicomTagBrowser,
   ToolFlipHorizontal,
   ToolFlipVertical,
@@ -739,6 +741,8 @@ export const Icons = {
   'launch-info': (props: IconProps) => LaunchInfo(props),
   'old-trash': (props: IconProps) => Trash(props),
   'tool-point': (props: IconProps) => ToolCircle(props),
+  // [CROSS-REF-POINT] target reticle for the Cross Reference Point tool.
+  'tool-cross-reference-point': (props: IconProps) => ToolCrossReferencePoint(props),
   'tool-freehand-line': (props: IconProps) => ToolFreehand(props),
   clipboard: (props: IconProps) => Clipboard(props),
   Undo,
