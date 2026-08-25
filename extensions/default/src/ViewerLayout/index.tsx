@@ -292,6 +292,12 @@ function ViewerLayout({
     // (currently 250ms) so the breast protocol's transition always arrives
     // before the default protocol's grace window elapses.
     const GRACE_MS = 900;
+    // [MR-AUTO-ORIENT] For MR, the auto-orient flip (A-top / R-left) settles
+    // ASYNCHRONOUSLY after the panes paint, so releasing the loader the instant
+    // they render lets the reader see the pane flip into place. Hold the MR loader
+    // this much longer (covers the 0/150/400/700ms orient re-applies) so the
+    // standard orientation is already in place when the loader lifts.
+    const MR_ORIENT_SETTLE_MS = 900;
 
     let renderedElements = new Set<HTMLElement>();
     let attachedListeners: Array<{ el: HTMLElement; fn: EventListener }> = [];
@@ -326,8 +332,16 @@ function ViewerLayout({
     const finish = () => {
       if (settled) return;
       settled = true;
-      setShowLoadingIndicator(false);
       clearWatchResources();
+      // MR: keep the loader up through the auto-orient settle window so the reader
+      // never sees the pane flip into the standard orientation. Non-MR settles at
+      // paint time — release immediately.
+      const isMR = hangingProtocolService.protocol?.id === '@ohif/hpMR';
+      if (isMR) {
+        setTimeout(() => setShowLoadingIndicator(false), MR_ORIENT_SETTLE_MS);
+      } else {
+        setShowLoadingIndicator(false);
+      }
     };
 
     const hasValidDims = (vp: any): boolean => {

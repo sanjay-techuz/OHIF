@@ -51,6 +51,8 @@ import {
   CustomRectangleROITool,
 } from './tools/CustomRoiHitTesting';
 import { CustomLengthTool } from './tools/CustomLengthTool';
+// [CROSS-REF-POINT] custom draggable cross-plane reference point (MR).
+import { CrossReferencePointTool } from './tools/CrossReferencePointTool';
 
 // ---------------------------------------------------------------------------
 // Fix Cornerstone3D WindowLevelTool drag for SIGMOID-windowed images (common on
@@ -147,6 +149,7 @@ export default function initCornerstoneTools(configuration = {}) {
   addTool(BrushTool);
   addTool(PaintFillTool);
   addTool(ReferenceLinesTool);
+  addTool(CrossReferencePointTool); // [CROSS-REF-POINT]
   addTool(CalibrationLineTool);
   addTool(TrackballRotateTool);
   addTool(ImageOverlayViewerTool);
@@ -202,6 +205,7 @@ const toolNames = {
   Length: LengthTool.toolName,
   DragProbe: DragProbeTool.toolName,
   Probe: ProbeTool.toolName,
+  CrossReferencePoint: CrossReferencePointTool.toolName, // [CROSS-REF-POINT]
   RectangleROI: RectangleROITool.toolName,
   RectangleROIThreshold: RectangleROIThresholdTool.toolName,
   EllipticalROI: EllipticalROITool.toolName,

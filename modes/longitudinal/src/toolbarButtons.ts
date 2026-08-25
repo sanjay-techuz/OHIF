@@ -284,6 +284,30 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    // MRI-only top-toolbar Image Slice Sync toggle. Custom component gates it to
+    // MR studies (renders null otherwise) — see
+    // extensions/default/src/Toolbar/ImageSliceSyncButton.tsx.
+    id: 'ImageSliceSyncMR',
+    uiType: 'ohif.imageSliceSyncButton',
+    props: {},
+  },
+  {
+    // MRI-only top-toolbar Reference Lines toggle (companion to ImageSliceSyncMR).
+    // Custom component gates it to MR studies — see
+    // extensions/default/src/Toolbar/ReferenceLinesButton.tsx.
+    id: 'ReferenceLinesMR',
+    uiType: 'ohif.referenceLinesButton',
+    props: {},
+  },
+  {
+    // [CROSS-REF-POINT] MRI-only draggable cross-plane reference point toggle.
+    // Custom component gates it to MR studies — see
+    // extensions/default/src/Toolbar/CrossReferencePointButton.tsx.
+    id: 'CrossReferencePointMR',
+    uiType: 'ohif.crossReferencePointButton',
+    props: {},
+  },
+  {
     id: 'ReferenceLines',
     uiType: 'ohif.toolButton',
     props: {

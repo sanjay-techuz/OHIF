@@ -83,6 +83,12 @@ function CustomizableViewportOverlay({
   // "Done" updates the store but the viewport keeps showing the old picks.
   useOverlayFieldsStore(s => s.version);
 
+  // Global show/hide for the whole info overlay (top-left fields + corner
+  // WW/WL / Zoom / Instance readouts). Toggled from the "Customize Viewport
+  // Overlay" modal; when hidden we skip rendering ViewportOverlay entirely
+  // (annotation tooltips / custom labels are intentionally kept).
+  const overlayHidden = useOverlayFieldsStore(s => s.overlayHidden);
+
   // Same reasoning for the folder-name map: the `case_id` extractor reads it
   // fresh via getState(), and it arrives asynchronously (ViewerLayout fetches it
   // from the LMS by PatientID). Without this subscription the overlay would keep
@@ -289,14 +295,16 @@ function CustomizableViewportOverlay({
 
   return (
     <>
-      <ViewportOverlay
-        topLeft={getContent(topLeftCustomization, 'topLeftOverlayItem')}
-        topRight={getContent(topRightCustomization, 'topRightOverlayItem')}
-        bottomLeft={getContent(bottomLeftCustomization, 'bottomLeftOverlayItem')}
-        bottomRight={getContent(bottomRightCustomization, 'bottomRightOverlayItem')}
-        color={isLight ? 'text-neutral-dark' : 'text-neutral-light'}
-        shadowClass={isLight ? 'shadow-light' : 'shadow-dark'}
-      />
+      {!overlayHidden && (
+        <ViewportOverlay
+          topLeft={getContent(topLeftCustomization, 'topLeftOverlayItem')}
+          topRight={getContent(topRightCustomization, 'topRightOverlayItem')}
+          bottomLeft={getContent(bottomLeftCustomization, 'bottomLeftOverlayItem')}
+          bottomRight={getContent(bottomRightCustomization, 'bottomRightOverlayItem')}
+          color={isLight ? 'text-neutral-dark' : 'text-neutral-light'}
+          shadowClass={isLight ? 'shadow-light' : 'shadow-dark'}
+        />
+      )}
       {/* Always-visible annotation label tooltips */}
       <AnnotationTooltipsOverlay
         element={element}
