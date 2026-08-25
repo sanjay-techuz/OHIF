@@ -143,7 +143,8 @@ const makeDisplaySet = instances => {
     // Picked up by the matcher in HangingProtocolService to globally skip
     // user-attached JPG/PNG (Modality ∈ {XC, OT, ...}) from automatic viewport
     // assignment. They remain draggable thumbnails in the study browser.
-    excludeFromHangingProtocolMatching: isUserAttachmentInstance(instance),
+    excludeFromHangingProtocolMatching:
+      isUserAttachmentInstance(instance) || isSpecialMammoView(instance),
   });
 
   imageSet.sortBy(instancesSortCriteria.default);
@@ -201,6 +202,38 @@ const isUserAttachmentInstance = instance =>
   !!instance &&
   (NON_RADIOLOGY_MODALITIES.has(instance.Modality) ||
     instance.SOPClassUID === sopClassDictionary.SecondaryCaptureImageStorage);
+
+// Spot-compression, magnification, and stereotactic/biopsy mammography images
+// are diagnostic ADD-ONS, not standard screening views. They still carry a normal
+// ViewPosition (e.g. MLO) + ImageLaterality, so the view labeler reads them as
+// "RMLO" etc. and a hanging protocol would drop them into a standard pane — a real
+// problem after merging studies, where these specials outnumber the true views and
+// win a pane the algorithm should have filled with the full-field LE/Recombined
+// image. Flag them excludeFromHangingProtocolMatching so they stay visible +
+// draggable in the study browser but are never auto-picked by any protocol.
+//
+// Signals (ViewModifierCodeSequence — the "proper" spot/mag tag — is frequently
+// ABSENT on these vendors' anonymized files, so we can't rely on it):
+//   - ImageType contains STEREO_* (STEREO_PLUS / STEREO_MINUS / STEREO_SCOUT):
+//     a stereotactic biopsy acquisition.
+//   - PaddleDescription (0018,11A4) names a spot / magnification / biopsy paddle
+//     (e.g. "Sliding Square Spot paddle", "MAG 1.8 SPOT", "18x24 SP R", "Biopsy
+//     Right Arm paddle"). Standard full-field paddles read "…Standard"/"…Flexible"
+//     and are NOT matched.
+const SPECIAL_MAMMO_PADDLE = /BIOPSY|SPOT|\bMAG\b|\bSP\b/i;
+const isSpecialMammoView = instance => {
+  if (!instance || instance.Modality !== 'MG') {
+    return false;
+  }
+  const rawImageType = instance.ImageType;
+  const imageType = Array.isArray(rawImageType)
+    ? rawImageType.join('\\')
+    : String(rawImageType || '');
+  if (/STEREO/i.test(imageType)) {
+    return true;
+  }
+  return SPECIAL_MAMMO_PADDLE.test(String(instance.PaddleDescription || ''));
+};
 
 function getSopClassUids(instances) {
   const uniqueSopClassUidsInSeries = new Set();

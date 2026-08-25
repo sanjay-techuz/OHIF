@@ -179,7 +179,48 @@ function getMammoViewLabel(instance: any): string | null {
   // rolled, cleavage, …) so a manually-loaded modified view is identifiable and
   // never silently reads like the standard screening view, e.g. "RMLO Spot Mag".
   label += getViewModifierSuffix(instance);
+  // Fallback for vendors that DON'T populate ViewModifierCodeSequence (common on
+  // anonymized files): derive the same Spot/Mag/Stereo/Biopsy tag from
+  // PaddleDescription + ImageType, so these images read e.g. "RCC Mag Spot" or
+  // "RMLO Stereo Biopsy" in the sidebar/overlay instead of looking like a normal
+  // view. Same signals the hanging-protocol exclusion uses (getSopClassHandlerModule).
+  label += getSpecialAcquisitionSuffix(instance, label);
   return label;
+}
+
+/**
+ * Spot / magnification / stereotactic-biopsy suffix derived from PaddleDescription
+ * (0018,11A4) and ImageType (0008,0008) — the signals that survive anonymization
+ * when ViewModifierCodeSequence is stripped. De-duplicated against whatever
+ * getViewModifierSuffix already appended (so a view is never tagged "Spot Spot").
+ * Returns '' for a standard full-field view.
+ */
+function getSpecialAcquisitionSuffix(instance: any, existing: string): string {
+  const rawImageType = instance?.ImageType;
+  const imageType = (
+    Array.isArray(rawImageType) ? rawImageType.join('\\') : String(rawImageType || '')
+  ).toUpperCase();
+  const paddle = String(instance?.PaddleDescription || '').toUpperCase();
+
+  const parts: string[] = [];
+  if (/STEREO/.test(imageType)) {
+    parts.push('Stereo');
+  }
+  if (/BIOPSY/.test(paddle)) {
+    parts.push('Biopsy');
+  }
+  if (/\bMAG\b/.test(paddle)) {
+    parts.push('Mag');
+  }
+  if (/SPOT|\bSP\b/.test(paddle)) {
+    parts.push('Spot');
+  }
+
+  const seen = new Set<string>();
+  const uniq = parts.filter(p =>
+    existing.toUpperCase().includes(p.toUpperCase()) ? false : seen.has(p) ? false : (seen.add(p), true)
+  );
+  return uniq.length ? ` ${uniq.join(' ')}` : '';
 }
 
 /**
