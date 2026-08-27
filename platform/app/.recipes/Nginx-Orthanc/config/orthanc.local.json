@@ -1,5 +1,5 @@
 {
-  "Name": "Orthanc inside Docker",
+  "Name": "Orthanc (local dev)",
   "StorageDirectory": "/var/lib/orthanc/db",
   "IndexDirectory": "/var/lib/orthanc/db",
   "StorageCompression": false,
@@ -39,11 +39,7 @@
 
   "RemoteAccessAllowed": true,
   "SslEnabled": false,
-  "SslCertificate": "certificate.pem",
   "AuthenticationEnabled": false,
-  "RegisteredUsers": {
-    "admin": "__SET_VIA_ENV__"
-  },
   "DicomModalities": {},
   "DicomModalitiesInDatabase": false,
   "DicomAlwaysAllowEcho": true,
@@ -95,15 +91,5 @@
     "StowMaxInstances": 10,
     "StowMaxSize": 10,
     "QidoCaseSensitive": false
-  },
-  "AzureBlobStorage": {
-    "ConnectionString": "__SET_VIA_ENV__",
-    "ContainerName": "__SET_VIA_ENV__",
-    "CreateContainerIfNotExists": true,
-    "RootPath": "DICOMS",
-    "MigrationFromFileSystemEnabled": false,
-    "StorageStructure": "flat",
-    "EnableLegacyUnknownFiles": true,
-    "HybridMode": "Disabled"
   }
 }
