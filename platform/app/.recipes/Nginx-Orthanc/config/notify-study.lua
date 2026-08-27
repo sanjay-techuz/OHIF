@@ -206,19 +206,24 @@ local function handleAutoModification(studyId)
         -- Copy our custom UserMetadata from source → new study. With
         -- KeepSource:true Orthanc creates a brand-new resource and
         -- does NOT inherit UserMetadata (1024 isAnonymized, 1026
-        -- folderName, 1027 subSpecialitySlug, 1028 modalitySlug). Without
-        -- this copy the new study's OnStableStudy webhook would arrive at
-        -- Node with empty metadata.folderName / slugs and the Cases row
-        -- would land with folder_name=NULL ("N/A" in admin). Read by
-        -- alias (that's what /metadata?expand returns per orthanc.json
-        -- UserMetadata config) and write by numeric key (canonical form
-        -- Orthanc accepts on PUT). Labels are already carried by
-        -- KeepLabels:true so we don't touch them here.
+        -- folderName, 1027 subSpecialitySlug, 1028 modalitySlug,
+        -- 1030 facultyIds, 1031 facultyFolderName). Without this copy the
+        -- new study's OnStableStudy webhook would arrive at Node with empty
+        -- metadata.folderName / slugs / facultyIds and the Cases row would
+        -- land with folder_name=NULL ("N/A" in admin) and NO faculties
+        -- assigned. Read by alias (that's what /metadata?expand returns per
+        -- orthanc.json UserMetadata config) and write by numeric key
+        -- (canonical form Orthanc accepts on PUT). Labels are already
+        -- carried by KeepLabels:true so we don't touch them here.
+        -- NOTE: faculty assignment MUST survive anonymize/modify — keep
+        -- 1030/1031 in this list (see BIEDX-OHIF-HANDOFF §7).
         local metaPairs = {
             { num = "1024", alias = "isAnonymized" },
             { num = "1026", alias = "folderName" },
             { num = "1027", alias = "subSpecialitySlug" },
-            { num = "1028", alias = "modalitySlug" }
+            { num = "1028", alias = "modalitySlug" },
+            { num = "1030", alias = "facultyIds" },
+            { num = "1031", alias = "facultyFolderName" }
         }
         for _, pair in ipairs(metaPairs) do
             local val = meta[pair.num] or meta[pair.alias]
