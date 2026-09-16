@@ -29,6 +29,12 @@ export default displaySet => {
   const imageType = (Array.isArray(rawImageType) ? rawImageType.join('\\') : rawImageType || '').toString().toUpperCase();
 
   if (!imageType.includes('TOMOSYNTHESIS')) {
+    // Some vendors export the reconstructed tomo volume as Secondary Capture with
+    // ImageType `DERIVED\PRIMARY\VOLUME\NONE` instead of the 13.1.3 SOP class +
+    // TOMOSYNTHESIS token. The VOLUME slab is the canonical scrollable recon.
+    if (/\bVOLUME\b/.test(imageType)) {
+      return 'RECON';
+    }
     return 'NONE';
   }
   if (imageType.includes('GENERATED_2D')) {
