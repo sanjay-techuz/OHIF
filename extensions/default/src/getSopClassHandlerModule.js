@@ -4,6 +4,7 @@ import { id } from './id';
 import getDisplaySetMessages from './getDisplaySetMessages';
 import getDisplaySetsFromUnsupportedSeries from './getDisplaySetsFromUnsupportedSeries';
 import { chartHandler } from './SOPClassHandlers/chartSOPClassHandler';
+import { isTomosynthesisSlice } from './utils/isTomosynthesisSlice';
 
 const {
   isImage,
@@ -200,6 +201,9 @@ const NON_RADIOLOGY_MODALITIES = new Set([
 // (some AI images are 1), so SOP Class is the load-bearing signal here.
 const isUserAttachmentInstance = instance =>
   !!instance &&
+  // A Secondary-Capture-wrapped tomosynthesis volume is NOT a user attachment —
+  // it is the real DBT recon and must stay eligible for the hanging protocol.
+  !isTomosynthesisSlice(instance) &&
   (NON_RADIOLOGY_MODALITIES.has(instance.Modality) ||
     instance.SOPClassUID === sopClassDictionary.SecondaryCaptureImageStorage);
 
@@ -283,7 +287,7 @@ function getDisplaySetsFromSeries(instances) {
         acquisitionDatetime: instance.AcquisitionDateTime,
       });
       displaySets.push(displaySet);
-    } else if (isSingleImageModality(instance.Modality)) {
+    } else if (isSingleImageModality(instance.Modality) && !isTomosynthesisSlice(instance)) {
       displaySet = makeDisplaySet([instance]);
       displaySet.setAttributes({
         sopClassUids,
@@ -292,6 +296,10 @@ function getDisplaySetsFromSeries(instances) {
       });
       displaySets.push(displaySet);
     } else {
+      // Tomosynthesis recon slices (SC-wrapped) fall through to here so all the
+      // slices of one view stack into a SINGLE scrollable display set, instead of
+      // one 1-image display set per slice (which the MG single-image branch above
+      // would otherwise produce).
       stackableInstances.push(instance);
     }
   });

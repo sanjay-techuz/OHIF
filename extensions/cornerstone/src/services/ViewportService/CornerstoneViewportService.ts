@@ -39,6 +39,8 @@ import JumpPresets from '../../utils/JumpPresets';
 import reconcileInvertLut from '../../utils/reconcileInvertLut';
 // [MR-AUTO-ORIENT] revert: remove this import + the tagged call site below + utils/mrAutoOrient.ts
 import { scheduleRadiologicalOrientationMR } from '../../utils/mrAutoOrient';
+// [MAMMO-AUTO-ORIENT] revert: remove this import + the tagged call site below + utils/mammoAutoOrient.ts
+import { scheduleRadiologicalOrientationMammo } from '../../utils/mammoAutoOrient';
 
 const EVENTS = {
   VIEWPORT_DATA_CHANGED: 'event::cornerstoneViewportService:viewportDataChanged',
@@ -741,6 +743,16 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         scheduleRadiologicalOrientationMR(viewport);
       }
       // [MR-AUTO-ORIENT] END
+
+      // [MAMMO-AUTO-ORIENT] BEGIN — force the standard radiological mammography
+      // orientation on Secondary-Capture-wrapped DBT panes (from PatientOrientation).
+      // Display-only + metadata-driven, gated strictly to the SC-tomo slices, so it
+      // never disturbs 2D FFDM / CEM / real DBT / MR / US. REVERT: delete this block,
+      // the import at the top, and utils/mammoAutoOrient.ts.
+      if (isViewportAlive()) {
+        scheduleRadiologicalOrientationMammo(viewport);
+      }
+      // [MAMMO-AUTO-ORIENT] END
     });
   }
 

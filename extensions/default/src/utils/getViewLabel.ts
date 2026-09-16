@@ -5,6 +5,7 @@ import {
   isVibrantWater,
   type MRViewKey,
 } from '../hangingprotocols/utils/mrViewClassifier';
+import { isTomosynthesisSlice } from './isTomosynthesisSlice';
 
 /**
  * Per-instance clinical view-label detector.
@@ -34,6 +35,13 @@ export function getViewLabel(instance: any): string | null {
     // its acquisition tags instead.
     if (modality === 'MR' || modality === 'MRI') {
       return getMRViewLabel(instance);
+    }
+    // Secondary-Capture-wrapped tomosynthesis recon (some vendors export the DBT
+    // volume as SC VOLUME slices, not the 13.1.3 SOP class). Must be caught BEFORE
+    // the AI-overlay rule below, or a real tomo stack reads as "AI Image". Route it
+    // through the mammography labeler so it reads e.g. "RCC DBT".
+    if (modality === 'MG' && isTomosynthesisSlice(instance)) {
+      return getMammoViewLabel(instance);
     }
     // AI overlays (e.g. Lunit) are wrapped as Secondary Capture (Modality 'MG' /
     // 'XC' / 'OT', no ImageLaterality). Label them explicitly as "AI Image" rather
