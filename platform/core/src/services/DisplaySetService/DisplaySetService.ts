@@ -467,6 +467,21 @@ export default class DisplaySetService extends PubSubService {
 
         // For FFDM cases, require ImageLaterality
         if (caseType === 'FFDM') {
+          // CEM (Contrast-Enhanced Mammography) energy images — ImageType
+          // LOW_ENERGY / RECOMBINED / SUBTRACTION / IODINE / CESM — are legitimate
+          // MG images that some vendors export WITHOUT ImageLaterality. They must
+          // NOT be dropped by the laterality requirement below, or the ENTIRE CEM
+          // study vanishes from the viewer (only a leftover Secondary-Capture
+          // snapshot survives → blank viewports). Same energy tokens the CemEnergy
+          // hanging-protocol attribute keys on.
+          const rawImageType = instance?.ImageType;
+          const imageType = (
+            Array.isArray(rawImageType) ? rawImageType.join('\\') : String(rawImageType || '')
+          ).toUpperCase();
+          if (/LOW_ENERGY|RECOMBINED|SUBTRACTION|SUBTRACTED|IODINE|CESM/.test(imageType)) {
+            return true;
+          }
+
           const hasImageLaterality =
             instance?.ImageLaterality !== undefined &&
             instance?.ImageLaterality !== null &&
