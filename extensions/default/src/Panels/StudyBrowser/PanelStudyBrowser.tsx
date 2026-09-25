@@ -801,6 +801,17 @@ function PanelStudyBrowser({
 
   const activeDisplaySetInstanceUIDs = viewports.get(activeViewportId)?.displaySetInstanceUIDs;
 
+  // Every display set currently shown in ANY viewport (hanging-protocol OR manually
+  // dragged/opened), so the study browser can border-highlight everything that's on
+  // screen — not just the active viewport. Recomputed whenever `viewports` changes.
+  const displayedDisplaySetInstanceUIDs = React.useMemo(() => {
+    const uids = new Set<string>();
+    viewports?.forEach(viewport => {
+      viewport?.displaySetInstanceUIDs?.forEach(uid => uids.add(uid));
+    });
+    return Array.from(uids);
+  }, [viewports]);
+
   // --- Manual prior comparison ---------------------------------------------
   const currentStudyUID = StudyInstanceUIDs?.[0];
 
@@ -989,6 +1000,7 @@ function PanelStudyBrowser({
         onClickThumbnail={() => {}}
         onDoubleClickThumbnail={onDoubleClickThumbnailHandler}
         activeDisplaySetInstanceUIDs={activeDisplaySetInstanceUIDs}
+        displayedDisplaySetInstanceUIDs={displayedDisplaySetInstanceUIDs}
         showSettings={actionIcons.find(icon => icon.id === 'settings')?.value}
         viewPresets={viewPresets}
         ThumbnailMenuItems={MoreDropdownMenu({

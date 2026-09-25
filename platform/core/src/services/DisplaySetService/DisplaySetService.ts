@@ -310,14 +310,20 @@ export default class DisplaySetService extends PubSubService {
     // so make sure it gets copied here so that they have their own ref
     let instances = [...instancesSrc];
 
-    // Apply mammography-specific filtering to remove instances without ImageLaterality
-    // This prevents hanging protocol errors when processing mammography cases
-    instances = this._filterInstancesForMammography(instances);
-
-    // Safety check: if all instances were filtered out, return empty array
-    if (instances.length === 0) {
+    if (!instances.length) {
       return [];
     }
+
+    // Every valid instance is KEPT so it always appears in the study browser (sidebar)
+    // and can be dragged into a viewport. We no longer DELETE mammography instances that
+    // lack hanging-protocol metadata (e.g. no ImageLaterality) — doing so used to blank
+    // the entire study. Instead we detect them here and, when a whole (per-series) group
+    // is such HP-ineligible mammography, flag the display sets it produces as
+    // `excludeFromHangingProtocolMatching` below: they stay visible/draggable but are not
+    // auto-placed into the 4-view layout. Non-mammography and proper mammography studies
+    // are completely unaffected (the classifier returns them unchanged / non-empty).
+    const hpEligibleInstances = this._filterInstancesForMammography(instances);
+    const excludeCreatedDisplaySetsFromHp = hpEligibleInstances.length === 0;
 
     const instance = instances[0];
 
@@ -379,6 +385,11 @@ export default class DisplaySetService extends PubSubService {
           Object.keys(settings).forEach(key => {
             ds[key] = settings[key];
           });
+          // HP-ineligible mammography (e.g. no ImageLaterality): keep it visible +
+          // draggable in the study browser, but never auto-place it in the layout.
+          if (excludeCreatedDisplaySetsFromHp) {
+            ds.excludeFromHangingProtocolMatching = true;
+          }
         });
 
         this._addDisplaySetsToCache(displaySets);
@@ -402,6 +413,9 @@ export default class DisplaySetService extends PubSubService {
           Object.keys(settings).forEach(key => {
             ds[key] = settings[key];
           });
+          if (excludeCreatedDisplaySetsFromHp) {
+            ds.excludeFromHangingProtocolMatching = true;
+          }
         });
 
         this._addDisplaySetsToCache(displaySets);

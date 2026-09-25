@@ -10,6 +10,7 @@ const ThumbnailList = ({
   onThumbnailDoubleClick,
   onClickUntrack,
   activeDisplaySetInstanceUIDs = [],
+  displayedDisplaySetInstanceUIDs = [],
   viewPreset,
   ThumbnailMenuItems,
 }) => {
@@ -39,6 +40,7 @@ const ThumbnailList = ({
             const { displaySetInstanceUID, componentType, numInstances, ...rest } = item;
 
             const isActive = activeDisplaySetInstanceUIDs.includes(displaySetInstanceUID);
+            const isDisplayed = displayedDisplaySetInstanceUIDs.includes(displaySetInstanceUID);
             return (
               <Thumbnail
                 key={displaySetInstanceUID}
@@ -46,6 +48,7 @@ const ThumbnailList = ({
                 displaySetInstanceUID={displaySetInstanceUID}
                 numInstances={numInstances || 1}
                 isActive={isActive}
+                isDisplayed={isDisplayed}
                 thumbnailType={componentType}
                 viewPreset="thumbnails"
                 onClick={onThumbnailClick.bind(null, displaySetInstanceUID)}
@@ -66,6 +69,7 @@ const ThumbnailList = ({
           {listItems.map(item => {
             const { displaySetInstanceUID, componentType, numInstances, ...rest } = item;
             const isActive = activeDisplaySetInstanceUIDs.includes(displaySetInstanceUID);
+            const isDisplayed = displayedDisplaySetInstanceUIDs.includes(displaySetInstanceUID);
             return (
               <Thumbnail
                 key={displaySetInstanceUID}
@@ -73,6 +77,7 @@ const ThumbnailList = ({
                 displaySetInstanceUID={displaySetInstanceUID}
                 numInstances={numInstances || 1}
                 isActive={isActive}
+                isDisplayed={isDisplayed}
                 thumbnailType={componentType}
                 viewPreset="list"
                 onClick={onThumbnailClick.bind(null, displaySetInstanceUID)}
@@ -114,6 +119,7 @@ ThumbnailList.propTypes = {
     })
   ),
   activeDisplaySetInstanceUIDs: PropTypes.arrayOf(PropTypes.string),
+  displayedDisplaySetInstanceUIDs: PropTypes.arrayOf(PropTypes.string),
   onThumbnailClick: PropTypes.func.isRequired,
   onThumbnailDoubleClick: PropTypes.func.isRequired,
   onClickUntrack: PropTypes.func.isRequired,
