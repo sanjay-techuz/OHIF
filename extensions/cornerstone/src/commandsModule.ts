@@ -2690,6 +2690,23 @@ function commandsModule({
           .filter((m: any) => m.isSelected)
           .map((m: any) => m.uid);
       }
+      if (!uids.length) {
+        // HOVER fallback: Cornerstone's mouseMoveCallback sets `annotation.highlighted
+        // = true` on the annotation currently under the cursor. So when the user is just
+        // hovering (nothing clicked/selected), delete the highlighted annotation — this
+        // makes "hover + Delete" work smoothly without first clicking the annotation.
+        try {
+          const all = (cornerstoneTools.annotation.state.getAllAnnotations?.() || []) as Array<{
+            annotationUID?: string;
+            highlighted?: boolean;
+          }>;
+          uids = all
+            .filter(a => a?.highlighted && a?.annotationUID)
+            .map(a => a.annotationUID as string);
+        } catch {
+          /* ignore — fall through with no uids */
+        }
+      }
       uids.forEach(uid => {
         commandsManager.run('removeMeasurement', { uid });
       });

@@ -18,6 +18,7 @@ const StudyBrowser = ({
   onDoubleClickThumbnail = noop,
   onClickUntrack = noop,
   activeDisplaySetInstanceUIDs,
+  displayedDisplaySetInstanceUIDs,
   servicesManager,
   showSettings,
   viewPresets,
@@ -47,6 +48,7 @@ const StudyBrowser = ({
               onDoubleClickThumbnail={onDoubleClickThumbnail}
               onClickUntrack={onClickUntrack}
               activeDisplaySetInstanceUIDs={activeDisplaySetInstanceUIDs}
+              displayedDisplaySetInstanceUIDs={displayedDisplaySetInstanceUIDs}
               data-cy="thumbnail-list"
               viewPreset={viewPreset}
               ThumbnailMenuItems={ThumbnailMenuItems}
@@ -98,6 +100,7 @@ StudyBrowser.propTypes = {
   activeTabName: PropTypes.string.isRequired,
   expandedStudyInstanceUIDs: PropTypes.arrayOf(PropTypes.string).isRequired,
   activeDisplaySetInstanceUIDs: PropTypes.arrayOf(PropTypes.string),
+  displayedDisplaySetInstanceUIDs: PropTypes.arrayOf(PropTypes.string),
   tabs: PropTypes.arrayOf(
     PropTypes.shape({
       name: PropTypes.string.isRequired,

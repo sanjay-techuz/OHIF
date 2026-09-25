@@ -16,6 +16,7 @@ const StudyItem = ({
   isExpanded,
   displaySets,
   activeDisplaySetInstanceUIDs,
+  displayedDisplaySetInstanceUIDs,
   onClickThumbnail,
   onDoubleClickThumbnail,
   onClickUntrack,
@@ -98,6 +99,7 @@ const StudyItem = ({
             <ThumbnailList
               thumbnails={displaySets}
               activeDisplaySetInstanceUIDs={activeDisplaySetInstanceUIDs}
+              displayedDisplaySetInstanceUIDs={displayedDisplaySetInstanceUIDs}
               onThumbnailClick={onClickThumbnail}
               onThumbnailDoubleClick={onDoubleClickThumbnail}
               onClickUntrack={onClickUntrack}

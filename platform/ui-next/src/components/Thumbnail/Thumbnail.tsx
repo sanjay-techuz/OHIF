@@ -21,6 +21,7 @@ const Thumbnail = ({
   countIcon,
   messages,
   isActive,
+  isDisplayed = false,
   onClick,
   onDoubleClick,
   thumbnailType,
@@ -256,7 +257,12 @@ const Thumbnail = ({
     <div
       className={classnames(
         className,
-        'hover:bg-primary/30 group flex cursor-pointer select-none flex-col overflow-hidden rounded-lg border border-white/80 bg-[#000000] outline-none',
+        'hover:bg-primary/30 group flex cursor-pointer select-none flex-col overflow-hidden rounded-lg border bg-[#000000] outline-none',
+        // isDisplayed = this series/display set is currently shown in ANY viewport
+        // (hanging-protocol OR manually dragged/opened). Highlight it with a theme
+        // border so the user can tell at a glance what's on screen — vital when
+        // several series share the same description (MRI/DBT/MG).
+        isDisplayed ? 'border-highlight border-2' : 'border-white/80',
         viewPreset === 'thumbnails' && '',
         viewPreset === 'list' && 'w-full'
       )}
@@ -305,6 +311,7 @@ Thumbnail.propTypes = {
   loadingProgress: PropTypes.number,
   messages: PropTypes.object,
   isActive: PropTypes.bool.isRequired,
+  isDisplayed: PropTypes.bool,
   onClick: PropTypes.func.isRequired,
   onDoubleClick: PropTypes.func.isRequired,
   viewPreset: PropTypes.string,
