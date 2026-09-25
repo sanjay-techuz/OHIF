@@ -26,8 +26,14 @@ type ViewportLinkState = {
 };
 
 export const useViewportLinkStore = create<ViewportLinkState>(set => ({
-  imageSliceSyncOn: false,
-  referenceLinesOn: false,
+  // Default ON for MRI: when an MR case opens, Image Slice Sync + Reference Lines
+  // should be active automatically (each BIEDX case opens as a fresh page load, so
+  // this default applies per case). The MR-gated toolbar buttons enforce this state
+  // on first paint; the user can still toggle either OFF, and non-MR studies are
+  // unaffected (the buttons don't render / their enforce effects are MR-gated).
+  imageSliceSyncOn: true,
+  referenceLinesOn: true,
+  // Cross Reference Point stays OFF by default (opt-in only).
   crossReferencePointOn: false,
   setImageSliceSyncOn: value => set({ imageSliceSyncOn: value }),
   setReferenceLinesOn: value => set({ referenceLinesOn: value }),
