@@ -42,6 +42,12 @@ export interface QuestionAnswerModalProps {
    * so the existing density-only propagation path stays untouched.
    */
   onBiRadsChange?: (form: Record<string, unknown>) => void;
+  /**
+   * Faculty-dashboard (user) flow only: fires after a successful save with the measurement uid and
+   * the full form. The per-ROI answers aren't saved to the backend during drawing in this flow
+   * (they're gathered and sent at Submit), so the parent keeps them here until then.
+   */
+  onUserFacultyAnswerSaved?: (measurementUid: string, form: Record<string, unknown>) => void;
   /** 1-based annotation index for the title (ROI - 1, Lesion - 2, etc.) */
   annotationIndex?: number;
 }
@@ -298,6 +304,7 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
   onClose,
   onBreastDensityChange,
   onBiRadsChange,
+  onUserFacultyAnswerSaved,
   annotationIndex,
 }) => {
   const { measurementService } = servicesManager.services;
@@ -312,6 +319,7 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
     isFellowship,
     programId,
     phaseId,
+    answerAuth,
   } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
@@ -408,7 +416,13 @@ const QuestionAnswerModal: React.FC<QuestionAnswerModalProps> = ({
       }
     } else {
       body.faculty_id = facultyId;
-      if (isAddAnswerClicked) {
+      if (userType === 'faculty' && answerAuth === 'user') {
+        // Faculty-dashboard (user) flow: don't save to admin — keep the per-ROI answer in the
+        // parent (gathered + sent per course from the Submit Answer picker) and propagate BI-RADS
+        // to the ACR display.
+        onUserFacultyAnswerSaved?.(measurementUid, { ...form });
+        success = true;
+      } else if (isAddAnswerClicked) {
         const result = await apiCall(() => apiService.post('/admin/cases/submit-form-data', body));
         success = result.success;
         if (!success) {

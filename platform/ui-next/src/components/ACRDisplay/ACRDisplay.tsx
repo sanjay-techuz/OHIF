@@ -34,6 +34,7 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     isFellowship,
     programId,
     phaseId,
+    answerAuth,
   } = useCustomParams();
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const modalitySlug = useUIStateStore(state => state.uiState.modalitySlug as string | null);
@@ -77,6 +78,12 @@ const ACRDisplay: React.FC<ACRDisplayProps> = ({
     } else {
       body.faculty_id = facultyId;
       delete body.student_id;
+      // Faculty-dashboard (user) flow: don't save to admin here — the ACR values are sent
+      // once, per selected course, from the Submit Answer course picker. Just surface them.
+      if (userType === 'faculty' && answerAuth === 'user') {
+        onValuesChange?.(newValues);
+        return;
+      }
       if (isAddAnswerClicked) {
         const result = await apiCall(() => apiService.post('/admin/cases/case-answer', body));
         if (result.success) {

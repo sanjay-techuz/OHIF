@@ -631,6 +631,7 @@ class MeasurementService extends PubSubService {
               moduleId: u_moduleId,
               userType: u_userType,
               facultyId: u_facultyId,
+              answerAuth: u_answerAuth,
               isPreview: u_isPreview,
               isFellowship: u_isFellowship,
               programId: u_programId,
@@ -689,7 +690,10 @@ class MeasurementService extends PubSubService {
                       await apiService.post('/user/cases/annotation-measurements', body);
                     } else {
                       body.faculty_id = u_facultyId;
-                      await apiService.post('/admin/cases/annotation-measurements', body);
+                      // Faculty-dashboard (user) flow: not saved to admin (sent at Submit).
+                      if (!(u_userType === 'faculty' && u_answerAuth === 'user')) {
+                        await apiService.post('/admin/cases/annotation-measurements', body);
+                      }
                     }
                   } catch (err) {
                     console.warn('Measurement update save failed', err);
@@ -718,6 +722,7 @@ class MeasurementService extends PubSubService {
           moduleId,
           userType,
           facultyId,
+          answerAuth,
           isPreview,
           isFellowship,
           programId,
@@ -780,7 +785,8 @@ class MeasurementService extends PubSubService {
             body.faculty_id = facultyId;
             delete body.student_id;
             const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
-            if (isAddAnswerClicked) {
+            // Faculty-dashboard (user) flow: not saved to admin here (sent at Submit).
+            if (isAddAnswerClicked && !(userType === 'faculty' && answerAuth === 'user')) {
               await apiService.post('/admin/cases/annotation-measurements', body);
             }
           }

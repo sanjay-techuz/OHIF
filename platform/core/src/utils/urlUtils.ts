@@ -36,6 +36,10 @@ function buildParamsFromPayload(
     isFellowship: payload?.isFellowship === true || payload?.isFellowship === 'true',
     programId: payload?.programId ? `${payload.programId}` : undefined,
     phaseId: payload?.phaseId ? `${payload.phaseId}` : undefined,
+    // Faculty-dashboard (user) launch: answers go to /user/faculty endpoints via a course
+    // picker on submit, instead of the admin per-change saves. Absent = admin flow (unchanged).
+    answerAuth: payload?.answerAuth ? `${payload.answerAuth}` : undefined,
+    caseSetId: payload?.caseSetId ? `${payload.caseSetId}` : undefined,
   };
 }
 
@@ -56,6 +60,11 @@ export interface CustomParams {
   isFellowship?: boolean;
   programId?: string;
   phaseId?: string;
+  // 'user' when launched from the faculty dashboard (biedx-next): faculty answers are saved
+  // as the logged-in USER via /user/faculty/cases/:caseId/answer with a course picker on
+  // submit. Undefined for the admin-launched faculty flow (writes to /admin/cases/*).
+  answerAuth?: string;
+  caseSetId?: string;
 }
 
 /**
