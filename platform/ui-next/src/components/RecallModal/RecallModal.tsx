@@ -10,6 +10,12 @@ export interface RecallModalProps {
   servicesManager: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   measurementUid?: string; // Changed from currentMeasurement to measurementUid
   annotationData?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /**
+   * Faculty-dashboard (user) flow only: fires when the faculty confirms Recall. The case-level
+   * recall decision isn't saved to the backend during drawing in this flow — it's sent per course
+   * at Submit — so the parent records it here until then.
+   */
+  onUserFacultyRecall?: () => void;
 }
 
 const RecallModal: React.FC<RecallModalProps> = ({
@@ -18,6 +24,7 @@ const RecallModal: React.FC<RecallModalProps> = ({
   servicesManager,
   measurementUid,
   annotationData,
+  onUserFacultyRecall,
 }) => {
   const { displaySetService, measurementService } = servicesManager.services;
   const {
@@ -28,6 +35,7 @@ const RecallModal: React.FC<RecallModalProps> = ({
     moduleId,
     userType,
     facultyId,
+    answerAuth,
     isPreview,
     isFellowship,
     programId,
@@ -67,7 +75,12 @@ const RecallModal: React.FC<RecallModalProps> = ({
         body.faculty_id = facultyId;
         delete body.student_id;
         const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
-        if (isAddAnswerClicked) {
+        const isUserFacultyAnswer = userType === 'faculty' && answerAuth === 'user';
+        if (isUserFacultyAnswer) {
+          // Faculty-dashboard (user) flow: don't save to admin — record the recall decision in
+          // the parent; it's sent per course (with the annotation) from the Submit Answer picker.
+          onUserFacultyRecall?.();
+        } else if (isAddAnswerClicked) {
           await apiService.post('/admin/cases/annotation-measurements', body);
         }
       }
