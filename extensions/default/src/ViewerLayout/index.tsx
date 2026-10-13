@@ -193,6 +193,8 @@ function ViewerLayout({
     Array<{ case_set_id: number; case_set_name: string; course_id: number; course_title: string; answered: boolean }>
   >([]);
   const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
+  // Only the case OWNER faculty (assigned to the case itself) may set the master/default answer.
+  const [isMasterFaculty, setIsMasterFaculty] = useState(false);
   const [submittingFacultyAnswer, setSubmittingFacultyAnswer] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -1633,8 +1635,18 @@ function ViewerLayout({
         annotations: gatherFacultyAnnotations(),
         // Screening: the case-level recall decision (diagnostic cases carry no recall).
         ...(currentViewType === 'screening' ? { is_recall: facultyRecall } : {}),
+        // Course scope: send explicit (course, case_set) pairs. The case set comes from each
+        // selected target — not the URL caseSetId, which is absent when opened from "My all cases".
         ...(scope === 'course'
-          ? { case_set_id: caseSetId ? Number(caseSetId) : undefined, course_ids: courseIds }
+          ? {
+              targets: answerTargets
+                .filter(
+                  t =>
+                    courseIds.includes(t.course_id) &&
+                    (!caseSetId || `${t.case_set_id}` === `${caseSetId}`)
+                )
+                .map(t => ({ course_id: t.course_id, case_set_id: t.case_set_id })),
+            }
           : {}),
       };
       const result = await apiCall(() => apiService.post(`/user/faculty/cases/${caseId}/answer`, body));
@@ -1662,6 +1674,7 @@ function ViewerLayout({
         const ctx = (result?.data as any)?.data;
         const targets = (ctx?.targets ?? []) as typeof answerTargets;
         setAnswerTargets(targets);
+        setIsMasterFaculty(!!ctx?.is_master_faculty);
         // Pre-select the courses of the case set this viewer was opened from.
         setSelectedCourseIds(
           caseSetId ? targets.filter(t => `${t.case_set_id}` === `${caseSetId}`).map(t => t.course_id) : []
@@ -1670,6 +1683,7 @@ function ViewerLayout({
         console.error('Failed to load answer context', e);
         setAnswerTargets([]);
         setSelectedCourseIds([]);
+        setIsMasterFaculty(false);
       }
       setCoursePickerOpen(true);
       return;
@@ -2300,13 +2314,22 @@ function ViewerLayout({
                             </button>
                           </div>
                         )}
-                        <button
-                          disabled={submittingFacultyAnswer}
-                          onClick={() => submitFacultyUserAnswer('master', [])}
-                          className="w-full rounded-lg border border-white/20 py-2 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
-                        >
-                          Save as master (default) answer
-                        </button>
+                        {/* Master/default answer — only the faculty who OWNS the case may set it. */}
+                        {isMasterFaculty && (
+                          <button
+                            disabled={submittingFacultyAnswer}
+                            onClick={() => submitFacultyUserAnswer('master', [])}
+                            className="w-full rounded-lg border border-white/20 py-2 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
+                          >
+                            Save as master (default) answer
+                          </button>
+                        )}
+                        {setTargets.length === 0 && !isMasterFaculty && (
+                          <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
+                            There&apos;s nothing to save here. You can answer this case only for courses you teach,
+                            and you&apos;re not the faculty who owns this case.
+                          </p>
+                        )}
                         <button
                           disabled={submittingFacultyAnswer}
                           onClick={() => setCoursePickerOpen(false)}
