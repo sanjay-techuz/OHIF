@@ -855,6 +855,21 @@ function ViewerLayout({
                     formData: item.form_data || null,
                   };
 
+                  // Seed the faculty ROI-form map from the loaded answer so a later faculty
+                  // submit re-sends forms the faculty didn't re-edit this session. Without this,
+                  // gatherFacultyAnnotations() sends form_data: null for untouched annotations and
+                  // the batch submit WIPES their previously-saved ROI answers.
+                  if (item.form_data) {
+                    try {
+                      facultyFormByUidRef.current.set(
+                        item.measurement_data.uid,
+                        typeof item.form_data === 'string' ? JSON.parse(item.form_data) : item.form_data
+                      );
+                    } catch {
+                      /* ignore malformed form_data */
+                    }
+                  }
+
                   // Use addRawMeasurement with transformed data
                   servicesManager.services.measurementService.addRawMeasurement(
                     existingSource,
