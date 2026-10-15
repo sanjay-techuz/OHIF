@@ -182,17 +182,15 @@ function ViewerLayout({
   // Faculty-dashboard (user) answer flow: the logged-in faculty submits via the
   // /user/faculty answer endpoints + a course picker, instead of the admin per-change saves.
   const isUserFacultyAnswer = userType === 'faculty' && answerAuth === 'user';
-  // Scope for the faculty prefill reads. Opened from a course (courseId + caseSetId both present)
-  // → that course's answer with master fallback; opened from "My cases" → master/default answer.
+  // Scope for the faculty prefill reads. Faculty answers are CASE-SET scoped now: opened from a set
+  // → that set's answer with master fallback; opened from "My cases" → master/default answer.
   const facultyScopeQuery =
-    isUserFacultyAnswer && courseId && caseSetId
-      ? `?course_id=${encodeURIComponent(courseId)}&case_set_id=${encodeURIComponent(caseSetId)}`
-      : '';
+    isUserFacultyAnswer && caseSetId ? `?case_set_id=${encodeURIComponent(caseSetId)}` : '';
   const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const [answerTargets, setAnswerTargets] = useState<
-    Array<{ case_set_id: number; case_set_name: string; course_id: number; course_title: string; answered: boolean }>
+    Array<{ case_set_id: number; case_set_name: string; course_count: number; answered: boolean }>
   >([]);
-  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
+  const [selectedSetIds, setSelectedSetIds] = useState<number[]>([]);
   // Only the case OWNER faculty (assigned to the case itself) may set the master/default answer.
   const [isMasterFaculty, setIsMasterFaculty] = useState(false);
   const [submittingFacultyAnswer, setSubmittingFacultyAnswer] = useState(false);
@@ -630,7 +628,7 @@ function ViewerLayout({
           if (isAddAnswerClicked) {
             const result = await apiCall(() =>
               apiService.get(
-                `${isUserFacultyAnswer ? '/user/faculty/cases' : '/admin/cases'}/question-answer/${data.measurementUid}`
+                `${isUserFacultyAnswer ? '/user/faculty/cases' : '/admin/cases'}/question-answer/${data.measurementUid}${facultyScopeQuery}`
               )
             );
             if (result.success) {
@@ -685,6 +683,9 @@ function ViewerLayout({
           }
           if (data && data.length > 0) {
             data.forEach(item => {
+              // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+              // measurement_data/toolName and would crash the tool-mapping lookup.
+              if (!item?.measurement_data?.toolName) return;
               const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
               const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -753,6 +754,9 @@ function ViewerLayout({
             }
             if (data && data.length > 0) {
               data.forEach(item => {
+                // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+                // measurement_data/toolName and would crash the tool-mapping lookup.
+                if (!item?.measurement_data?.toolName) return;
                 const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
                 const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -818,6 +822,9 @@ function ViewerLayout({
               }
               if (data && data.length > 0) {
                 data.forEach(item => {
+                  // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+                  // measurement_data/toolName and would crash the tool-mapping lookup.
+                  if (!item?.measurement_data?.toolName) return;
                   const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
                   const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -1639,7 +1646,7 @@ function ViewerLayout({
     }
   };
 
-  const submitFacultyUserAnswer = async (scope: 'master' | 'course', courseIds: number[]) => {
+  const submitFacultyUserAnswer = async (scope: 'master' | 'caseset', setIds: number[]) => {
     setSubmittingFacultyAnswer(true);
     try {
       const body: Record<string, unknown> = {
@@ -1650,19 +1657,9 @@ function ViewerLayout({
         annotations: gatherFacultyAnnotations(),
         // Screening: the case-level recall decision (diagnostic cases carry no recall).
         ...(currentViewType === 'screening' ? { is_recall: facultyRecall } : {}),
-        // Course scope: send explicit (course, case_set) pairs. The case set comes from each
-        // selected target — not the URL caseSetId, which is absent when opened from "My all cases".
-        ...(scope === 'course'
-          ? {
-              targets: answerTargets
-                .filter(
-                  t =>
-                    courseIds.includes(t.course_id) &&
-                    (!caseSetId || `${t.case_set_id}` === `${caseSetId}`)
-                )
-                .map(t => ({ course_id: t.course_id, case_set_id: t.case_set_id })),
-            }
-          : {}),
+        // Case-set scope: the selected case sets. One answer per set, shared by every course that
+        // uses the set — so no course is sent.
+        ...(scope === 'caseset' ? { case_set_ids: setIds } : {}),
       };
       const result = await apiCall(() => apiService.post(`/user/faculty/cases/${caseId}/answer`, body));
       if (!result.success) {
@@ -1673,14 +1670,14 @@ function ViewerLayout({
     } finally {
       setSubmittingFacultyAnswer(false);
       setCoursePickerOpen(false);
-      setSelectedCourseIds([]);
+      setSelectedSetIds([]);
       setFacultyRecall(false);
       setUIState('addAnswerClicked', false);
     }
   };
 
   const handleSubmitAnswer = async () => {
-    // Faculty-dashboard flow: open the course picker (answers save per course on confirm).
+    // Faculty-dashboard flow: open the case-set picker (the answer saves per selected set on confirm).
     if (isUserFacultyAnswer) {
       try {
         const result = await apiCall(() =>
@@ -1690,14 +1687,14 @@ function ViewerLayout({
         const targets = (ctx?.targets ?? []) as typeof answerTargets;
         setAnswerTargets(targets);
         setIsMasterFaculty(!!ctx?.is_master_faculty);
-        // Pre-select the courses of the case set this viewer was opened from.
-        setSelectedCourseIds(
-          caseSetId ? targets.filter(t => `${t.case_set_id}` === `${caseSetId}`).map(t => t.course_id) : []
+        // Pre-select the case set this viewer was opened from (if any).
+        setSelectedSetIds(
+          caseSetId ? targets.filter(t => `${t.case_set_id}` === `${caseSetId}`).map(t => t.case_set_id) : []
         );
       } catch (e) {
         console.error('Failed to load answer context', e);
         setAnswerTargets([]);
-        setSelectedCourseIds([]);
+        setSelectedSetIds([]);
         setIsMasterFaculty(false);
       }
       setCoursePickerOpen(true);
@@ -2273,88 +2270,82 @@ function ViewerLayout({
                   onClick={e => e.stopPropagation()}
                 >
                   <h3 className="mb-1 text-lg font-semibold">Submit answer</h3>
-                  <p className="mb-4 text-sm text-white/60">Choose where to save this case&apos;s answer.</p>
-                  {(() => {
-                    const setTargets = caseSetId
-                      ? answerTargets.filter(t => `${t.case_set_id}` === `${caseSetId}`)
-                      : answerTargets;
-                    return (
-                      <>
-                        {setTargets.length > 0 && (
-                          <div className="mb-4">
-                            <div className="mb-2 flex items-center justify-between">
-                              <span className="text-sm font-medium">
-                                Courses{caseSetId ? ' in this case set' : ''}
-                              </span>
-                              <button
-                                className="text-xs"
-                                style={{ color: 'hsl(var(--highlight))' }}
-                                onClick={() => setSelectedCourseIds(setTargets.map(t => t.course_id))}
-                              >
-                                Select all
-                              </button>
-                            </div>
-                            <div className="max-h-[220px] divide-y divide-white/5 overflow-y-auto rounded-lg border border-white/10">
-                              {setTargets.map(t => {
-                                const checked = selectedCourseIds.includes(t.course_id);
-                                return (
-                                  <label
-                                    key={`${t.case_set_id}:${t.course_id}`}
-                                    className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-white/5"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={() =>
-                                        setSelectedCourseIds(prev =>
-                                          checked ? prev.filter(id => id !== t.course_id) : [...prev, t.course_id]
-                                        )
-                                      }
-                                    />
-                                    <span className="flex-1 text-sm">{t.course_title}</span>
-                                    {t.answered && <span className="text-[11px] text-green-400">answered</span>}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                            <button
-                              disabled={submittingFacultyAnswer || selectedCourseIds.length === 0}
-                              onClick={() => submitFacultyUserAnswer('course', selectedCourseIds)}
-                              className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50"
-                              style={{ backgroundColor: 'hsl(var(--highlight))' }}
-                            >
-                              {submittingFacultyAnswer
-                                ? 'Saving…'
-                                : `Save for ${selectedCourseIds.length} selected course${selectedCourseIds.length === 1 ? '' : 's'}`}
-                            </button>
-                          </div>
-                        )}
-                        {/* Master/default answer — only the faculty who OWNS the case may set it. */}
-                        {isMasterFaculty && (
-                          <button
-                            disabled={submittingFacultyAnswer}
-                            onClick={() => submitFacultyUserAnswer('master', [])}
-                            className="w-full rounded-lg border border-white/20 py-2 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
-                          >
-                            Save as master (default) answer
-                          </button>
-                        )}
-                        {setTargets.length === 0 && !isMasterFaculty && (
-                          <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
-                            There&apos;s nothing to save here. You can answer this case only for courses you teach,
-                            and you&apos;re not the faculty who owns this case.
-                          </p>
-                        )}
+                  <p className="mb-4 text-sm text-white/60">Choose which case set(s) to save this answer for. The same answer applies to every course that uses the set.</p>
+                  {answerTargets.length > 0 && (
+                    <div className="mb-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">Your case sets with this case</span>
                         <button
-                          disabled={submittingFacultyAnswer}
-                          onClick={() => setCoursePickerOpen(false)}
-                          className="mt-2 w-full py-2 text-sm text-white/50 hover:text-white"
+                          className="text-xs"
+                          style={{ color: 'hsl(var(--highlight))' }}
+                          onClick={() => setSelectedSetIds(answerTargets.map(t => t.case_set_id))}
                         >
-                          Cancel
+                          Select all
                         </button>
-                      </>
-                    );
-                  })()}
+                      </div>
+                      <div className="max-h-[220px] divide-y divide-white/5 overflow-y-auto rounded-lg border border-white/10">
+                        {answerTargets.map(t => {
+                          const checked = selectedSetIds.includes(t.case_set_id);
+                          return (
+                            <label
+                              key={t.case_set_id}
+                              className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-white/5"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedSetIds(prev =>
+                                    checked ? prev.filter(id => id !== t.case_set_id) : [...prev, t.case_set_id]
+                                  )
+                                }
+                              />
+                              <span className="flex-1 text-sm">
+                                {t.case_set_name}
+                                <span className="block text-[11px] text-white/40">
+                                  used in {t.course_count} course{t.course_count === 1 ? '' : 's'}
+                                </span>
+                              </span>
+                              {t.answered && <span className="text-[11px] text-green-400">answered</span>}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <button
+                        disabled={submittingFacultyAnswer || selectedSetIds.length === 0}
+                        onClick={() => submitFacultyUserAnswer('caseset', selectedSetIds)}
+                        className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        style={{ backgroundColor: 'hsl(var(--highlight))' }}
+                      >
+                        {submittingFacultyAnswer
+                          ? 'Saving…'
+                          : `Save for ${selectedSetIds.length} selected set${selectedSetIds.length === 1 ? '' : 's'}`}
+                      </button>
+                    </div>
+                  )}
+                  {/* Master/default answer — only the faculty who OWNS the case may set it. */}
+                  {isMasterFaculty && (
+                    <button
+                      disabled={submittingFacultyAnswer}
+                      onClick={() => submitFacultyUserAnswer('master', [])}
+                      className="w-full rounded-lg border border-white/20 py-2 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
+                    >
+                      Save as master (default) answer
+                    </button>
+                  )}
+                  {answerTargets.length === 0 && !isMasterFaculty && (
+                    <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
+                      There&apos;s nothing to save here. You can answer this case only for a case set you&apos;re assigned to,
+                      and you&apos;re not the faculty who owns this case.
+                    </p>
+                  )}
+                  <button
+                    disabled={submittingFacultyAnswer}
+                    onClick={() => setCoursePickerOpen(false)}
+                    className="mt-2 w-full py-2 text-sm text-white/50 hover:text-white"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             )}
