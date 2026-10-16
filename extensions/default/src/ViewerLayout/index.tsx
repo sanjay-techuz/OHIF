@@ -1626,7 +1626,12 @@ function ViewerLayout({
   const gatherFacultyAnnotations = (): Array<Record<string, unknown>> => {
     try {
       const measurements = servicesManager.services.measurementService.getMeasurements?.() || [];
-      return measurements.map((m: any) => {
+      // Only CircleROI is persisted. Any other tool (freehand ROI, length, …) the faculty drew is
+      // draw-only and must never be sent to the backend (freehand point arrays are huge and broke
+      // the answer query — ER_OUT_OF_SORTMEMORY).
+      return measurements
+        .filter((m: any) => m.toolName === 'CircleROI')
+        .map((m: any) => {
         let annotationData: unknown = null;
         try {
           annotationData = csAnnotation.state.getAnnotation(m.uid) ?? null;

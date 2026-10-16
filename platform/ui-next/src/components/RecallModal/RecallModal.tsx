@@ -47,7 +47,8 @@ const RecallModal: React.FC<RecallModalProps> = ({
     // Add any recall logic here
 
     const measurement = measurementService?.getMeasurement(measurementUid);
-    if (measurement) {
+    // Only CircleROI is persisted. A non-circle tool is draw-only — never save it to the DB.
+    if (measurement && measurement.toolName === 'CircleROI') {
       const displaySetInstanceUID = measurement.displaySetInstanceUID;
       const displaySet = displaySetService.getDisplaySetByUID(displaySetInstanceUID);
 

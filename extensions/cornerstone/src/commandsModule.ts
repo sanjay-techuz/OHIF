@@ -792,6 +792,11 @@ function commandsModule({
                   meta?.referenceStudyUID ||
                   meta?.StudyInstanceUID;
                 const toolName = meta?.toolName || measurementForSave?.toolName;
+                // Only CircleROI is persisted — a non-circle annotation is draw-only and was never
+                // saved, so don't POST a color change for it (would create an unwanted DB row).
+                if (toolName !== 'CircleROI') {
+                  return;
+                }
                 // Modality must come from the displaySet OR cornerstone's
                 // cached DICOM instance metadata — measurement objects do NOT
                 // carry a top-level `modality` field. The backend Joi
