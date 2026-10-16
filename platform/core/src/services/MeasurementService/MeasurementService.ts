@@ -643,7 +643,10 @@ class MeasurementService extends PubSubService {
                 u_userType === 'student' ||
                 !!useUIStateStore.getState().uiState.addAnswerClicked;
 
-              if (isFacultyAddAnswerClicked) {
+              // Only CircleROI is persisted. Every other tool (freehand ROI, length, …) is
+              // draw-only and must never hit the DB — freehand point arrays are huge and broke
+              // the answer query (ER_OUT_OF_SORTMEMORY). The matching ADD path below does the same.
+              if (isFacultyAddAnswerClicked && newMeasurement.toolName === 'CircleROI') {
                 const existing = pendingMeasurementUpdateSaves.get(internalUID);
                 if (existing) {
                   clearTimeout(existing);
@@ -753,46 +756,55 @@ class MeasurementService extends PubSubService {
         // and the double-click reopener checks the same condition
         // (initDoubleClick.ts:46-47) — this brings the auto-open path in sync.
         if (localStorage.getItem('ohif-viewType') === 'diagnostic' && !isPreview) {
+          // Only CircleROI is persisted and carries a BI-RADS form. Every other tool
+          // (freehand ROI, length, rectangle, …) is DRAW-ONLY: no modal and NO DB save, so it
+          // disappears on refresh/reload. Freehand ROI point arrays are huge and broke the answer
+          // query (ER_OUT_OF_SORTMEMORY), so such annotations must never reach the DB.
           if (newMeasurement.toolName === 'CircleROI') {
             this._broadcastEvent(this.EVENTS.SHOW_MEASUREMENT_MODAL, {
               measurementUid: newMeasurement.uid || {},
               measurement: newMeasurement,
             });
-          }
 
-          const body: Record<string, unknown> = {
-            ...(isFellowship
-              ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
-              : { course_id: courseId, module_id: moduleId }),
-            case_id: caseId,
-            view_type: viewType,
-            study_instance_uid: newMeasurement.referenceStudyUID,
-            measurement_uid: newMeasurement.uid,
-            tool_name: newMeasurement.toolName,
-            measurement_data: newMeasurement,
-            annotation_data: annotationData,
-            modality:
-              getModalityForMeasurement(newMeasurement, annotationData) || displaySet?.Modality || '',
-            student_id: '',
-            faculty_id: '',
-            is_recall: false,
-          };
-          if (userType === 'student') {
-            body.student_id = studentId;
-            delete body.faculty_id;
-            await apiService.post('/user/cases/annotation-measurements', body);
-          } else {
-            body.faculty_id = facultyId;
-            delete body.student_id;
-            const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
-            // Faculty-dashboard (user) flow: not saved to admin here (sent at Submit).
-            if (isAddAnswerClicked && !(userType === 'faculty' && answerAuth === 'user')) {
-              await apiService.post('/admin/cases/annotation-measurements', body);
+            const body: Record<string, unknown> = {
+              ...(isFellowship
+                ? buildFellowshipBody({ isFellowship, programId, phaseId, moduleId })
+                : { course_id: courseId, module_id: moduleId }),
+              case_id: caseId,
+              view_type: viewType,
+              study_instance_uid: newMeasurement.referenceStudyUID,
+              measurement_uid: newMeasurement.uid,
+              tool_name: newMeasurement.toolName,
+              measurement_data: newMeasurement,
+              annotation_data: annotationData,
+              modality:
+                getModalityForMeasurement(newMeasurement, annotationData) || displaySet?.Modality || '',
+              student_id: '',
+              faculty_id: '',
+              is_recall: false,
+            };
+            if (userType === 'student') {
+              body.student_id = studentId;
+              delete body.faculty_id;
+              await apiService.post('/user/cases/annotation-measurements', body);
+            } else {
+              body.faculty_id = facultyId;
+              delete body.student_id;
+              const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
+              // Faculty-dashboard (user) flow: not saved to admin here (sent at Submit).
+              if (isAddAnswerClicked && !(userType === 'faculty' && answerAuth === 'user')) {
+                await apiService.post('/admin/cases/annotation-measurements', body);
+              }
             }
           }
         }
-        // Show the recall modal
-        if (localStorage.getItem('ohif-viewType') === 'screening' && !isPreview) {
+        // Show the recall modal — only for CircleROI (the only persisted tool). Other tools are
+        // draw-only in screening too: no recall modal, no DB save.
+        if (
+          localStorage.getItem('ohif-viewType') === 'screening' &&
+          !isPreview &&
+          newMeasurement.toolName === 'CircleROI'
+        ) {
           this._broadcastEvent(this.EVENTS.SHOW_RECALL_MODAL, {
             measurementUid: newMeasurement.uid || {},
             measurement: newMeasurement,
