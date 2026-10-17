@@ -792,6 +792,11 @@ function commandsModule({
                   meta?.referenceStudyUID ||
                   meta?.StudyInstanceUID;
                 const toolName = meta?.toolName || measurementForSave?.toolName;
+                // Only CircleROI is persisted — a non-circle annotation is draw-only and was never
+                // saved, so don't POST a color change for it (would create an unwanted DB row).
+                if (toolName !== 'CircleROI') {
+                  return;
+                }
                 // Modality must come from the displaySet OR cornerstone's
                 // cached DICOM instance metadata — measurement objects do NOT
                 // carry a top-level `modality` field. The backend Joi
@@ -851,7 +856,10 @@ function commandsModule({
                   body.faculty_id = (getCustomParams() as any)?.facultyId;
                   const isAddAnswerClicked = !!useUIStateStore.getState().uiState
                     .addAnswerClicked;
-                  if (isAddAnswerClicked) {
+                  const isUserFacultyAnswer =
+                    userType === 'faculty' && (getCustomParams() as any)?.answerAuth === 'user';
+                  // Faculty-dashboard (user) flow: not saved to admin here (sent at Submit).
+                  if (isAddAnswerClicked && !isUserFacultyAnswer) {
                     apiService
                       .post('/admin/cases/annotation-measurements', body)
                       .catch(err =>
@@ -969,7 +977,7 @@ function commandsModule({
         measurementService.removeMany(uid);
       } else {
         // To remove the measurement from the server
-        const { userType, isPreview } = getCustomParams();
+        const { userType, isPreview, answerAuth } = getCustomParams() as any;
         if (isPreview) {
           return;
         }
@@ -977,7 +985,10 @@ function commandsModule({
           await apiService.delete(`/user/cases/annotation-measurements/${uid}`);
         } else {
           const isAddAnswerClicked = !!useUIStateStore.getState().uiState.addAnswerClicked;
-          if (isAddAnswerClicked) {
+          const isUserFacultyAnswer = userType === 'faculty' && answerAuth === 'user';
+          // Faculty-dashboard (user) flow: nothing persisted during drawing — the removal is
+          // reflected at Submit, which replaces this faculty's annotations for the scope.
+          if (isAddAnswerClicked && !isUserFacultyAnswer) {
             await apiService.delete(`/admin/cases/annotation-measurements/${uid}`);
           }
         }

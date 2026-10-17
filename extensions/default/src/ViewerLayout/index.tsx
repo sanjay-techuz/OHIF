@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Enums as CoreEnums } from '@cornerstonejs/core';
+import { annotation as csAnnotation } from '@cornerstonejs/tools';
 
 import { useCustomParams } from '@ohif/app/src/hooks/useCustomParams';
 import {
@@ -111,6 +112,9 @@ function ViewerLayout({
   // call whenever the new value is already in-sync with the backend.
   // PatientID we've already fetched folder names for — the display-set
   // subscription below fires repeatedly, and this keeps it to one request.
+  // Faculty-dashboard (user) flow: per-ROI question-modal answers, kept here (not saved during
+  // drawing) and gathered into the Submit Answer payload. Keyed by measurement uid.
+  const facultyFormByUidRef = useRef<Map<string, Record<string, unknown>>>(new Map());
   const folderNamesPatientRef = useRef<string | null>(null);
   const initialAcrLoadedRef = useRef(false);
   const lastSavedAcrRef = useRef<string | null>(null);
@@ -119,6 +123,9 @@ function ViewerLayout({
   // ViewType management
   const [currentViewType, setCurrentViewType] = useState<'diagnostic' | 'screening'>('diagnostic');
   const [showRecallModal, setShowRecallModal] = useState(false);
+  // Faculty-dashboard (user) flow, screening cases: the case-level recall decision. Captured from
+  // the Recall modal (not saved during drawing) and sent per course from the Submit Answer picker.
+  const [facultyRecall, setFacultyRecall] = useState(false);
 
   // Case navigation state
   const [caseList, setCaseList] = useState([]);
@@ -134,6 +141,10 @@ function ViewerLayout({
   const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
   const [showOverlayFieldsModal, setShowOverlayFieldsModal] = useState(false);
   const [caseHistoryText, setCaseHistoryText] = useState('');
+  // Case Notes (screening): a per-case free-text note. Admin + master faculty edit the master note;
+  // a non-master faculty edits their case-set note; students view it read-only.
+  const [showCaseNotesModal, setShowCaseNotesModal] = useState(false);
+  const [caseNotesText, setCaseNotesText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
 
   // Lexa AI reporting panel — single panel, two modes ('generate' | 'correct').
@@ -161,6 +172,8 @@ function ViewerLayout({
     isFellowship,
     programId,
     phaseId,
+    answerAuth,
+    caseSetId,
   } = useCustomParams();
   // Fellowship cases come to OHIF with `programId` instead of `courseId`.
   // Existing backend endpoints expect a value in the `:courseId` URL slot;
@@ -170,6 +183,21 @@ function ViewerLayout({
   const urlCourseId = isFellowship ? programId : courseId;
   const isAddAnswerClicked = useUIStateStore(state => !!state.uiState.addAnswerClicked);
   const { setUIState } = useUIStateStore();
+  // Faculty-dashboard (user) answer flow: the logged-in faculty submits via the
+  // /user/faculty answer endpoints + a course picker, instead of the admin per-change saves.
+  const isUserFacultyAnswer = userType === 'faculty' && answerAuth === 'user';
+  // Scope for the faculty prefill reads. Faculty answers are CASE-SET scoped now: opened from a set
+  // → that set's answer with master fallback; opened from "My cases" → master/default answer.
+  const facultyScopeQuery =
+    isUserFacultyAnswer && caseSetId ? `?case_set_id=${encodeURIComponent(caseSetId)}` : '';
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
+  const [answerTargets, setAnswerTargets] = useState<
+    Array<{ case_set_id: number; case_set_name: string; course_count: number; answered: boolean }>
+  >([]);
+  const [selectedSetIds, setSelectedSetIds] = useState<number[]>([]);
+  // Only the case OWNER faculty (assigned to the case itself) may set the master/default answer.
+  const [isMasterFaculty, setIsMasterFaculty] = useState(false);
+  const [submittingFacultyAnswer, setSubmittingFacultyAnswer] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { show } = useModal();
@@ -517,7 +545,12 @@ function ViewerLayout({
       const patientId = instance.PatientID as string | undefined;
       if (patientId && patientId !== folderNamesPatientRef.current) {
         folderNamesPatientRef.current = patientId;
-        const endpoint = userType === 'faculty' ? '/admin/cases/folder-names' : '/user/cases/folder-names';
+        const endpoint =
+          userType === 'faculty'
+            ? isUserFacultyAnswer
+              ? '/user/faculty/cases/folder-names'
+              : '/admin/cases/folder-names'
+            : '/user/cases/folder-names';
         apiCall(() => apiService.get(`${endpoint}?patient_id=${encodeURIComponent(patientId)}`))
           .then((result: any) => {
             const map = (result?.success ? result?.data?.data : null) as Record<string, string> | null;
@@ -598,7 +631,9 @@ function ViewerLayout({
         } else {
           if (isAddAnswerClicked) {
             const result = await apiCall(() =>
-              apiService.get(`/admin/cases/question-answer/${data.measurementUid}`)
+              apiService.get(
+                `${isUserFacultyAnswer ? '/user/faculty/cases' : '/admin/cases'}/question-answer/${data.measurementUid}${facultyScopeQuery}`
+              )
             );
             if (result.success) {
               const { data: formData } = result.data as any;
@@ -652,6 +687,9 @@ function ViewerLayout({
           }
           if (data && data.length > 0) {
             data.forEach(item => {
+              // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+              // measurement_data/toolName and would crash the tool-mapping lookup.
+              if (!item?.measurement_data?.toolName) return;
               const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
               const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -720,6 +758,9 @@ function ViewerLayout({
             }
             if (data && data.length > 0) {
               data.forEach(item => {
+                // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+                // measurement_data/toolName and would crash the tool-mapping lookup.
+                if (!item?.measurement_data?.toolName) return;
                 const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
                 const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -773,7 +814,9 @@ function ViewerLayout({
         } else {
           if (isAddAnswerClicked) {
             const result = await apiCall(() =>
-              apiService.get(`/admin/cases/annotation-measurements/${caseId}/${facultyId}`)
+              apiService.get(
+                `${isUserFacultyAnswer ? '/user/faculty/cases' : '/admin/cases'}/annotation-measurements/${caseId}/${facultyId}${facultyScopeQuery}`
+              )
             );
             if (result.success) {
               const { data } = result.data as any;
@@ -783,6 +826,9 @@ function ViewerLayout({
               }
               if (data && data.length > 0) {
                 data.forEach(item => {
+                  // Skip rows with no drawn measurement (e.g. a form-only answer row) — they have no
+                  // measurement_data/toolName and would crash the tool-mapping lookup.
+                  if (!item?.measurement_data?.toolName) return;
                   const CORNERSTONE_3D_TOOLS_SOURCE_NAME = 'Cornerstone3DTools';
                   const CORNERSTONE_3D_TOOLS_SOURCE_VERSION = '0.1';
 
@@ -819,6 +865,21 @@ function ViewerLayout({
                     toolName: item.measurement_data.toolName,
                     formData: item.form_data || null,
                   };
+
+                  // Seed the faculty ROI-form map from the loaded answer so a later faculty
+                  // submit re-sends forms the faculty didn't re-edit this session. Without this,
+                  // gatherFacultyAnnotations() sends form_data: null for untouched annotations and
+                  // the batch submit WIPES their previously-saved ROI answers.
+                  if (item.form_data) {
+                    try {
+                      facultyFormByUidRef.current.set(
+                        item.measurement_data.uid,
+                        typeof item.form_data === 'string' ? JSON.parse(item.form_data) : item.form_data
+                      );
+                    } catch {
+                      /* ignore malformed form_data */
+                    }
+                  }
 
                   // Use addRawMeasurement with transformed data
                   servicesManager.services.measurementService.addRawMeasurement(
@@ -872,7 +933,11 @@ function ViewerLayout({
       }
       if (userType === 'faculty' || isPreview) {
         if (isAddAnswerClicked) {
-          const result = await apiCall(() => apiService.get(`/admin/cases/acr-values/${caseId}`));
+          const result = await apiCall(() =>
+            apiService.get(
+              `${isUserFacultyAnswer ? '/user/faculty/cases' : '/admin/cases'}/acr-values/${caseId}${facultyScopeQuery}`
+            )
+          );
           if (
             result.success &&
             (result.status === HTTP_STATUS.OK || result.status === HTTP_STATUS.CREATED)
@@ -883,6 +948,10 @@ function ViewerLayout({
                 setFacultyAcrValues(data.result_data || acrConfig.defaultValues);
               } else {
                 seedStudentAcr(data.result_data || acrConfig.defaultValues);
+                // Screening: seed the recall decision so editing an existing answer reflects it.
+                if (isUserFacultyAnswer) {
+                  setFacultyRecall(!!data.is_recall);
+                }
               }
             }
           } else {
@@ -1004,6 +1073,11 @@ function ViewerLayout({
         return;
       }
       if (userType === 'faculty' && !isAddAnswerClicked) {
+        return;
+      }
+      // Faculty-dashboard flow: don't per-change save to admin — the ACR (studentAcrValues)
+      // is sent once, per selected course, from the Submit Answer course picker.
+      if (isUserFacultyAnswer) {
         return;
       }
       try {
@@ -1294,7 +1368,9 @@ function ViewerLayout({
       return;
     }
     try {
-      const result = await apiCall(() => apiService.get(`/admin/cases/${caseId}`));
+      const result = await apiCall(() =>
+        apiService.get(isUserFacultyAnswer ? `/user/faculty/cases/${caseId}` : `/admin/cases/${caseId}`)
+      );
       if (result.success) {
         const caseData = result.data?.data;
         if (caseData) {
@@ -1325,6 +1401,39 @@ function ViewerLayout({
       fetchFacultyCaseDetails();
     }
   }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
+
+  // Case Notes (screening) — load the scope-resolved note. Faculty/admin edit it; students read it.
+  // Student + isPreview resolve the note by their (course/fellowship → case set) scope; a faculty uses
+  // the faculty endpoint (case-set note with master fallback) or the admin endpoint for the master note.
+  const fetchCaseNote = async () => {
+    if (!caseId) {
+      return;
+    }
+    try {
+      let url: string;
+      if (userType === 'student' || isPreview) {
+        const noteQuery = isFellowship
+          ? buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })
+          : `?course_id=${encodeURIComponent(urlCourseId ?? '')}&module_id=${encodeURIComponent(moduleId ?? '')}`;
+        url = `/user/cases/faculty-note/${caseId}${noteQuery}`;
+      } else if (isUserFacultyAnswer) {
+        url = `/user/faculty/cases/${caseId}/notes${facultyScopeQuery}`;
+      } else {
+        url = `/admin/cases/${caseId}/notes`;
+      }
+      const result = await apiCall(() => apiService.get(url));
+      if (result.success) {
+        setCaseNotesText(result.data?.data?.notes || '');
+      }
+    } catch (error) {
+      console.error('Error fetching case note:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCaseNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, userType, isPreview, isFellowship, programId, courseId, moduleId, caseSetId, answerAuth]);
 
   const viewportComponents = viewports.map(getViewportComponentData);
 
@@ -1495,7 +1604,9 @@ function ViewerLayout({
           ? `/user/cases/evaluation/preview-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
           : userType === 'student'
             ? `/user/cases/annotation-measurements/${urlCourseId}/${moduleId}/${caseId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
-            : `/admin/cases/annotation-measurements/${caseId}/${facultyId}`;
+            : isUserFacultyAnswer
+              ? `/user/faculty/cases/annotation-measurements/${caseId}/${facultyId}${facultyScopeQuery}`
+              : `/admin/cases/annotation-measurements/${caseId}/${facultyId}`;
         const result = await apiCall(() => apiService.get(url));
         if (cancelled || !result.success) {
           return;
@@ -1544,7 +1655,94 @@ function ViewerLayout({
     return caseId ? `Case ${caseId}` : '';
   }, [caseList, currentCaseIndex, caseId]);
 
+  // Faculty-dashboard flow: submit the BI-RADS answer for the master/default OR for the
+  // selected courses of this case set, via the /user/faculty answer endpoint.
+  // Gather the faculty's drawn annotations (+ their BI-RADS form answers) for the Submit payload.
+  // The user-faculty flow doesn't save per change, so we collect from the live measurement state
+  // here. The backend replaces this faculty's annotations for the target scope with these rows.
+  const gatherFacultyAnnotations = (): Array<Record<string, unknown>> => {
+    try {
+      const measurements = servicesManager.services.measurementService.getMeasurements?.() || [];
+      // Only CircleROI is persisted. Any other tool (freehand ROI, length, …) the faculty drew is
+      // draw-only and must never be sent to the backend (freehand point arrays are huge and broke
+      // the answer query — ER_OUT_OF_SORTMEMORY).
+      return measurements
+        .filter((m: any) => m.toolName === 'CircleROI')
+        .map((m: any) => {
+        let annotationData: unknown = null;
+        try {
+          annotationData = csAnnotation.state.getAnnotation(m.uid) ?? null;
+        } catch {
+          annotationData = null;
+        }
+        return {
+          measurement_uid: m.uid,
+          tool_name: m.toolName ?? null,
+          measurement_data: m,
+          annotation_data: annotationData,
+          form_data: facultyFormByUidRef.current.get(m.uid) ?? null,
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+
+  const submitFacultyUserAnswer = async (scope: 'master' | 'caseset', setIds: number[]) => {
+    setSubmittingFacultyAnswer(true);
+    try {
+      const body: Record<string, unknown> = {
+        study_instance_uid: StudyInstanceUIDs,
+        scope,
+        view_type: viewType,
+        result_data: studentAcrValues,
+        annotations: gatherFacultyAnnotations(),
+        // Screening: the case-level recall decision (diagnostic cases carry no recall).
+        ...(currentViewType === 'screening' ? { is_recall: facultyRecall } : {}),
+        // Case-set scope: the selected case sets. One answer per set, shared by every course that
+        // uses the set — so no course is sent.
+        ...(scope === 'caseset' ? { case_set_ids: setIds } : {}),
+      };
+      const result = await apiCall(() => apiService.post(`/user/faculty/cases/${caseId}/answer`, body));
+      if (!result.success) {
+        console.error('Failed to submit faculty answer:', (result as any).error);
+      }
+    } catch (e) {
+      console.error('Submit faculty answer failed', e);
+    } finally {
+      setSubmittingFacultyAnswer(false);
+      setCoursePickerOpen(false);
+      setSelectedSetIds([]);
+      setFacultyRecall(false);
+      setUIState('addAnswerClicked', false);
+    }
+  };
+
   const handleSubmitAnswer = async () => {
+    // Faculty-dashboard flow: open the case-set picker (the answer saves per selected set on confirm).
+    if (isUserFacultyAnswer) {
+      try {
+        const result = await apiCall(() =>
+          apiService.get(`/user/faculty/cases/${caseId}/answer-context`)
+        );
+        const ctx = (result?.data as any)?.data;
+        const targets = (ctx?.targets ?? []) as typeof answerTargets;
+        setAnswerTargets(targets);
+        setIsMasterFaculty(!!ctx?.is_master_faculty);
+        // Pre-select the case set this viewer was opened from (if any).
+        setSelectedSetIds(
+          caseSetId ? targets.filter(t => `${t.case_set_id}` === `${caseSetId}`).map(t => t.case_set_id) : []
+        );
+      } catch (e) {
+        console.error('Failed to load answer context', e);
+        setAnswerTargets([]);
+        setSelectedSetIds([]);
+        setIsMasterFaculty(false);
+      }
+      setCoursePickerOpen(true);
+      return;
+    }
+
     const body = {
       course_id: courseId,
       module_id: moduleId,
@@ -1841,6 +2039,30 @@ function ViewerLayout({
               </Button>
             )}
             */}
+
+            {/* Case Notes button (SCREENING only). Like the BI-RADS answer, a faculty only sees it
+                after pressing "Add Answer" (edit mode); students see it read-only. Just viewing a
+                case (no Add Answer) hides it. */}
+            {currentViewType === 'screening' &&
+              ((userType === 'faculty' && isAddAnswerClicked) || userType === 'student') && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowCaseNotesModal(true)}
+                className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+                title="Case Notes"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 6H20M4 12H20M4 18H14"
+                    stroke="white"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-sm">Notes</span>
+              </Button>
+            )}
           </div>
 
           {/* //Center Section - Main Toolbar
@@ -2102,6 +2324,98 @@ function ViewerLayout({
               </Button>
             )}
 
+            {/* Faculty-dashboard course picker (user flow): save this case's answer for the
+                master/default or the selected courses of the case set. */}
+            {coursePickerOpen && (
+              <div
+                className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60"
+                onClick={() => !submittingFacultyAnswer && setCoursePickerOpen(false)}
+              >
+                <div
+                  className="w-[480px] max-w-[92vw] rounded-xl bg-[#1b1b1b] p-5 text-white shadow-2xl"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <h3 className="mb-1 text-lg font-semibold">Submit answer</h3>
+                  <p className="mb-4 text-sm text-white/60">Choose which case set(s) to save this answer for. The same answer applies to every course that uses the set.</p>
+                  {answerTargets.length > 0 && (
+                    <div className="mb-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-sm font-medium">Your case sets with this case</span>
+                        <button
+                          className="text-xs"
+                          style={{ color: 'hsl(var(--highlight))' }}
+                          onClick={() => setSelectedSetIds(answerTargets.map(t => t.case_set_id))}
+                        >
+                          Select all
+                        </button>
+                      </div>
+                      <div className="max-h-[220px] divide-y divide-white/5 overflow-y-auto rounded-lg border border-white/10">
+                        {answerTargets.map(t => {
+                          const checked = selectedSetIds.includes(t.case_set_id);
+                          return (
+                            <label
+                              key={t.case_set_id}
+                              className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-white/5"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedSetIds(prev =>
+                                    checked ? prev.filter(id => id !== t.case_set_id) : [...prev, t.case_set_id]
+                                  )
+                                }
+                              />
+                              <span className="flex-1 text-sm">
+                                {t.case_set_name}
+                                <span className="block text-[11px] text-white/40">
+                                  used in {t.course_count} course{t.course_count === 1 ? '' : 's'}
+                                </span>
+                              </span>
+                              {t.answered && <span className="text-[11px] text-green-400">answered</span>}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <button
+                        disabled={submittingFacultyAnswer || selectedSetIds.length === 0}
+                        onClick={() => submitFacultyUserAnswer('caseset', selectedSetIds)}
+                        className="mt-3 w-full rounded-lg py-2 text-sm font-semibold text-white disabled:opacity-50"
+                        style={{ backgroundColor: 'hsl(var(--highlight))' }}
+                      >
+                        {submittingFacultyAnswer
+                          ? 'Saving…'
+                          : `Save for ${selectedSetIds.length} selected set${selectedSetIds.length === 1 ? '' : 's'}`}
+                      </button>
+                    </div>
+                  )}
+                  {/* Master/default answer — only the faculty who OWNS the case may set it. */}
+                  {isMasterFaculty && (
+                    <button
+                      disabled={submittingFacultyAnswer}
+                      onClick={() => submitFacultyUserAnswer('master', [])}
+                      className="w-full rounded-lg border border-white/20 py-2 text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
+                    >
+                      Save as master (default) answer
+                    </button>
+                  )}
+                  {answerTargets.length === 0 && !isMasterFaculty && (
+                    <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/70">
+                      There&apos;s nothing to save here. You can answer this case only for a case set you&apos;re assigned to,
+                      and you&apos;re not the faculty who owns this case.
+                    </p>
+                  )}
+                  <button
+                    disabled={submittingFacultyAnswer}
+                    onClick={() => setCoursePickerOpen(false)}
+                    className="mt-2 w-full py-2 text-sm text-white/50 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* // Undo/Redo Buttons
             <div className="flex items-center gap-2">
               <div className="bg-bkg-full flex items-center justify-center gap-2 rounded-lg px-2 py-1">
@@ -2171,6 +2485,27 @@ function ViewerLayout({
           servicesManager={servicesManager}
           open={showMeasurementModal}
           onClose={() => setShowMeasurementModal(false)}
+          onUserFacultyAnswerSaved={(uid, savedForm) => {
+            // Keep the per-ROI answer until Submit (user-faculty flow doesn't save per change).
+            facultyFormByUidRef.current.set(uid, savedForm);
+            // Keep roiFormDataList in sync by measurement index so ACR/Lexa aggregation sees it.
+            try {
+              const measurements = servicesManager.services.measurementService.getMeasurements?.() || [];
+              const idx = measurements.findIndex((m: any) => m.uid === uid);
+              if (idx >= 0) {
+                setRoiFormDataList(prev => {
+                  const next = [...prev];
+                  while (next.length <= idx) {
+                    next.push(null);
+                  }
+                  next[idx] = savedForm;
+                  return next;
+                });
+              }
+            } catch {
+              /* non-critical */
+            }
+          }}
           onBreastDensityChange={value => {
             // ACR breast density = highest BI-RADS density across ALL ROIs.
             // Example: ROI-1=B, ROI-2=C, ROI-3=A → ACR shows C.
@@ -2316,6 +2651,11 @@ function ViewerLayout({
           servicesManager={servicesManager}
           measurementUid={currentMeasurementUid}
           annotationData={annotationData}
+          onUserFacultyRecall={() => {
+            // Faculty-dashboard (user) flow: capture "recall this case" now; the decision +
+            // annotation are sent per course from the Submit Answer picker (not saved here).
+            setFacultyRecall(true);
+          }}
         />
       )}
       {/* Validation Modal */}
@@ -2415,6 +2755,44 @@ function ViewerLayout({
         readOnly={userType === 'student'}
       />
       */}
+
+      {/* Case Notes modal (screening). Reuses the CaseHistoryModal shell with a different title. */}
+      <CaseHistoryModal
+        open={showCaseNotesModal}
+        onClose={() => setShowCaseNotesModal(false)}
+        title="Case Notes"
+        placeholder="Enter a note for this case..."
+        emptyText="No note has been added for this case yet."
+        initialValue={caseNotesText}
+        readOnly={userType === 'student' || isPreview}
+        onSave={
+          userType === 'student' || isPreview
+            ? undefined
+            : async (value: string) => {
+                setCaseNotesText(value);
+                if (!caseId) {
+                  return;
+                }
+                try {
+                  if (isUserFacultyAnswer) {
+                    // Faculty-dashboard flow: case-set note when opened from a set, else the master note.
+                    await apiCall(() =>
+                      apiService.post(`/user/faculty/cases/${caseId}/notes`, {
+                        scope: caseSetId ? 'caseset' : 'master',
+                        ...(caseSetId ? { case_set_ids: [Number(caseSetId)] } : {}),
+                        notes: value,
+                      })
+                    );
+                  } else {
+                    // Admin-launched viewer: the master note (shared with the master faculty).
+                    await apiCall(() => apiService.patch(`/admin/cases/${caseId}/notes`, { notes: value }));
+                  }
+                } catch (error) {
+                  console.error('Error saving case note:', error);
+                }
+              }
+        }
+      />
 
       {/* LexaReportingPanel — commented out along with its bottom-bar buttons.
           Uncomment both to restore the feature. */}
