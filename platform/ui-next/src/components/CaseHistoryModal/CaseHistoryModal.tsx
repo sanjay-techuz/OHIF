@@ -16,6 +16,12 @@ export interface CaseHistoryModalProps {
   initialValue?: string;
   onSave?: (value: string) => void;
   readOnly?: boolean;
+  /** Dialog heading (defaults to "Case History"); the Case Notes feature passes "Case Notes". */
+  title?: string;
+  /** Textarea placeholder (edit mode); the read-only empty state follows the title. */
+  placeholder?: string;
+  /** Read-only empty-state message. */
+  emptyText?: string;
 }
 
 const CaseHistoryModal: React.FC<CaseHistoryModalProps> = ({
@@ -24,6 +30,9 @@ const CaseHistoryModal: React.FC<CaseHistoryModalProps> = ({
   initialValue = '',
   onSave,
   readOnly = false,
+  title = 'Case History',
+  placeholder = 'Enter case history or description...',
+  emptyText = 'No case history available.',
 }) => {
   const [value, setValue] = useState(initialValue);
   const [error, setError] = useState('');
@@ -55,7 +64,7 @@ const CaseHistoryModal: React.FC<CaseHistoryModalProps> = ({
     >
       {/* Title */}
       <div className="mb-6">
-        <h2 className="text-primary-light text-2xl font-bold leading-tight">Case History</h2>
+        <h2 className="text-primary-light text-2xl font-bold leading-tight">{title}</h2>
       </div>
 
       {/* Content */}
@@ -65,7 +74,7 @@ const CaseHistoryModal: React.FC<CaseHistoryModalProps> = ({
             className="w-full whitespace-pre-wrap rounded-lg border border-[#4F4F4F] bg-transparent px-3 py-3 text-white"
             style={{ fontFamily: 'inherit', fontSize: '1rem', minHeight: '200px' }}
           >
-            {value || <span className="text-white/40">No case history available.</span>}
+            {value || <span className="text-white/40">{emptyText}</span>}
           </div>
         ) : (
           <>
@@ -78,7 +87,7 @@ const CaseHistoryModal: React.FC<CaseHistoryModalProps> = ({
               maxLength={MAX_CHARS}
               className="w-full resize-none rounded-lg border border-[#4F4F4F] bg-transparent px-3 py-3 text-white placeholder-white/40 focus:border-white/50 focus:outline-none focus:ring-0"
               rows={8}
-              placeholder="Enter case history or description..."
+              placeholder={placeholder}
               style={{ fontFamily: 'inherit', fontSize: '1rem' }}
             />
             <div className="flex items-center justify-between">

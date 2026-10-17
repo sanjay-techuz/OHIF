@@ -141,6 +141,10 @@ function ViewerLayout({
   const [showCaseHistoryModal, setShowCaseHistoryModal] = useState(false);
   const [showOverlayFieldsModal, setShowOverlayFieldsModal] = useState(false);
   const [caseHistoryText, setCaseHistoryText] = useState('');
+  // Case Notes (screening): a per-case free-text note. Admin + master faculty edit the master note;
+  // a non-master faculty edits their case-set note; students view it read-only.
+  const [showCaseNotesModal, setShowCaseNotesModal] = useState(false);
+  const [caseNotesText, setCaseNotesText] = useState('');
   const [annotationData, setAnnotationData] = useState<any>(null);
 
   // Lexa AI reporting panel — single panel, two modes ('generate' | 'correct').
@@ -1398,6 +1402,39 @@ function ViewerLayout({
     }
   }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
 
+  // Case Notes (screening) — load the scope-resolved note. Faculty/admin edit it; students read it.
+  // Student + isPreview resolve the note by their (course/fellowship → case set) scope; a faculty uses
+  // the faculty endpoint (case-set note with master fallback) or the admin endpoint for the master note.
+  const fetchCaseNote = async () => {
+    if (!caseId) {
+      return;
+    }
+    try {
+      let url: string;
+      if (userType === 'student' || isPreview) {
+        const noteQuery = isFellowship
+          ? buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })
+          : `?course_id=${encodeURIComponent(urlCourseId ?? '')}&module_id=${encodeURIComponent(moduleId ?? '')}`;
+        url = `/user/cases/faculty-note/${caseId}${noteQuery}`;
+      } else if (isUserFacultyAnswer) {
+        url = `/user/faculty/cases/${caseId}/notes${facultyScopeQuery}`;
+      } else {
+        url = `/admin/cases/${caseId}/notes`;
+      }
+      const result = await apiCall(() => apiService.get(url));
+      if (result.success) {
+        setCaseNotesText(result.data?.data?.notes || '');
+      }
+    } catch (error) {
+      console.error('Error fetching case note:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchCaseNote();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, userType, isPreview, isFellowship, programId, courseId, moduleId, caseSetId, answerAuth]);
+
   const viewportComponents = viewports.map(getViewportComponentData);
 
   // Auto-compose key findings for the Lexa form from current OHIF state.
@@ -2002,6 +2039,30 @@ function ViewerLayout({
               </Button>
             )}
             */}
+
+            {/* Case Notes button (SCREENING only). Like the BI-RADS answer, a faculty only sees it
+                after pressing "Add Answer" (edit mode); students see it read-only. Just viewing a
+                case (no Add Answer) hides it. */}
+            {currentViewType === 'screening' &&
+              ((userType === 'faculty' && isAddAnswerClicked) || userType === 'student') && (
+              <Button
+                variant="ghost"
+                onClick={() => setShowCaseNotesModal(true)}
+                className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+                title="Case Notes"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M4 6H20M4 12H20M4 18H14"
+                    stroke="white"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-sm">Notes</span>
+              </Button>
+            )}
           </div>
 
           {/* //Center Section - Main Toolbar
@@ -2694,6 +2755,44 @@ function ViewerLayout({
         readOnly={userType === 'student'}
       />
       */}
+
+      {/* Case Notes modal (screening). Reuses the CaseHistoryModal shell with a different title. */}
+      <CaseHistoryModal
+        open={showCaseNotesModal}
+        onClose={() => setShowCaseNotesModal(false)}
+        title="Case Notes"
+        placeholder="Enter a note for this case..."
+        emptyText="No note has been added for this case yet."
+        initialValue={caseNotesText}
+        readOnly={userType === 'student' || isPreview}
+        onSave={
+          userType === 'student' || isPreview
+            ? undefined
+            : async (value: string) => {
+                setCaseNotesText(value);
+                if (!caseId) {
+                  return;
+                }
+                try {
+                  if (isUserFacultyAnswer) {
+                    // Faculty-dashboard flow: case-set note when opened from a set, else the master note.
+                    await apiCall(() =>
+                      apiService.post(`/user/faculty/cases/${caseId}/notes`, {
+                        scope: caseSetId ? 'caseset' : 'master',
+                        ...(caseSetId ? { case_set_ids: [Number(caseSetId)] } : {}),
+                        notes: value,
+                      })
+                    );
+                  } else {
+                    // Admin-launched viewer: the master note (shared with the master faculty).
+                    await apiCall(() => apiService.patch(`/admin/cases/${caseId}/notes`, { notes: value }));
+                  }
+                } catch (error) {
+                  console.error('Error saving case note:', error);
+                }
+              }
+        }
+      />
 
       {/* LexaReportingPanel — commented out along with its bottom-bar buttons.
           Uncomment both to restore the feature. */}
