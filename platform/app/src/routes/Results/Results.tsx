@@ -371,9 +371,9 @@ const Results: React.FC<ResultsProps> = ({
           className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border px-8 py-10"
           style={{ borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' }}
         >
-          <h2 className="text-xl font-medium">Results not available yet</h2>
+          <h2 className="text-xl font-medium">Results will be available later</h2>
           <p className="text-sm leading-relaxed text-white/70">
-            Your answers have been submitted successfully. The results for this case will be available once all the course
+            Your answers have been submitted successfully. The results for this case will be available once all the live
             sessions are complete, or once your instructor releases them.
           </p>
           <Button
