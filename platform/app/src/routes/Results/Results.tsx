@@ -89,6 +89,9 @@ const Results: React.FC<ResultsProps> = ({
   // Backend "pre-course result gate": live-online / on-site PRE-COURSE cases whose results are
   // not yet released return { locked: true }. Show a friendly message instead of the metrics/table.
   const [resultLocked, setResultLocked] = useState(false);
+  // Keep a loader on screen until the evaluation API resolves, so the real results (or the locked
+  // message) render in one go — without this the default empty metrics flash for a frame first.
+  const [loading, setLoading] = useState(true);
 
   const { courseId, studentId, moduleId, isFellowship, programId, phaseId } =
     getCustomParams();
@@ -98,20 +101,21 @@ const Results: React.FC<ResultsProps> = ({
   const urlCourseId = isFellowship ? programId : courseId;
   useEffect(() => {
     const fetchResults = async () => {
-      const result = await apiCall(() =>
-        apiService.get(
-          `/user/cases/evaluation/measurement/${urlCourseId}/${moduleId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
-        )
-      );
+      try {
+        const result = await apiCall(() =>
+          apiService.get(
+            `/user/cases/evaluation/measurement/${urlCourseId}/${moduleId}/${studentId}${buildFellowshipQuery({ isFellowship, programId, phaseId, moduleId })}`
+          )
+        );
 
-      if (result.success) {
-        const { data } = result.data as { data: any };
-        if (data?.locked) {
-          // Pre-course results not released yet — show the locked message, skip metrics parsing.
-          setResultLocked(true);
-          return;
-        }
-        if (data) {
+        if (result.success) {
+          const { data } = result.data as { data: any };
+          if (data?.locked) {
+            // Pre-course results not released yet — show the locked message, skip metrics parsing.
+            setResultLocked(true);
+            return;
+          }
+          if (data) {
           const evaluation = data.evaluation;
           const evalType = evaluation.evaluationType || 'rl_based';
           setEvaluationType(evalType);
@@ -210,8 +214,11 @@ const Results: React.FC<ResultsProps> = ({
             }
           }
         }
-      } else {
-        console.error('Failed to fetch results data:', (result as any).error);
+        } else {
+          console.error('Failed to fetch results data:', (result as any).error);
+        }
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -220,6 +227,23 @@ const Results: React.FC<ResultsProps> = ({
 
   const handleBackToWorklist = () => {
     navigate('/');
+  };
+
+  /**
+   * Close the viewer tab and return the learner to their LMS course. The viewer is
+   * opened in a NEW tab from the LMS (window.open), so closing it drops them back on
+   * the course tab. If the tab can't be closed programmatically (not script-opened),
+   * fall back to navigating back a step.
+   */
+  const handleCloseViewer = () => {
+    window.close();
+    setTimeout(() => {
+      try {
+        navigate(-1);
+      } catch {
+        navigate('/');
+      }
+    }, 200);
   };
 
   /**
@@ -323,15 +347,28 @@ const Results: React.FC<ResultsProps> = ({
 
   const isOverall = evaluationType === 'overall_based';
 
+  // Loader until the evaluation API resolves — prevents the empty-metrics flash before the
+  // real results (or the locked message) render.
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center" style={{ backgroundColor: themeBg }}>
+        <div
+          className="h-10 w-10 animate-spin rounded-full border-2 border-white/20"
+          style={{ borderTopColor: borderColor }}
+        />
+      </div>
+    );
+  }
+
   // Pre-course result gate (live-online / on-site): results not released yet.
   if (resultLocked) {
     return (
       <div
-        className="relative flex h-full w-full flex-col items-center justify-center px-6 text-center text-white"
+        className="flex h-screen w-full flex-col items-center justify-center px-6 text-center text-white"
         style={{ backgroundColor: themeBg }}
       >
         <div
-          className="flex max-w-md flex-col items-center gap-4 rounded-2xl border px-8 py-10"
+          className="flex w-full max-w-md flex-col items-center gap-4 rounded-2xl border px-8 py-10"
           style={{ borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' }}
         >
           <h2 className="text-xl font-medium">Results not available yet</h2>
@@ -341,7 +378,7 @@ const Results: React.FC<ResultsProps> = ({
           </p>
           <Button
             variant="secondary"
-            onClick={handleBackToWorklist}
+            onClick={handleCloseViewer}
             className="mt-2 h-9 px-4 text-sm font-medium text-white"
             style={{ backgroundColor: 'hsl(var(--highlight))' }}
           >
