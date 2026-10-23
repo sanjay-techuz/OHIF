@@ -86,6 +86,9 @@ const Results: React.FC<ResultsProps> = ({
   const [specificity, setSpecificity] = useState(0);
   const [accuracy, setAccuracy] = useState(0);
   const [evaluationType, setEvaluationType] = useState<'rl_based' | 'overall_based'>('rl_based');
+  // Backend "pre-course result gate": live-online / on-site PRE-COURSE cases whose results are
+  // not yet released return { locked: true }. Show a friendly message instead of the metrics/table.
+  const [resultLocked, setResultLocked] = useState(false);
 
   const { courseId, studentId, moduleId, isFellowship, programId, phaseId } =
     getCustomParams();
@@ -103,6 +106,11 @@ const Results: React.FC<ResultsProps> = ({
 
       if (result.success) {
         const { data } = result.data as { data: any };
+        if (data?.locked) {
+          // Pre-course results not released yet — show the locked message, skip metrics parsing.
+          setResultLocked(true);
+          return;
+        }
         if (data) {
           const evaluation = data.evaluation;
           const evalType = evaluation.evaluationType || 'rl_based';
@@ -314,6 +322,35 @@ const Results: React.FC<ResultsProps> = ({
   };
 
   const isOverall = evaluationType === 'overall_based';
+
+  // Pre-course result gate (live-online / on-site): results not released yet.
+  if (resultLocked) {
+    return (
+      <div
+        className="relative flex h-full w-full flex-col items-center justify-center px-6 text-center text-white"
+        style={{ backgroundColor: themeBg }}
+      >
+        <div
+          className="flex max-w-md flex-col items-center gap-4 rounded-2xl border px-8 py-10"
+          style={{ borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.03)' }}
+        >
+          <h2 className="text-xl font-medium">Results not available yet</h2>
+          <p className="text-sm leading-relaxed text-white/70">
+            Your answers have been submitted successfully. The results for this case will be available once all the course
+            sessions are complete, or once your instructor releases them.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={handleBackToWorklist}
+            className="mt-2 h-9 px-4 text-sm font-medium text-white"
+            style={{ backgroundColor: 'hsl(var(--highlight))' }}
+          >
+            Back to My Courses
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
