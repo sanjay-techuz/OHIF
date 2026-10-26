@@ -115,6 +115,11 @@ function ViewerLayout({
   // Faculty-dashboard (user) flow: per-ROI question-modal answers, kept here (not saved during
   // drawing) and gathered into the Submit Answer payload. Keyed by measurement uid.
   const facultyFormByUidRef = useRef<Map<string, Record<string, unknown>>>(new Map());
+  // Review/preview (student side): per-ROI form_data for BOTH the student's and the faculty/admin
+  // annotations, keyed by the OHIF measurement uid. preview-measurements already returns faculty
+  // form_data, so the review modal reads it from here instead of the student-only /question-answer
+  // endpoint (which only knows CaseStudentAnswer and would render faculty ROIs blank).
+  const previewFormByUidRef = useRef<Record<string, any>>({});
   const folderNamesPatientRef = useRef<string | null>(null);
   const initialAcrLoadedRef = useRef(false);
   const lastSavedAcrRef = useRef<string | null>(null);
@@ -615,18 +620,27 @@ function ViewerLayout({
         }
 
         if (userType === 'student') {
-          const result = await apiCall(() =>
-            apiService.get(`/user/cases/question-answer/${data.measurementUid}`)
-          );
-          if (result.success) {
-            const { data: formData } = result.data as any;
-            console.log('formData--------------', formData);
-            setCurrentFormData(formData || null);
-            console.log('SHOW_MEASUREMENT_MODAL event received in ViewerLayout', data);
+          // In review/preview, the student's AND the faculty/admin form_data are already loaded via
+          // preview-measurements (keyed by uid). Read from memory so a faculty ROI shows its answers —
+          // the student /question-answer endpoint only knows CaseStudentAnswer and returns blank for
+          // faculty ROIs. If the uid isn't in memory (or not preview), fall back to the API so the
+          // student's own ROIs can never regress.
+          const inMemoryForm = isPreview ? previewFormByUidRef.current?.[data.measurementUid] : undefined;
+          if (inMemoryForm !== undefined) {
+            setCurrentFormData(inMemoryForm ?? null);
             setShowMeasurementModal(true);
           } else {
-            console.error('Failed to fetch measurement data:', (result as any).error);
-            // Handle error - could show notification or set error state
+            const result = await apiCall(() =>
+              apiService.get(`/user/cases/question-answer/${data.measurementUid}`)
+            );
+            if (result.success) {
+              const { data: formData } = result.data as any;
+              setCurrentFormData(formData || null);
+              setShowMeasurementModal(true);
+            } else {
+              console.error('Failed to fetch measurement data:', (result as any).error);
+              // Handle error - could show notification or set error state
+            }
           }
         } else {
           if (isAddAnswerClicked) {
@@ -684,6 +698,23 @@ function ViewerLayout({
           console.log('data--------------', data);
           if (Array.isArray(data)) {
             setRoiFormDataList(data.map((it: any) => it?.form_data ?? null));
+            // Also key each ROI's form_data by the OHIF measurement uid so the review modal can show
+            // it (faculty ROIs included). form_data may arrive as a raw JSON string — parse to object.
+            const byUid: Record<string, any> = {};
+            data.forEach((it: any) => {
+              const uid = it?.measurement_data?.uid;
+              if (!uid) return;
+              let fd = it?.form_data ?? null;
+              if (typeof fd === 'string') {
+                try {
+                  fd = JSON.parse(fd);
+                } catch {
+                  fd = null;
+                }
+              }
+              byUid[uid] = fd;
+            });
+            previewFormByUidRef.current = byUid;
           }
           if (data && data.length > 0) {
             data.forEach(item => {
