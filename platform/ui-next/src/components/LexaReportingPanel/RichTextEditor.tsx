@@ -20,6 +20,13 @@ interface Props {
   placeholder?: string;
   /** Min editor body height in px. Defaults to 280. */
   minHeight?: number;
+  /**
+   * Max editor body height in px. When set, only the text area scrolls (overflow-y: auto) while the
+   * toolbar stays fixed above it — so the formatting buttons stay visible in a long document.
+   */
+  maxHeight?: number;
+  /** Quill toolbar config. Defaults to TOOLBAR (callers like the Report pass a richer one). */
+  toolbar?: any[];
 }
 
 const TOOLBAR = [
@@ -30,7 +37,7 @@ const TOOLBAR = [
   ['clean'],
 ];
 
-const RichTextEditor: React.FC<Props> = ({ value, onChange, placeholder, minHeight = 280 }) => {
+const RichTextEditor: React.FC<Props> = ({ value, onChange, placeholder, minHeight = 280, maxHeight, toolbar }) => {
   return (
     <div
       className="lexa-rte overflow-hidden rounded-lg border border-[#4F4F4F]"
@@ -63,6 +70,15 @@ const RichTextEditor: React.FC<Props> = ({ value, onChange, placeholder, minHeig
                     min-height: ${minHeight}px;
                     padding: 14px 16px;
                 }
+                ${
+                  maxHeight
+                    ? `
+                /* Keep the toolbar fixed: only the text body scrolls. */
+                .lexa-rte .ql-toolbar { position: sticky; top: 0; z-index: 2; }
+                .lexa-rte .ql-container { max-height: ${maxHeight}px; overflow-y: auto; }
+                `
+                    : ''
+                }
                 .lexa-rte .ql-editor.ql-blank::before {
                     color: rgba(255, 255, 255, 0.4);
                     font-style: normal;
@@ -81,7 +97,7 @@ const RichTextEditor: React.FC<Props> = ({ value, onChange, placeholder, minHeig
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        modules={{ toolbar: TOOLBAR }}
+        modules={{ toolbar: toolbar ?? TOOLBAR }}
       />
     </div>
   );

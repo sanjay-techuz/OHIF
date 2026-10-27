@@ -18,6 +18,7 @@ import {
   ACRDisplay,
   Button,
   CaseHistoryModal,
+  ReportModal,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -150,6 +151,14 @@ function ViewerLayout({
   // a non-master faculty edits their case-set note; students view it read-only.
   const [showCaseNotesModal, setShowCaseNotesModal] = useState(false);
   const [caseNotesText, setCaseNotesText] = useState('');
+  // Case Report (all modalities + view types): one rich-text (HTML) report per case. Admin/master
+  // faculty edit; case-set faculty + students read-only. Held as HTML, loaded by fetchReport().
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportHtml, setReportHtml] = useState('');
+  // Whether the CURRENT viewer may edit the report — authoritative from the report GET (admin → true,
+  // master/case-owner faculty → true, case-set faculty + students → false). Avoids depending on the
+  // answer-flow's lazily-set isMasterFaculty, which is false until "Add Answer" is clicked.
+  const [reportCanEdit, setReportCanEdit] = useState(false);
   const [annotationData, setAnnotationData] = useState<any>(null);
 
   // Lexa AI reporting panel — single panel, two modes ('generate' | 'correct').
@@ -1466,6 +1475,57 @@ function ViewerLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId, userType, isPreview, isFellowship, programId, courseId, moduleId, caseSetId, answerAuth]);
 
+  // Load the single global case report (one per case, no course/case-set scope). Endpoint depends on
+  // the actor: students/preview read /user/cases, faculty-workspace reads /user/faculty, the
+  // admin-launched flow reads /admin/cases.
+  const fetchReport = async () => {
+    if (!caseId) {
+      return;
+    }
+    try {
+      let url: string;
+      if (userType === 'student' || isPreview) {
+        url = `/user/cases/report/${caseId}`;
+      } else if (isUserFacultyAnswer) {
+        url = `/user/faculty/cases/${caseId}/report`;
+      } else {
+        url = `/admin/cases/${caseId}/report`;
+      }
+      const result = await apiCall(() => apiService.get(url));
+      if (result.success) {
+        setReportHtml(result.data?.data?.report || '');
+        setReportCanEdit(!!result.data?.data?.can_edit);
+      }
+    } catch (error) {
+      console.error('Error fetching case report:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseId, userType, isPreview, isUserFacultyAnswer]);
+
+  // Report edit permission comes authoritatively from the GET (can_edit): admin & master/case-owner
+  // faculty → editable; case-set faculty, students, preview → read-only. Save hits /admin for the
+  // admin-launched flow and /user/faculty for the master faculty in the workspace.
+  const canEditReport = !isPreview && reportCanEdit;
+
+  const handleSaveReport = async (html: string) => {
+    try {
+      const result = await apiCall(() =>
+        isUserFacultyAnswer
+          ? apiService.post(`/user/faculty/cases/${caseId}/report`, { report: html })
+          : apiService.patch(`/admin/cases/${caseId}/report`, { report: html })
+      );
+      if (result.success) {
+        setReportHtml(html);
+      }
+    } catch (error) {
+      console.error('Error saving case report:', error);
+    }
+  };
+
   const viewportComponents = viewports.map(getViewportComponentData);
 
   // Auto-compose key findings for the Lexa form from current OHIF state.
@@ -2004,6 +2064,30 @@ function ViewerLayout({
               className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
               title="Instructions"
             >
+              {/* Info (i) icon — Instructions. */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle cx="12" cy="12" r="9.25" stroke="white" strokeWidth="1.5" />
+                <path d="M12 11V16.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="12" cy="7.75" r="1" fill="white" />
+              </svg>
+            </Button>
+
+            {/* Report button — opens the per-case rich-text report. Shown for ALL modalities and both
+                view types (no gating). Editable only for admin/master faculty; read-only for case-set
+                faculty + students (enforced on the <ReportModal> mount via readOnly/onSave). */}
+            <Button
+              variant="ghost"
+              onClick={() => setShowReportModal(true)}
+              className="inline-flex h-auto gap-2 rounded-lg bg-[#232323] py-2 px-4 font-medium text-white hover:bg-[#2e2e2e] disabled:opacity-50"
+              title="Report"
+            >
+              {/* Open-book icon — Report. */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="25"
@@ -2019,6 +2103,7 @@ function ViewerLayout({
                   strokeLinejoin="round"
                 />
               </svg>
+              <span className="text-sm">Report</span>
             </Button>
 
             {/* Case History Button - Faculty (edit mode) or Student (read-only).
@@ -2823,6 +2908,17 @@ function ViewerLayout({
                 }
               }
         }
+      />
+
+      {/* Report modal — one rich-text report per case. Editable only for admin/master faculty
+          (canEditReport); read-only (formatted) for case-set faculty + students. */}
+      <ReportModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title="Report"
+        initialValue={reportHtml}
+        readOnly={!canEditReport}
+        onSave={canEditReport ? handleSaveReport : undefined}
       />
 
       {/* LexaReportingPanel — commented out along with its bottom-bar buttons.
