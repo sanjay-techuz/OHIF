@@ -1205,6 +1205,19 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
     try {
       const viewports = this.getRenderingEngine().getViewports();
 
+      // [AUTO-ORIENT] A resize (sidebar toggle, one-up, HP layout swap) resets the
+      // camera and restores only pan/zoom below, dropping any auto-orient flip. If we
+      // let the flip come back a beat later (async scheduler/event), the viewport paints
+      // UNFLIPPED first and then flips — a visible flicker. So capture the flip the camera
+      // ALREADY has and restore it in this SAME synchronous pass (the browser composites
+      // only the final state of a task, so no unflipped frame is ever shown). This preserves
+      // existing state only — it computes nothing from metadata and skips un-flipped
+      // viewports entirely, so it can never disturb the load-time orientation.
+      const beforeResizeFlips = new Map<
+        string,
+        { flipHorizontal: boolean; flipVertical: boolean }
+      >();
+
       // Store the current position presentations for each viewport.
       viewports.forEach(({ id: viewportId }) => {
         const presentation = this._getPositionPresentation(viewportId);
@@ -1214,6 +1227,18 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         // We need to revisit this to make it more robust and understandable.
         delete presentation.viewReference?.sliceIndex;
         this.beforeResizePositionPresentations.set(viewportId, presentation);
+
+        try {
+          const cam = this.getCornerstoneViewport(viewportId)?.getCamera?.();
+          if (cam && (cam.flipHorizontal || cam.flipVertical)) {
+            beforeResizeFlips.set(viewportId, {
+              flipHorizontal: !!cam.flipHorizontal,
+              flipVertical: !!cam.flipVertical,
+            });
+          }
+        } catch {
+          /* best-effort — never break a resize over flip preservation */
+        }
       });
 
       // Resize the rendering engine and render.
@@ -1227,6 +1252,25 @@ class CornerstoneViewportService extends PubSubService implements IViewportServi
         this.setPresentations(viewportId, {
           positionPresentation,
         });
+      });
+
+      // [AUTO-ORIENT] Re-apply the captured flip BEFORE the final render so the only frame
+      // the browser paints for this resize is already correctly oriented (no flicker).
+      beforeResizeFlips.forEach((flip, viewportId) => {
+        try {
+          const vp = this.getCornerstoneViewport(viewportId);
+          const cam = vp?.getCamera?.();
+          if (
+            vp &&
+            cam &&
+            (!!cam.flipHorizontal !== flip.flipHorizontal ||
+              !!cam.flipVertical !== flip.flipVertical)
+          ) {
+            vp.setCamera(flip);
+          }
+        } catch {
+          /* best-effort */
+        }
       });
 
       // Resize and render the rendering engine again.
