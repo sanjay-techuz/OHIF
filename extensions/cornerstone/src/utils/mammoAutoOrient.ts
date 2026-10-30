@@ -33,16 +33,35 @@
 import { Enums, metaData, Types } from '@cornerstonejs/core';
 
 const SECONDARY_CAPTURE_SOP_CLASS = '1.2.840.10008.5.1.4.1.1.7';
+const BREAST_TOMO_SOP_CLASS = '1.2.840.10008.5.1.4.1.1.13.1.3'; // Breast Tomosynthesis Image Storage
 
-// Same narrow predicate as extensions/default/src/utils/isTomosynthesisSlice.ts,
-// inlined here to keep this cornerstone util free of a cross-extension import.
-const isSecondaryCaptureTomo = (instance: any): boolean => {
-  if (!instance || instance.SOPClassUID !== SECONDARY_CAPTURE_SOP_CLASS) {
+// At most ONE active settle-window per viewport element. Repeated schedule calls (fast
+// sidebar toggles, HP changes) MUST reuse the open window and only push its expiry out —
+// never stack another CAMERA_MODIFIED listener or another batch of timers. Stacking N
+// listeners turns a single camera change into an N-deep synchronous re-apply cascade that
+// freezes the browser tab; capping at one listener per element keeps every correction
+// cheap and bounded.
+const SETTLE_MS = 2500;
+const mammoOrientWindows = new WeakMap<HTMLElement, { expiry: number }>();
+
+// A DBT tomosynthesis slice — either the proper Breast-Tomosynthesis SOP class, OR the
+// Secondary-Capture-wrapped tomo some vendors (e.g. LifeTrack teaching exports) ship instead. Both can
+// store the LEFT views in the right-breast orientation; the flip below only acts when PatientOrientation
+// actually disagrees with the standard target, so a correctly-authored DBT stack stays untouched.
+// Narrowed to tomo so it can never disturb 2D FFDM, CEM, MR or US.
+const isTomoSlice = (instance: any): boolean => {
+  if (!instance) {
     return false;
   }
-  const raw = instance.ImageType;
-  const imageType = (Array.isArray(raw) ? raw.join('\\') : String(raw || '')).toUpperCase();
-  return /\bVOLUME\b/.test(imageType) || imageType.includes('TOMOSYNTHESIS');
+  if (instance.SOPClassUID === BREAST_TOMO_SOP_CLASS) {
+    return true;
+  }
+  if (instance.SOPClassUID === SECONDARY_CAPTURE_SOP_CLASS) {
+    const raw = instance.ImageType;
+    const imageType = (Array.isArray(raw) ? raw.join('\\') : String(raw || '')).toUpperCase();
+    return /\bVOLUME\b/.test(imageType) || imageType.includes('TOMOSYNTHESIS');
+  }
+  return false;
 };
 
 // Anatomical axis of a PatientOrientation letter, and its opposite direction.
@@ -90,9 +109,10 @@ export function applyRadiologicalOrientationMammo(viewport: Types.IStackViewport
       return;
     }
     const instance: any = metaData.get('instance', imageId);
-    // Gate strictly to the SC-wrapped tomo slices — the only series that are
-    // mis-stored. Everything else is left exactly as authored.
-    if (!isSecondaryCaptureTomo(instance)) {
+    // Gate to DBT tomo slices (proper 13.1.3 OR SC-wrapped). The flip only fires when
+    // PatientOrientation disagrees with the target, so correctly-stored tomo is a no-op and
+    // 2D FFDM / CEM / MR / US are never touched.
+    if (!isTomoSlice(instance)) {
       return;
     }
 
@@ -162,31 +182,66 @@ export function scheduleRadiologicalOrientationMammo(viewport: Types.IStackViewp
     return;
   }
 
-  const run = () => applyRadiologicalOrientationMammo(viewport);
-  run();
-  [150, 400, 800, 1300, 2000].forEach(ms => setTimeout(run, ms));
+  // Always re-assert orientation immediately — idempotent and cheap.
+  applyRadiologicalOrientationMammo(viewport);
 
   const el = (viewport as unknown as { element?: HTMLElement })?.element;
   if (!el) {
     return;
   }
+
+  // If a settle-window is already open for THIS element, just extend it and keep the
+  // single listener/timers in place. This is what prevents the freeze on fast toggling —
+  // no second listener is ever attached to the same element.
+  const existing = mammoOrientWindows.get(el);
+  if (existing) {
+    existing.expiry = Date.now() + SETTLE_MS;
+    return;
+  }
+
+  const state = { expiry: Date.now() + SETTLE_MS };
+  mammoOrientWindows.set(el, state);
+
+  const run = () => applyRadiologicalOrientationMammo(viewport);
+  const timers = [150, 400, 800, 1300, 2000].map(ms => setTimeout(run, ms));
+
   let pending = false;
   const onCameraModified = () => {
     if (pending) {
       return;
     }
+    // Correct the flip SYNCHRONOUSLY — in the SAME task as the camera change that fired
+    // this event (e.g. a resize or HP re-stack that restored flipHorizontal but dropped
+    // flipVertical, leaving a half-flipped camera). An async setTimeout would let that
+    // half-flipped frame paint first — the visible flicker. This is safe ONLY because the
+    // window guard above guarantees a single listener per element: the `pending` guard
+    // blocks re-entry and the skip-if-correct apply is a no-op once the camera is right,
+    // so it converges in one pass instead of cascading across stacked listeners.
     pending = true;
-    setTimeout(() => {
-      pending = false;
+    try {
       applyRadiologicalOrientationMammo(viewport);
-    }, 0);
+    } finally {
+      pending = false;
+    }
   };
   el.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraModified);
-  setTimeout(() => {
+
+  // Tear down the window once its (possibly extended) expiry passes, so a deliberate
+  // manual flip is respected afterwards.
+  const closeWindow = () => {
+    const s = mammoOrientWindows.get(el);
+    const remaining = s ? s.expiry - Date.now() : 0;
+    if (remaining > 0) {
+      setTimeout(closeWindow, remaining);
+      return;
+    }
     try {
       el.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraModified);
     } catch {
       /* noop */
     }
-  }, 2500);
+    timers.forEach(clearTimeout);
+    mammoOrientWindows.delete(el);
+  };
+  setTimeout(closeWindow, SETTLE_MS);
 }

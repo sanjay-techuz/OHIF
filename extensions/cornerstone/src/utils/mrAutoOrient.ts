@@ -25,6 +25,11 @@ import { Enums, metaData, Types } from '@cornerstonejs/core';
 
 type Vec3 = [number, number, number];
 
+// At most ONE active settle-window per viewport element — see scheduleRadiologicalOrientationMR.
+// Prevents stacked CAMERA_MODIFIED listeners (fast toggling) from cascading into a tab freeze.
+const MR_SETTLE_MS = 2500;
+const mrOrientWindows = new WeakMap<HTMLElement, { expiry: number }>();
+
 // LPS dominant axis: 0 = X (R↔L), 1 = Y (A↔P), 2 = Z (S↔I).
 const dominantAxis = (v: Vec3): number => {
   const a = [Math.abs(v[0]), Math.abs(v[1]), Math.abs(v[2])];
@@ -136,35 +141,64 @@ export function applyRadiologicalOrientationMR(viewport: Types.IStackViewport): 
  * fallback in case a change lands without firing the event.
  */
 export function scheduleRadiologicalOrientationMR(viewport: Types.IStackViewport): void {
-  const run = () => applyRadiologicalOrientationMR(viewport);
-  run();
-  // Fallback timed shots (in case some override doesn't fire CAMERA_MODIFIED).
-  [150, 400, 800, 1300, 2000].forEach(ms => setTimeout(run, ms));
+  // Always re-assert orientation immediately — idempotent and cheap.
+  applyRadiologicalOrientationMR(viewport);
 
-  // Primary mechanism: correct the orientation whenever the camera changes, for a
-  // ~2.5s settle window. Coalesced to the next tick so we never re-enter setCamera
-  // synchronously from within a CAMERA_MODIFIED dispatch.
   const el = (viewport as unknown as { element?: HTMLElement })?.element;
   if (!el) {
     return;
   }
+
+  // At most ONE active settle-window per element. Repeated schedule calls (fast sidebar
+  // toggles, HP changes) just extend the open window — they never stack a second
+  // CAMERA_MODIFIED listener or another batch of timers. Stacking N listeners turns one
+  // camera change into an N-deep synchronous re-apply cascade that freezes the tab.
+  const existing = mrOrientWindows.get(el);
+  if (existing) {
+    existing.expiry = Date.now() + MR_SETTLE_MS;
+    return;
+  }
+
+  const state = { expiry: Date.now() + MR_SETTLE_MS };
+  mrOrientWindows.set(el, state);
+
+  const run = () => applyRadiologicalOrientationMR(viewport);
+  // Fallback timed shots (in case some override doesn't fire CAMERA_MODIFIED).
+  const timers = [150, 400, 800, 1300, 2000].map(ms => setTimeout(run, ms));
+
   let pending = false;
   const onCameraModified = () => {
     if (pending) {
       return;
     }
+    // Correct the orientation SYNCHRONOUSLY — same task as the camera change that fired
+    // this event — so a half-flipped frame never paints (an async setTimeout would let
+    // that flicker show). Safe ONLY because the window guard above guarantees a single
+    // listener per element: the `pending` guard blocks re-entry and the skip-if-correct
+    // apply is a no-op once correct, so it converges in one pass rather than cascading.
     pending = true;
-    setTimeout(() => {
-      pending = false;
+    try {
       applyRadiologicalOrientationMR(viewport);
-    }, 0);
+    } finally {
+      pending = false;
+    }
   };
   el.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraModified);
-  setTimeout(() => {
+
+  const closeWindow = () => {
+    const s = mrOrientWindows.get(el);
+    const remaining = s ? s.expiry - Date.now() : 0;
+    if (remaining > 0) {
+      setTimeout(closeWindow, remaining);
+      return;
+    }
     try {
       el.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraModified);
     } catch {
       /* noop */
     }
-  }, 2500);
+    timers.forEach(clearTimeout);
+    mrOrientWindows.delete(el);
+  };
+  setTimeout(closeWindow, MR_SETTLE_MS);
 }

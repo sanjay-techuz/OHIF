@@ -17,6 +17,8 @@ import getToolbarModule from './getToolbarModule';
 import init from './init';
 // [MR-AUTO-ORIENT] reliable orient trigger (see onModeEnter subscription below).
 import { scheduleRadiologicalOrientationMR } from './utils/mrAutoOrient';
+// [AUTO-ORIENT] revert: remove this import + the 'ohif-sidebar-toggle' listener block below.
+import { scheduleRadiologicalOrientationMammo } from './utils/mammoAutoOrient';
 import ColorbarService from './services/ColorbarService';
 import CornerstoneCacheService from './services/CornerstoneCacheService';
 import SegmentationService from './services/SegmentationService';
@@ -95,8 +97,13 @@ const cornerstoneExtension: Types.Extensions.Extension = {
   id,
 
   onModeEnter: ({ servicesManager, commandsManager }: withAppTypes): void => {
-    const { cornerstoneViewportService, toolbarService, segmentationService, hangingProtocolService } =
-      servicesManager.services;
+    const {
+      cornerstoneViewportService,
+      toolbarService,
+      segmentationService,
+      hangingProtocolService,
+      viewportGridService,
+    } = servicesManager.services;
 
     const { unsubscriptions: segmentationUnsubscriptions } = setUpSegmentationEventHandlers({
       servicesManager,
@@ -156,6 +163,40 @@ const cornerstoneExtension: Types.Extensions.Extension = {
       orientAllMrViewports
     );
     unsubscriptions.push(hpChangeSub.unsubscribe ?? hpChangeSub);
+
+    // [AUTO-ORIENT] Re-orient on SIDEBAR open/close (and ONLY then — this never runs during load).
+    // Toggling the left Studies panel RESIZES the viewports → CornerstoneViewportService.performResize()
+    // resets each camera and restores a position presentation WITHOUT flipHorizontal/flipVertical, so the
+    // auto-flip is lost. Unlike a re-stack or HP change, a plain resize fires NO VIEWPORT_DATA_CHANGED /
+    // PROTOCOL_CHANGED, so nothing re-applied it. ViewerLayout dispatches the custom 'ohif-sidebar-toggle'
+    // event on every left-panel toggle; we re-assert the orient on every live STACK viewport (both MR and
+    // mammo). The schedulers' timed shots + CAMERA_MODIFIED settle window re-apply AFTER performResize
+    // settles, so they win the race. Hooking this dedicated post-load event — instead of the resize path —
+    // means the INITIAL auto-flip is never touched. Idempotent + self-gating. REVERT: delete this block
+    // + the scheduleRadiologicalOrientationMammo import.
+    const orientAllStackViewports = () => {
+      try {
+        cornerstone.getEnabledElements().forEach(({ viewport }) => {
+          if (viewport && typeof (viewport as { setStack?: unknown }).setStack === 'function') {
+            scheduleRadiologicalOrientationMR(viewport as never);
+            scheduleRadiologicalOrientationMammo(viewport as never);
+          }
+        });
+      } catch {
+        /* never break the viewer over auto-orient */
+      }
+    };
+    // Sidebar open/close (resize).
+    window.addEventListener('ohif-sidebar-toggle', orientAllStackViewports);
+    unsubscriptions.push(() => window.removeEventListener('ohif-sidebar-toggle', orientAllStackViewports));
+    // Double-click one-up / grid layout change. LAYOUT_CHANGED is a post-event notification (it just
+    // re-asserts the orient; it does NOT reset the camera), the same shape as PROTOCOL_CHANGED — so
+    // firing during the initial HP layout is harmless and the INITIAL auto-flip is never broken.
+    const gridLayoutSub = viewportGridService.subscribe(
+      viewportGridService.EVENTS.LAYOUT_CHANGED,
+      orientAllStackViewports
+    );
+    unsubscriptions.push(gridLayoutSub.unsubscribe ?? gridLayoutSub);
 
     toolbarService.registerEventForToolbarUpdate(segmentationService, [
       segmentationService.EVENTS.SEGMENTATION_REMOVED,
