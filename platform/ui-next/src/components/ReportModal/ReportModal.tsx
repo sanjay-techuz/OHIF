@@ -18,10 +18,13 @@ import RichTextEditor from '../LexaReportingPanel/RichTextEditor';
 
 const MAX_CHARS = 100000;
 
-// Report toolbar = default formatting + text alignment (left / center / right / justify) as 4 buttons.
+// Report toolbar = default formatting + font/background color + text alignment
+// (left / center / right / justify) as 4 buttons. color = text color, background = text highlight;
+// both are built-in Quill formats stored as inline styles, so no backend/DB change is needed.
 const REPORT_TOOLBAR = [
   [{ header: [1, 2, 3, false] }],
   ['bold', 'italic', 'underline', 'strike'],
+  [{ color: [] }, { background: [] }],
   [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
   [{ list: 'ordered' }, { list: 'bullet' }],
   ['blockquote'],
