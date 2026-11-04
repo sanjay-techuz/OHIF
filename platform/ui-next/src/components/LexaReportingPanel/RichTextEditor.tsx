@@ -91,6 +91,21 @@ const RichTextEditor: React.FC<Props> = ({ value, onChange, placeholder, minHeig
                 }
                 .lexa-rte .ql-snow .ql-picker.ql-header .ql-picker-label::before,
                 .lexa-rte .ql-snow .ql-picker.ql-header .ql-picker-item::before { color: #FFFFFF; }
+                /* Color / background pickers: show the swatch grid clearly on the dark toolbar. */
+                .lexa-rte .ql-snow .ql-color-picker .ql-picker-options,
+                .lexa-rte .ql-snow .ql-background .ql-picker-options {
+                    background: #1a1a1a;
+                    border: 1px solid #4F4F4F;
+                    padding: 6px;
+                    width: 160px;
+                }
+                .lexa-rte .ql-snow .ql-color-picker .ql-picker-item,
+                .lexa-rte .ql-snow .ql-background .ql-picker-item {
+                    border: 1px solid rgba(255, 255, 255, 0.25);
+                }
+                /* The little color square shown on the toolbar button itself. */
+                .lexa-rte .ql-snow .ql-color-picker .ql-picker-label svg .ql-stroke,
+                .lexa-rte .ql-snow .ql-background .ql-picker-label svg .ql-stroke { stroke: #FFFFFF; }
             `}</style>
       <ReactQuill
         theme="snow"
