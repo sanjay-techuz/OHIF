@@ -18,13 +18,28 @@ import RichTextEditor from '../LexaReportingPanel/RichTextEditor';
 
 const MAX_CHARS = 100000;
 
-// Report toolbar = default formatting + font/background color + text alignment
-// (left / center / right / justify) as 4 buttons. color = text color, background = text highlight;
-// both are built-in Quill formats stored as inline styles, so no backend/DB change is needed.
+// Brand-first color palette, used for BOTH text color and highlight (background). The order is the
+// swatch-grid order: BIEDX pink shades first, then mustard shades, then white / neutrals + a few
+// general colors. All are picked for good contrast on the viewer's black background so report text —
+// especially MRI case-report headings — stays clearly visible.
+const BRAND_COLORS = [
+  // Pinks — BIEDX brand #FF2768 first, then lighter and darker shades.
+  '#FF2768', '#FF5C87', '#FF8FAC', '#FFB3CC', '#D11E52', '#A3173F', '#73102C',
+  // Mustards — #FFC000 first, then lighter and darker shades.
+  '#FFC000', '#FFCF33', '#FFDD70', '#FFE9A6', '#CC9A00', '#997300', '#664D00',
+  // Neutrals + a few general colors (all readable on black).
+  '#FFFFFF', '#D9D9D9', '#A6A6A6', '#00B0F0', '#00B050', '#ED7D31', '#B15EFF',
+];
+
+// Report toolbar = formatting + font/highlight color + text alignment. color = text color,
+// background = text highlight, both using the brand palette above. A "+ Custom colour" row is
+// injected at the bottom of each color dropdown (see RichTextEditor) that opens the OS color picker,
+// so any shade can be chosen beyond the brand swatches — no separate toolbar buttons needed.
+// All colors are stored as inline styles, so no backend/DB change is needed.
 const REPORT_TOOLBAR = [
   [{ header: [1, 2, 3, false] }],
   ['bold', 'italic', 'underline', 'strike'],
-  [{ color: [] }, { background: [] }],
+  [{ color: BRAND_COLORS }, { background: BRAND_COLORS }],
   [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
   [{ list: 'ordered' }, { list: 'bullet' }],
   ['blockquote'],
