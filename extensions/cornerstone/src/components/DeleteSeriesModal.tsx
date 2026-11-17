@@ -20,6 +20,7 @@ function DeleteSeriesModal({
   onCancel: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="text-white">
@@ -30,6 +31,21 @@ function DeleteSeriesModal({
         This cannot be undone. The series is removed from storage, and any saved annotations and
         answers for it are discarded.
       </p>
+
+      {/* Inline error — the modal stays open on a failed delete (e.g. the last remaining
+          series) so the reason is shown right here instead of only a transient toast. */}
+      {error && (
+        <p
+          className="mb-6 rounded-[8px] px-3 py-2 text-sm"
+          style={{
+            color: 'hsl(var(--destructive))',
+            backgroundColor: 'hsl(var(--destructive) / 0.12)',
+          }}
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Button
@@ -44,11 +60,14 @@ function DeleteSeriesModal({
         <Button
           disabled={busy}
           onClick={async () => {
+            setError(null);
             setBusy(true);
             try {
               await onConfirm();
-            } catch {
-              // onConfirm already surfaced the error; re-enable so the user can retry or cancel.
+            } catch (e: any) {
+              // Keep the modal open and show WHY the delete failed (e.g. last remaining series),
+              // then re-enable so the user can read it and cancel or retry.
+              setError(e?.message || 'Could not delete the series.');
               setBusy(false);
             }
           }}

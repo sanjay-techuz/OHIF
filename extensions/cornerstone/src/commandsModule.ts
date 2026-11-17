@@ -1036,13 +1036,11 @@ function commandsModule({
             );
           }
         } catch (err: any) {
-          uiNotificationService.show({
-            title: 'Delete series',
-            message: err?.response?.data?.message || err?.message || 'Could not delete the series.',
-            type: 'error',
-            duration: 4000,
-          });
-          throw err;
+          // Surface the reason to the modal (it stays open and shows this inline), e.g. the
+          // backend's "Cannot delete the only series in this study." for the last series.
+          const message =
+            err?.response?.data?.message || err?.message || 'Could not delete the series.';
+          throw new Error(message);
         }
         uiNotificationService.show({
           title: 'Series deleted',
