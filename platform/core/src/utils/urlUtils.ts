@@ -40,6 +40,10 @@ function buildParamsFromPayload(
     // picker on submit, instead of the admin per-change saves. Absent = admin flow (unchanged).
     answerAuth: payload?.answerAuth ? `${payload.answerAuth}` : undefined,
     caseSetId: payload?.caseSetId ? `${payload.caseSetId}` : undefined,
+    // Server-computed at viewer-token mint time (never trusted from the client): true when the
+    // requester may permanently delete a series — admin, or the master faculty who owns the case.
+    // Gates the "Delete series" option in the sidebar; the backend delete endpoint re-checks it.
+    canDeleteSeries: payload?.canDeleteSeries === true || payload?.canDeleteSeries === 'true',
   };
 }
 
@@ -65,6 +69,9 @@ export interface CustomParams {
   // submit. Undefined for the admin-launched faculty flow (writes to /admin/cases/*).
   answerAuth?: string;
   caseSetId?: string;
+  // True only when the server (at mint time) confirmed this requester may delete a series:
+  // an admin, or the master faculty assigned to the case. Used to show/hide the delete option.
+  canDeleteSeries?: boolean;
 }
 
 /**

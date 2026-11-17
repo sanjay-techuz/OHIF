@@ -56,9 +56,18 @@ export function getEnhancedDisplaySets({ viewportId, services }) {
     displaySet => !displaySetsUIDs.includes(displaySet.displaySetInstanceUID)
   );
 
-  const viewportDisplaySets = displaySetsUIDs.map(displaySetUID =>
-    displaySetService.getDisplaySetByUID(displaySetUID)
-  );
+  const viewportDisplaySets = displaySetsUIDs
+    .map(displaySetUID => displaySetService.getDisplaySetByUID(displaySetUID))
+    // A viewport can momentarily reference a display set that was just removed (e.g. a
+    // deleted series). Drop those so we never read `.imageIds` of undefined and crash render.
+    .filter(Boolean);
+
+  if (!viewportDisplaySets.length) {
+    return {
+      viewportDisplaySets: [],
+      enhancedDisplaySets: [],
+    };
+  }
 
   const backgroundCanBeVolume = csUtils.isValidVolume(viewportDisplaySets[0].imageIds || []);
   const backgroundDisplaySet = viewportDisplaySets[0];
