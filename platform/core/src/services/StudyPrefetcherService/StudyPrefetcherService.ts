@@ -328,7 +328,11 @@ class StudyPrefetcherService extends PubSubService {
       displaySetsInstanceUIDs.length &&
       displaySetsInstanceUIDs.every(
         displaySetsInstanceUID =>
-          this._displaySetLoadingStates.get(displaySetsInstanceUID).loadingProgress >= 1
+          // A display set can briefly have no loading state — e.g. right after a series is
+          // deleted and the active viewport is re-pointed. Treat a missing state as "not
+          // loaded yet" (optional chaining) instead of reading `.loadingProgress` of undefined
+          // and crashing on the image-loaded event.
+          this._displaySetLoadingStates.get(displaySetsInstanceUID)?.loadingProgress >= 1
       )
     );
   }

@@ -1433,14 +1433,51 @@ function ViewerLayout({
     }
   };
 
+  // Faculty next/previous WITHIN a case set. Loads the set's full ordered case list so the same
+  // bottom-bar navigation students use becomes available. Only runs when `caseSetId` is present —
+  // which is the case ONLY when a case was opened from a folder/case set, so "My all cases" is
+  // excluded. This runs IN ADDITION to fetchFacultyCaseDetails (which still loads the current case's
+  // title/slugs/history/overlays); it only populates the sibling list + index for navigation.
+  const fetchFacultyCaseSetList = async () => {
+    if (!caseSetId) {
+      return;
+    }
+    setIsLoadingCases(true);
+    setCaseListError(null);
+    try {
+      const result = await apiCall(() =>
+        apiService.get(`/user/faculty/case-sets/${caseSetId}/case-nav`)
+      );
+      if (result.success) {
+        const rawCases = result.data?.data?.cases || [];
+        // The faculty viewer identifies a case by its Cases primary key `id` (the launch passes
+        // caseId = item.id, not the case_id column). The shared index/navigation logic keys on
+        // `case_id`, so expose the PK `id` as `case_id` here. `navigateToCase` then rebuilds the URL
+        // with caseId = PK id, keeping faculty case resolution correct after each jump.
+        const cases = rawCases.map(c => ({ ...c, case_id: c.id }));
+        setCaseList(cases);
+        const currentIndex = cases.findIndex(c => c.case_id === +caseId);
+        setCurrentCaseIndex(currentIndex >= 0 ? currentIndex : 0);
+      }
+    } catch (error) {
+      console.error('Error fetching faculty case-set navigation list:', error);
+    } finally {
+      setIsLoadingCases(false);
+    }
+  };
+
   // Fetch case list/details on mount
   useEffect(() => {
     if (userType === 'student') {
       fetchCaseList();
     } else if (userType === 'faculty') {
       fetchFacultyCaseDetails();
+      // Opened from a folder/case set → also load the set's ordered cases for next/previous nav.
+      if (caseSetId) {
+        fetchFacultyCaseSetList();
+      }
     }
-  }, [courseId, moduleId, caseId, userType, isFellowship, programId]);
+  }, [courseId, moduleId, caseId, userType, isFellowship, programId, caseSetId]);
 
   // Case Notes (screening) — load the scope-resolved note. Faculty/admin edit it; students read it.
   // Student + isPreview resolve the note by their (course/fellowship → case set) scope; a faculty uses

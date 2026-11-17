@@ -42,10 +42,10 @@
         var FLAG_PREFIX = 'biedx-prefetched:';
         var CACHE_NAME = 'biedx-dicom-prefetch';
         var CONCURRENCY = 6;
-        // Cap on distinct studies kept in the cache. Prefetching an 11th study
+        // Cap on distinct studies kept in the cache. Prefetching a 21st study
         // (or opening one past the cap in the viewer) evicts the oldest-stored
         // study's frames — a large cache hangs the browser (5-6+ studies).
-        var MAX_STUDIES = 10;
+        var MAX_STUDIES = 20;
 
         var params = new URLSearchParams(location.search);
         // Only accept/reply to the LMS origin that embedded us.
@@ -310,7 +310,7 @@
 
           if (failed === 0 && total > 0) {
             // Stamp every study in the case (primary + priors) as most-recently
-            // stored, then enforce the cap — prefetching the 11th study evicts
+            // stored, then enforce the cap — prefetching the 21st study evicts
             // the oldest. Done AFTER caching so the fresh study is never evicted.
             uids.forEach(function (u) {
               markPrefetched(u);

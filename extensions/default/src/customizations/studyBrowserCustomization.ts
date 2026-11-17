@@ -1,9 +1,30 @@
-import { utils } from '@ohif/core';
+import { utils, getCustomParams } from '@ohif/core';
 const { formatDate } = utils;
 
 export default {
   'studyBrowser.studyMenuItems': [],
   'studyBrowser.thumbnailMenuItems': [
+    // Permanently delete a series — only for admin / master-faculty (never students or
+    // preview). `isVisible` is read by MoreDropdownMenu, which hides the whole ⋯ menu when
+    // no item is visible, so students see nothing. The delete itself runs in the command.
+    {
+      id: 'deleteSeries',
+      label: 'Delete series',
+      iconName: 'Delete',
+      isVisible: () => {
+        const p = getCustomParams();
+        if (!p || p.userType !== 'faculty' || p.isPreview) {
+          return false;
+        }
+        // Faculty-dashboard launch (answerAuth === 'user'): only the master faculty who OWNS the
+        // case may delete, so require the server-computed canDeleteSeries flag (set at token mint).
+        // Admin launch (no answerAuth) may always delete; the backend re-checks either way.
+        return p.answerAuth !== 'user' || p.canDeleteSeries === true;
+      },
+      onClick: ({ commandsManager, displaySetInstanceUID }: withAppTypes) => {
+        commandsManager.runCommand('deleteCaseSeries', { displaySetInstanceUID });
+      },
+    },
     // Tag Browser thumbnail menu item hidden for BIEDX (commented, not removed).
     // {
     //   id: 'tagBrowser',
