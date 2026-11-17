@@ -24,7 +24,9 @@ function DeleteSeriesModal({
 
   return (
     <div className="text-white">
-      <p className="mb-2 font-medium text-white">
+      {/* break-words so a long space-less label (e.g. a full DICOM filename) wraps inside
+          the modal instead of overflowing its width. */}
+      <p className="mb-2 break-words font-medium text-white">
         Permanently delete this series{seriesLabel ? `: ${seriesLabel}` : ''}?
       </p>
       <p className="text-muted-foreground mb-6 text-sm">
