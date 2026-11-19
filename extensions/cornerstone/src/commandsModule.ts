@@ -41,6 +41,7 @@ import { usePositionPresentationStore, useSegmentationPresentationStore } from '
 import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
 import { generateSegmentationCSVReport } from './utils/generateSegmentationCSVReport';
 import getActiveViewportEnabledElement from './utils/getActiveViewportEnabledElement';
+import DeleteSeriesModal from './components/DeleteSeriesModal';
 import reconcileInvertLut from './utils/reconcileInvertLut';
 // [MR-AUTO-ORIENT] revert: remove this import, scheduleMROrientation(), and its
 // call sites in resetView + resetViewport.
@@ -143,6 +144,7 @@ function commandsModule({
     toolGroupService,
     cineService,
     uiDialogService,
+    uiModalService,
     cornerstoneViewportService,
     uiNotificationService,
     measurementService,
@@ -994,6 +996,119 @@ function commandsModule({
         }
         measurementService.remove(uid);
       }
+    },
+
+    // Permanently delete ONE series from the case (admin / master-faculty only).
+    // Confirms first, then calls the backend (which removes it from Orthanc, discards
+    // the series' annotations/answers and refreshes the counts). The prefetch service
+    // worker caches this study's metadata + frames, so after a successful delete we clear
+    // that cache and reload — otherwise the deleted series would reappear from cache.
+    deleteCaseSeries: async ({ displaySetInstanceUID }) => {
+      const { userType, isPreview, answerAuth, caseId } = getCustomParams() as any;
+      // Students and preview mode never delete; a missing userType is treated as student.
+      if (isPreview || userType !== 'faculty') {
+        return;
+      }
+      const displaySet = displaySetService.getDisplaySetByUID(displaySetInstanceUID);
+      const seriesInstanceUID = displaySet?.SeriesInstanceUID;
+      const studyInstanceUID = displaySet?.StudyInstanceUID;
+      if (!seriesInstanceUID || !studyInstanceUID) {
+        return;
+      }
+      const seriesLabel =
+        displaySet?.SeriesDescription ||
+        (displaySet?.SeriesNumber != null ? `Series ${displaySet.SeriesNumber}` : '');
+
+      const doDelete = async () => {
+        // answerAuth === 'user' → launched from the faculty dashboard (user token, ownership
+        // checked server-side); otherwise admin-launched (admin token).
+        const isUserFaculty = answerAuth === 'user';
+        try {
+          if (isUserFaculty) {
+            await apiService.delete(
+              `/user/faculty/cases/${caseId}/series/${encodeURIComponent(seriesInstanceUID)}`
+            );
+          } else {
+            await apiService.delete(
+              `/admin/cases/studies/${encodeURIComponent(studyInstanceUID)}/series/${encodeURIComponent(
+                seriesInstanceUID
+              )}`
+            );
+          }
+        } catch (err: any) {
+          // Surface the reason to the modal (it stays open and shows this inline), e.g. the
+          // backend's "Cannot delete the only series in this study." for the last series.
+          const message =
+            err?.response?.data?.message || err?.message || 'Could not delete the series.';
+          throw new Error(message);
+        }
+        uiNotificationService.show({
+          title: 'Series deleted',
+          message: 'The series was permanently deleted.',
+          type: 'success',
+          duration: 3000,
+        });
+        // Update the viewer live (no reload): drop the series' display set(s) from the
+        // sidebar, and move any viewport that was showing it onto another series so a
+        // deleted series is never left on screen.
+        try {
+          const deleted = new Set<string>([displaySetInstanceUID]);
+          (displaySetService.getDisplaySetsForSeries(seriesInstanceUID) || []).forEach(ds =>
+            deleted.add(ds.displaySetInstanceUID)
+          );
+          // A still-present series to show wherever the deleted one was (the backend blocks
+          // deleting the last series, so one always remains).
+          const replacement = displaySetService
+            .getActiveDisplaySets()
+            .find(ds => !deleted.has(ds.displaySetInstanceUID));
+
+          const { viewports } = viewportGridService.getState();
+          const viewportsToUpdate: Array<{ viewportId: string; displaySetInstanceUIDs: string[] }> =
+            [];
+          for (const vp of viewports.values()) {
+            const vpId = vp?.viewportOptions?.viewportId || vp?.viewportId;
+            const shown = vp?.displaySetInstanceUIDs || [];
+            if (vpId && replacement && shown.some((uid: string) => deleted.has(uid))) {
+              viewportsToUpdate.push({
+                viewportId: vpId,
+                displaySetInstanceUIDs: [replacement.displaySetInstanceUID],
+              });
+            }
+          }
+          // Re-point the viewports FIRST and WAIT for it, so no viewport still references the
+          // deleted series when we remove it (otherwise NavigationComponent reads an undefined
+          // display set and the render crashes).
+          if (viewportsToUpdate.length) {
+            await viewportGridService.setDisplaySetsForViewports(viewportsToUpdate);
+          }
+          // Remove the series' display set(s) → the StudyBrowser sidebar refreshes (it
+          // subscribes to DISPLAY_SETS_CHANGED).
+          deleted.forEach(uid => displaySetService.deleteDisplaySet(uid));
+        } catch (e) {
+          console.warn('deleteCaseSeries: live viewer update failed', e);
+        }
+        // Keep the prefetch cache correct for a FUTURE reload (the study's metadata + frames
+        // are cached by the service worker) — without reloading now.
+        try {
+          navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_DICOM_CACHE' });
+        } catch {
+          /* best-effort */
+        }
+      };
+
+      const close = () => uiModalService.hide();
+      uiModalService.show({
+        title: 'Delete series',
+        content: DeleteSeriesModal,
+        contentProps: {
+          seriesLabel,
+          onCancel: close,
+          onConfirm: async () => {
+            await doDelete();
+            close();
+          },
+        },
+      });
     },
 
     toggleLockMeasurement: ({ uid }) => {
@@ -3043,6 +3158,9 @@ function commandsModule({
     },
     jumpToMeasurement: {
       commandFn: actions.jumpToMeasurement,
+    },
+    deleteCaseSeries: {
+      commandFn: actions.deleteCaseSeries,
     },
     removeMeasurement: {
       commandFn: actions.removeMeasurement,

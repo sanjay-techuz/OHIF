@@ -77,7 +77,14 @@ export default function MoreDropdownMenu(bindProps) {
   const { servicesManager } = useSystem();
   const { customizationService } = servicesManager.services;
 
-  const items = customizationService.getCustomization(menuItemsKey);
+  const allItems = customizationService.getCustomization(menuItemsKey);
+
+  // Per-item visibility gate: an item may expose `isVisible()`; filter here so the ⋯
+  // trigger itself disappears when nothing is visible (e.g. the BIEDX "Delete series"
+  // item is hidden for students / preview, leaving no menu at all).
+  const items = (allItems || []).filter(item =>
+    typeof item.isVisible === 'function' ? item.isVisible() : true
+  );
 
   if (!items?.length) {
     // Return a no-op COMPONENT, not null: consumers (e.g. Thumbnail) render
