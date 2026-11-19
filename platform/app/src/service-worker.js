@@ -143,21 +143,47 @@ const expirationPlugin = new workbox.expiration.ExpirationPlugin({
 });
 const dicomPlugins = [cacheableResponsePlugin, expirationPlugin, studyCapPlugin];
 
+// Normalize the cache KEY for per-instance resources by stripping the query
+// string. A prefetched frame is stored under its plain URL (`.../frames/1`) while
+// the viewer requests it with appended retrieve args (`.../frames/1?...`). By
+// keying BOTH on the plain URL we can use a FAST exact-key lookup
+// (ignoreSearch:false) on Route 1 instead of ignoreSearch:true — which forced
+// Cache Storage to LINEARLY SCAN every cached entry on each lookup, so the
+// Service Worker took seconds per frame once a large study filled the cache.
+// Only the cache key is normalized; the real network fetch still uses the full
+// original URL+query, and the study UID in the path (used by the cap/expiration
+// plugins) is untouched. Applied to Route 1 ONLY — Route 2 (QIDO lists/metadata)
+// must keep the query, because different QIDO queries are different results.
+const stripSearchPlugin = {
+  cacheKeyWillBeUsed: async ({ request }) => {
+    const url = new URL(request.url);
+    if (!url.search) {
+      return request;
+    }
+    url.search = '';
+    return new Request(url.href, { headers: request.headers });
+  },
+};
+const dicomFramePlugins = [...dicomPlugins, stripSearchPlugin];
+
 // Route 1 — per-instance bytes (frames + per-instance metadata + bulkdata).
 // Matches `/studies/{S}/series/{Se}/instances/{I}/...`. Registered FIRST so it
-// claims every instance-level request; ignoreSearch is needed because the viewer
-// appends `?...` retrieve arguments a prefetched (plain-URL) frame lacks.
+// claims every instance-level request. The viewer appends `?...` retrieve
+// arguments a prefetched (plain-URL) frame lacks; stripSearchPlugin normalizes
+// both to the same plain-URL key so they match via a fast exact-key lookup.
 workbox.routing.registerRoute(
   ({ url }) =>
     /^\/pacs\/dicom-web\/studies\/[^/]+\/series\/[^/]+\/instances\/[^/]+/.test(url.pathname),
   new workbox.strategies.CacheFirst({
     cacheName: DICOM_CACHE,
-    // ignoreSearch: a prefetched frame (plain URL) must still HIT when the
-    //   viewer requests it with appended `?...` retrieve arguments.
-    // ignoreVary:  ignore Accept/transfer-syntax differences between the
-    //   prefetch fetch and cornerstone's request.
-    matchOptions: { ignoreSearch: true, ignoreVary: true },
-    plugins: dicomPlugins,
+    // The cache KEY is normalized (query stripped — see stripSearchPlugin), so a
+    //   prefetched plain-URL frame and the viewer's `?...`-appended request share
+    //   ONE key. That lets ignoreSearch stay FALSE here → a fast exact-key lookup,
+    //   instead of ignoreSearch:true which made Cache Storage scan every entry on
+    //   each frame (seconds per frame as the cache grew).
+    // ignoreVary: ignore Accept/transfer-syntax differences (immutable bytes).
+    matchOptions: { ignoreSearch: false, ignoreVary: true },
+    plugins: dicomFramePlugins,
   })
 );
 
