@@ -92,6 +92,64 @@
           } catch (e) {}
         }
 
+        // ---- per-study PROBE url (scan-free "is it cached?") -------------------
+        // cache.keys() throws "Operation too large" once the cache holds tens of
+        // thousands of frames, which made listCachedStudyUids() return EMPTY → the
+        // "prefetched" dot flipped OFF (and flags got wiped) even though the frames
+        // were there. So detection must NEVER enumerate the whole cache. Instead we
+        // remember ONE frame URL per prefetched study ("probe") and confirm the
+        // study with an exact cache.match(probe) — O(1), works at any cache size.
+        var PROBE_PREFIX = 'biedx-prefetch-probe:';
+        function setProbe(uid, url) {
+          try {
+            if (url) {
+              localStorage.setItem(PROBE_PREFIX + uid, url);
+            }
+          } catch (e) {}
+        }
+        function getProbe(uid) {
+          try {
+            return localStorage.getItem(PROBE_PREFIX + uid) || '';
+          } catch (e) {
+            return '';
+          }
+        }
+        function removeProbe(uid) {
+          try {
+            localStorage.removeItem(PROBE_PREFIX + uid);
+          } catch (e) {}
+        }
+        // Pick one frame URL belonging to `uid` (to use as that study's probe).
+        function firstUrlForStudy(urls, uid) {
+          for (var i = 0; i < urls.length; i++) {
+            if (studyUidFromUrl(urls[i]) === uid) {
+              return urls[i];
+            }
+          }
+          return urls[0] || '';
+        }
+        // Is this study still cached? Exact match on its probe — no cache.keys().
+        // If the probe is gone (evicted), drop the flag+probe so the dot turns OFF.
+        async function isStudyCached(uid) {
+          var probe = getProbe(uid);
+          if (!probe) {
+            // No probe (prefetched before this version) → fall back to the flag.
+            return flagTs(uid) > 0;
+          }
+          try {
+            var cache = await caches.open(CACHE_NAME);
+            var hit = await cache.match(probe);
+            if (!hit) {
+              removeFlag(uid);
+              removeProbe(uid);
+            }
+            return !!hit;
+          } catch (e) {
+            // Unexpected match failure → don't demote a known-prefetched study.
+            return flagTs(uid) > 0;
+          }
+        }
+
         // ---- cache introspection + LRU cap ------------------------------------
         // The StudyInstanceUID is embedded in every WADO-RS frame URL as
         // /studies/{uid}/… so the cache itself is the source of truth for which
@@ -101,6 +159,12 @@
           var m = /\/studies\/([^/?#]+)/.exec(url || '');
           return m ? m[1] : null;
         }
+        // DEPRECATED / UNUSED: listCachedStudyUids + reconcileAndEnforceCap below
+        // enumerate the WHOLE cache with cache.keys(), which throws "Operation too
+        // large" once the cache holds tens of thousands of frames — that was the
+        // bug that made the "prefetched" dot flip OFF. Detection now uses the
+        // scan-free probe approach (isStudyCached) instead. Kept only for reference;
+        // do NOT call these on any live path.
         async function listCachedStudyUids() {
           var set = new Set();
           try {
@@ -116,6 +180,9 @@
           return set;
         }
         async function deleteStudyFromCache(uid) {
+          // Best-effort frame delete. On a very large cache cache.keys() may throw
+          // "Operation too large" and the frames just age out instead — but the dot
+          // turns OFF immediately because we always drop the flag + probe below.
           try {
             var cache = await caches.open(CACHE_NAME);
             var reqs = await cache.keys();
@@ -126,6 +193,7 @@
             }
           } catch (e) {}
           removeFlag(uid);
+          removeProbe(uid);
         }
         // Reconcile the store-time flags with the REAL cache, then enforce the
         // MAX_STUDIES cap by evicting the oldest-stored studies. Returns the Set
@@ -282,7 +350,11 @@
         }
 
         // ---- prefetch one CASE (primary study + priors) ------------------------
-        async function prefetchCase(requestId, studyUID, priorUIDs) {
+        // Split into "enumerate" (cheap QIDO — list every frame URL) and "download"
+        // (the heavy part), so a whole batch can be enumerated FIRST. The LMS then
+        // knows the total frame count up-front and shows a smooth, honest ETA instead
+        // of guessing the sizes of the studies that haven't started yet.
+        async function enumerateCase(studyUID, priorUIDs) {
           var uids = [studyUID].concat(priorUIDs || []).filter(Boolean);
           var allUrls = [];
           try {
@@ -291,9 +363,15 @@
               allUrls = allUrls.concat(urls);
             }
           } catch (e) {
-            postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: false, error: (e && e.message) || 'enumerate failed' });
-            return;
+            return { studyUID: studyUID, uids: uids, urls: null, error: (e && e.message) || 'enumerate failed' };
           }
+          return { studyUID: studyUID, uids: uids, urls: allUrls };
+        }
+
+        async function downloadCase(requestId, job) {
+          var studyUID = job.studyUID;
+          var uids = job.uids;
+          var allUrls = job.urls || [];
           var total = allUrls.length;
           var done = 0;
           var failed = 0;
@@ -309,13 +387,14 @@
           });
 
           if (failed === 0 && total > 0) {
-            // Stamp every study in the case (primary + priors) as most-recently
-            // stored, then enforce the cap — prefetching the 21st study evicts
-            // the oldest. Done AFTER caching so the fresh study is never evicted.
+            // Stamp every study in the case (primary + priors) as prefetched, and
+            // remember ONE of its frame URLs as a "probe" so later STATUS checks can
+            // confirm it's still cached with a fast exact cache.match — never
+            // cache.keys() (which throws "Operation too large" on big caches).
             uids.forEach(function (u) {
               markPrefetched(u);
+              setProbe(u, firstUrlForStudy(allUrls, u));
             });
-            await reconcileAndEnforceCap();
             postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: true });
           } else {
             postToParent({
@@ -332,13 +411,15 @@
         var busy = false;
         async function handleCommand(cmd) {
           if (cmd.type === 'STATUS') {
-            // Truth = the real cache contents (reconciled + capped), so a case
-            // opened via View shows as prefetched too, and the cap is enforced.
-            var presentStatus = await reconcileAndEnforceCap();
+            // Per-study exact lookup (scan-free): confirm each requested study by
+            // matching its probe frame URL. Works no matter how big the cache is —
+            // unlike cache.keys(), which throws "Operation too large" once the cache
+            // holds tens of thousands of frames and made the dot wrongly flip OFF.
             var map = {};
-            (cmd.studyUIDs || []).forEach(function (uid) {
-              map[uid] = presentStatus.has(uid);
-            });
+            var sUids = cmd.studyUIDs || [];
+            for (var si = 0; si < sUids.length; si++) {
+              map[sUids[si]] = await isStudyCached(sUids[si]);
+            }
             postToParent({ type: 'STATUS_RESULT', requestId: cmd.requestId, statusMap: map });
             return;
           }
@@ -351,14 +432,17 @@
                 await deleteStudyFromCache(clearUids[ci]);
               }
             } else {
-              // Full clear: whole cache + all flags.
+              // Full clear: whole cache + all flags + all probes.
               try {
                 await caches.delete(CACHE_NAME);
               } catch (e) {}
               try {
                 for (var i = localStorage.length - 1; i >= 0; i--) {
                   var key = localStorage.key(i);
-                  if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                  if (
+                    key &&
+                    (key.indexOf(FLAG_PREFIX) === 0 || key.indexOf(PROBE_PREFIX) === 0)
+                  ) {
                     localStorage.removeItem(key);
                   }
                 }
@@ -386,8 +470,25 @@
                 return;
               }
               var studies = cmd.studies || [];
+              // Phase 1 — enumerate EVERY case first and announce its frame total
+              // (done:0, total:N). The LMS learns the whole batch size up-front, so the
+              // ETA is based on real numbers from the start, not a running guess.
+              var jobs = [];
               for (var s = 0; s < studies.length; s++) {
-                await prefetchCase(cmd.requestId, studies[s].studyUID, studies[s].priorUIDs);
+                var job = await enumerateCase(studies[s].studyUID, studies[s].priorUIDs);
+                jobs.push(job);
+                if (job.urls) {
+                  postToParent({ type: 'PROGRESS', requestId: cmd.requestId, studyUID: job.studyUID, done: 0, total: job.urls.length });
+                } else {
+                  // Enumeration failed → report this case done-with-error now and skip it below.
+                  postToParent({ type: 'DONE', requestId: cmd.requestId, studyUID: job.studyUID, ok: false, error: job.error });
+                }
+              }
+              // Phase 2 — download the frames, case by case.
+              for (var d = 0; d < jobs.length; d++) {
+                if (jobs[d].urls) {
+                  await downloadCase(cmd.requestId, jobs[d]);
+                }
               }
             } finally {
               busy = false;

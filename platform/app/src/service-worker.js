@@ -31,15 +31,26 @@ workbox.core.clientsClaim();
 const DICOM_CACHE = 'biedx-dicom-prefetch';
 // Prefetched instances auto-expire 2 days after they were cached (per-entry age).
 const CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60; // 2 days
-// Keep at most this many DISTINCT studies in the cache (count cap, independent
-// of the age cap above). Enforced HERE in the SW — not just in the curriculum's
-// prefetch bridge — because every cache write (prefetch AND opening a case in
-// the viewer) flows through this route, so the cap holds no matter how a study
-// got cached.
+// DEPRECATED cap: the per-study count cap (enforceStudyCap below) scanned the
+// WHOLE cache with cache.keys(), which throws "Operation too large" once the
+// cache holds tens of thousands of frames — so it silently stopped enforcing
+// anything on big caches. Replaced by the scan-free ExpirationPlugin maxEntries
+// cap below. Kept only so the (now-unused) enforceStudyCap still references it.
 const MAX_STUDIES = 10;
 
+// Scan-free size cap. Workbox's ExpirationPlugin tracks entry ages in IndexedDB
+// (NOT cache.keys()), so it bounds the cache no matter how big it gets. When the
+// cache exceeds this many entries it drops the OLDEST ones; because a study's
+// frames are all written together, the oldest STUDY's frames age out as a group.
+// ~25k frames ≈ a few GB / roughly 10-15 studies on typical cases — tune freely.
+const MAX_CACHE_ENTRIES = 25000;
+
 // ---------------------------------------------------------------------------
-// Study-count cap
+// Study-count cap — DEPRECATED / DEAD CODE (not wired into dicomPlugins).
+// enforceStudyCap + studyCapPlugin below use cache.keys(), which throws
+// "Operation too large" on big caches and silently stopped capping anything.
+// The scan-free ExpirationPlugin maxEntries (above) replaces it. Kept here only
+// for reference — do NOT add studyCapPlugin back to dicomPlugins.
 // ---------------------------------------------------------------------------
 function studyUidFromUrl(pathname) {
   const m = /\/studies\/([^/?#]+)/.exec(pathname || '');
@@ -139,9 +150,13 @@ const cacheableResponsePlugin = new workbox.cacheableResponse.CacheableResponseP
 // quota error should fail just that one write, not destroy every cached study.
 const expirationPlugin = new workbox.expiration.ExpirationPlugin({
   maxAgeSeconds: CACHE_MAX_AGE_SECONDS,
+  maxEntries: MAX_CACHE_ENTRIES, // scan-free size cap (replaces enforceStudyCap)
   purgeOnQuotaError: false,
 });
-const dicomPlugins = [cacheableResponsePlugin, expirationPlugin, studyCapPlugin];
+// studyCapPlugin is intentionally NOT included: its enforceStudyCap used
+// cache.keys() (throws "Operation too large" on big caches). The scan-free
+// ExpirationPlugin maxEntries above now bounds the cache instead.
+const dicomPlugins = [cacheableResponsePlugin, expirationPlugin];
 
 // Normalize the cache KEY for per-instance resources by stripping the query
 // string. A prefetched frame is stored under its plain URL (`.../frames/1`) while
