@@ -42,10 +42,16 @@
         var FLAG_PREFIX = 'biedx-prefetched:';
         var CACHE_NAME = 'biedx-dicom-prefetch';
         var CONCURRENCY = 6;
-        // Cap on distinct studies kept in the cache. Prefetching a 21st study
-        // (or opening one past the cap in the viewer) evicts the oldest-stored
-        // study's frames — a large cache hangs the browser (5-6+ studies).
-        var MAX_STUDIES = 20;
+        // ── Prefetch cache caps ────────────────────────────────────────────────
+        // Whichever limit is hit first evicts the OLDEST whole study (never half a
+        // study). All three are enforced SCAN-FREE from the localStorage notes
+        // below — never cache.keys() (which throws "Operation too large" on a big
+        // cache). Frame count alone is a poor proxy for disk (MG = few HUGE frames,
+        // MR = many small frames), so the byte cap guards storage the frame cap
+        // can't, and the study cap guarantees "max 10 from a selection".
+        var MAX_STUDIES = 10; // keep at most this many prefetched studies
+        var MAX_FRAMES = 50000; // keep at most this many cached frames in total
+        var MAX_BYTES = 10 * 1024 * 1024 * 1024; // keep total storage under 10 GB
 
         var params = new URLSearchParams(location.search);
         // Only accept/reply to the LMS origin that embedded us.
@@ -119,6 +125,39 @@
             localStorage.removeItem(PROBE_PREFIX + uid);
           } catch (e) {}
         }
+
+        // ---- per-study FRAME COUNT (scan-free total-frames accounting) ---------
+        // Remember how many frames each prefetched study has, so the frame cap can
+        // sum the whole cache's frame count from localStorage — never a cache scan.
+        var FRAMES_PREFIX = 'biedx-prefetch-frames:';
+        function setFrameCount(uid, n) {
+          try {
+            localStorage.setItem(FRAMES_PREFIX + uid, String(n | 0));
+          } catch (e) {}
+        }
+        function getFrameCount(uid) {
+          try {
+            var v = localStorage.getItem(FRAMES_PREFIX + uid);
+            return v ? parseInt(v, 10) || 0 : 0;
+          } catch (e) {
+            return 0;
+          }
+        }
+        function removeFrameCount(uid) {
+          try {
+            localStorage.removeItem(FRAMES_PREFIX + uid);
+          } catch (e) {}
+        }
+        // Count how many of `urls` belong to study `uid`.
+        function countUrlsForStudy(urls, uid) {
+          var n = 0;
+          for (var i = 0; i < urls.length; i++) {
+            if (studyUidFromUrl(urls[i]) === uid) {
+              n++;
+            }
+          }
+          return n;
+        }
         // Pick one frame URL belonging to `uid` (to use as that study's probe).
         function firstUrlForStudy(urls, uid) {
           for (var i = 0; i < urls.length; i++) {
@@ -180,20 +219,28 @@
           return set;
         }
         async function deleteStudyFromCache(uid) {
-          // Best-effort frame delete. On a very large cache cache.keys() may throw
-          // "Operation too large" and the frames just age out instead — but the dot
-          // turns OFF immediately because we always drop the flag + probe below.
+          // Scan-free whole-study delete: re-list ONLY this study's frame URLs
+          // (cheap QIDO) and delete each exact key — never cache.keys() (which
+          // throws "Operation too large" on a big cache). Frames are stored under
+          // their plain (query-stripped) URL, which is exactly what
+          // enumerateFrameUrls returns, so each delete matches. If the re-list
+          // fails (offline), the frames are left to age out / be caught by the SW
+          // backstop, but we still drop the flag + probe + count below so the dot
+          // turns OFF and the cap accounting stays correct.
           try {
             var cache = await caches.open(CACHE_NAME);
-            var reqs = await cache.keys();
-            for (var i = 0; i < reqs.length; i++) {
-              if (studyUidFromUrl(reqs[i].url) === uid) {
-                await cache.delete(reqs[i]);
-              }
+            var urls = await enumerateFrameUrls(uid);
+            for (var i = 0; i < urls.length; i++) {
+              await cache.delete(urls[i]);
+            }
+            var probe = getProbe(uid);
+            if (probe) {
+              await cache.delete(probe);
             }
           } catch (e) {}
           removeFlag(uid);
           removeProbe(uid);
+          removeFrameCount(uid);
         }
         // Reconcile the store-time flags with the REAL cache, then enforce the
         // MAX_STUDIES cap by evicting the oldest-stored studies. Returns the Set
@@ -235,6 +282,66 @@
             }
           }
           return present;
+        }
+
+        // ---- cap enforcement (scan-free) --------------------------------------
+        // Every prefetched study, OLDEST-cached first, with its frame count — read
+        // entirely from the localStorage notes (no cache scan). `ts` is the cache
+        // time (markPrefetched restamps on re-prefetch, so the newest study always
+        // sorts last and is never the eviction victim).
+        function listPrefetchedStudies() {
+          var out = [];
+          try {
+            for (var i = 0; i < localStorage.length; i++) {
+              var key = localStorage.key(i);
+              if (key && key.indexOf(FLAG_PREFIX) === 0) {
+                var uid = key.slice(FLAG_PREFIX.length);
+                out.push({ uid: uid, ts: flagTs(uid), frames: getFrameCount(uid) });
+              }
+            }
+          } catch (e) {}
+          out.sort(function (a, b) {
+            return a.ts - b.ts; // oldest first
+          });
+          return out;
+        }
+        // Enforce the three caps by evicting the OLDEST whole study until all hold.
+        // Order: study-count → total-frames → storage-bytes. The frame/byte caps
+        // never evict the LAST remaining study, so a single huge study the user
+        // just asked for is always kept. Runs after each case is prefetched.
+        async function enforceCaps() {
+          var studies = listPrefetchedStudies();
+          // 1) study-count cap — "max 10 from a selection".
+          while (studies.length > MAX_STUDIES) {
+            var v1 = studies.shift();
+            await deleteStudyFromCache(v1.uid);
+          }
+          // 2) total-frame cap.
+          var totalFrames = 0;
+          for (var i = 0; i < studies.length; i++) {
+            totalFrames += studies[i].frames;
+          }
+          while (totalFrames > MAX_FRAMES && studies.length > 1) {
+            var v2 = studies.shift();
+            totalFrames -= v2.frames;
+            await deleteStudyFromCache(v2.uid);
+          }
+          // 3) storage-byte cap. usage is origin-wide, but the prefetch cache is
+          // by far the largest consumer on the viewer origin, so this reliably
+          // keeps total storage under MAX_BYTES (the guard the frame cap can't give
+          // for few-but-huge MG frames).
+          try {
+            if (navigator.storage && navigator.storage.estimate) {
+              var est = await navigator.storage.estimate();
+              var usage = (est && est.usage) || 0;
+              while (usage > MAX_BYTES && studies.length > 1) {
+                var v3 = studies.shift();
+                await deleteStudyFromCache(v3.uid);
+                est = await navigator.storage.estimate();
+                usage = (est && est.usage) || 0;
+              }
+            }
+          } catch (e) {}
         }
 
         // ---- QIDO/WADO helpers -------------------------------------------------
@@ -394,6 +501,7 @@
             uids.forEach(function (u) {
               markPrefetched(u);
               setProbe(u, firstUrlForStudy(allUrls, u));
+              setFrameCount(u, countUrlsForStudy(allUrls, u));
             });
             postToParent({ type: 'DONE', requestId: requestId, studyUID: studyUID, ok: true });
           } else {
@@ -441,7 +549,9 @@
                   var key = localStorage.key(i);
                   if (
                     key &&
-                    (key.indexOf(FLAG_PREFIX) === 0 || key.indexOf(PROBE_PREFIX) === 0)
+                    (key.indexOf(FLAG_PREFIX) === 0 ||
+                      key.indexOf(PROBE_PREFIX) === 0 ||
+                      key.indexOf(FRAMES_PREFIX) === 0)
                   ) {
                     localStorage.removeItem(key);
                   }
@@ -484,10 +594,14 @@
                   postToParent({ type: 'DONE', requestId: cmd.requestId, studyUID: job.studyUID, ok: false, error: job.error });
                 }
               }
-              // Phase 2 — download the frames, case by case.
+              // Phase 2 — download the frames, case by case. After each case,
+              // enforce the cache caps (evict the oldest WHOLE study if over the
+              // study / frame / byte limit) so the cache never rides a ceiling
+              // mid-batch and studies are never split.
               for (var d = 0; d < jobs.length; d++) {
                 if (jobs[d].urls) {
                   await downloadCase(cmd.requestId, jobs[d]);
+                  await enforceCaps();
                 }
               }
             } finally {
