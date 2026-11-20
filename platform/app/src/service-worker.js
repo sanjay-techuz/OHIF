@@ -38,12 +38,16 @@ const CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60; // 2 days
 // cap below. Kept only so the (now-unused) enforceStudyCap still references it.
 const MAX_STUDIES = 10;
 
-// Scan-free size cap. Workbox's ExpirationPlugin tracks entry ages in IndexedDB
-// (NOT cache.keys()), so it bounds the cache no matter how big it gets. When the
-// cache exceeds this many entries it drops the OLDEST ones; because a study's
-// frames are all written together, the oldest STUDY's frames age out as a group.
-// ~25k frames ≈ a few GB / roughly 10-15 studies on typical cases — tune freely.
-const MAX_CACHE_ENTRIES = 25000;
+// Scan-free HARD BACKSTOP on cache size. Workbox's ExpirationPlugin tracks entry
+// ages in IndexedDB (NOT cache.keys()), so it bounds the cache no matter how big
+// it gets, dropping the OLDEST entries first. This is ONLY a runaway-growth safety
+// net: the REAL caps (max 10 studies, max 50,000 frames, max 10 GB) are enforced
+// per-WHOLE-study by the prefetch bridge (prefetch-bridge.html). This number is
+// kept deliberately ABOVE the bridge's 50,000-frame cap so it never trims a frame
+// mid-prefetch (which would split a study); it only fires if the bridge ever fails
+// to run. Entry-count is a poor proxy for disk, so the bridge's 10 GB byte cap is
+// the true storage guard — this just stops the cache from growing without bound.
+const MAX_CACHE_ENTRIES = 65000;
 
 // ---------------------------------------------------------------------------
 // Study-count cap — DEPRECATED / DEAD CODE (not wired into dicomPlugins).
